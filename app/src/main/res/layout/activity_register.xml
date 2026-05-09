@@ -1,0 +1,728 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/activityRegister"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    tools:context=".activities.RegisterActivity">
+
+    <ScrollView
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingTop="20dp"
+                android:paddingBottom="18dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="84dp"
+                    android:layout_height="84dp"
+                    app:cardBackgroundColor="#FFFFFF"
+                    app:cardCornerRadius="26dp"
+                    app:cardElevation="6dp">
+
+
+                    <ImageView
+                        android:id="@+id/imageView"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:srcCompat="@drawable/cnsc_logo" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Create Account"
+                    android:textColor="#313131"
+                    android:textSize="28sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:alpha="0.75"
+                    android:gravity="center"
+                    android:text="Register your CNSC FacilityHub account"
+                    android:textColor="#313131"
+                    android:textSize="15sp" />
+            </LinearLayout>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="26dp"
+                app:cardElevation="8dp"
+                app:strokeColor="#970705"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="24dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Account Information"
+                        android:textColor="#313131"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilFullName"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="22dp"
+                        android:hint="Full Name"
+                        app:boxBackgroundColor="#FFFFFF"
+                        app:boxCornerRadiusBottomEnd="18dp"
+                        app:boxCornerRadiusBottomStart="18dp"
+                        app:boxCornerRadiusTopEnd="18dp"
+                        app:boxCornerRadiusTopStart="18dp"
+                        app:boxStrokeColor="#313131"
+                        app:hintTextColor="#313131"
+                        app:startIconDrawable="@android:drawable/ic_menu_myplaces"
+                        app:startIconTint="#970705">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etFullName"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPersonName"
+                            android:paddingTop="16dp"
+                            android:paddingBottom="16dp"
+                            android:textColor="#313131"
+                            android:textColorHint="#313131" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilContactNumber"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:hint="Contact Number"
+                        app:boxBackgroundColor="#FFFFFF"
+                        app:boxCornerRadiusBottomEnd="18dp"
+                        app:boxCornerRadiusBottomStart="18dp"
+                        app:boxCornerRadiusTopEnd="18dp"
+                        app:boxCornerRadiusTopStart="18dp"
+                        app:boxStrokeColor="#313131"
+                        app:hintTextColor="#313131"
+                        app:startIconDrawable="@android:drawable/ic_menu_call"
+                        app:startIconTint="#970705">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etContactNumber"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="phone"
+                            android:maxLength="15"
+                            android:paddingTop="16dp"
+                            android:paddingBottom="16dp"
+                            android:textColor="#313131"
+                            android:textColorHint="#313131" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilCollegeDepartmentAgency"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:hint="College / Department / Agency"
+                        app:boxBackgroundColor="#FFFFFF"
+                        app:boxCornerRadiusBottomEnd="18dp"
+                        app:boxCornerRadiusBottomStart="18dp"
+                        app:boxCornerRadiusTopEnd="18dp"
+                        app:boxCornerRadiusTopStart="18dp"
+                        app:boxStrokeColor="#313131"
+                        app:hintTextColor="#313131"
+                        app:startIconDrawable="@android:drawable/ic_menu_info_details"
+                        app:startIconTint="#970705">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etCollegeDepartmentAgency"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textCapWords"
+                            android:paddingTop="16dp"
+                            android:paddingBottom="16dp"
+                            android:textColor="#313131"
+                            android:textColorHint="#313131" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilOfficeCourse"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:hint="Office / Course"
+                        app:boxBackgroundColor="#FFFFFF"
+                        app:boxCornerRadiusBottomEnd="18dp"
+                        app:boxCornerRadiusBottomStart="18dp"
+                        app:boxCornerRadiusTopEnd="18dp"
+                        app:boxCornerRadiusTopStart="18dp"
+                        app:boxStrokeColor="#313131"
+                        app:hintTextColor="#313131"
+                        app:startIconDrawable="@android:drawable/ic_menu_edit"
+                        app:startIconTint="#970705">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etOfficeCourse"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textCapWords"
+                            android:paddingTop="16dp"
+                            android:paddingBottom="16dp"
+                            android:textColor="#313131"
+                            android:textColorHint="#313131" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilEmail"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:hint="Email Address"
+                        app:boxBackgroundColor="#FFFFFF"
+                        app:boxCornerRadiusBottomEnd="18dp"
+                        app:boxCornerRadiusBottomStart="18dp"
+                        app:boxCornerRadiusTopEnd="18dp"
+                        app:boxCornerRadiusTopStart="18dp"
+                        app:boxStrokeColor="#313131"
+                        app:hintTextColor="#313131"
+                        app:startIconDrawable="@android:drawable/ic_dialog_email"
+                        app:startIconTint="#970705">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etEmail"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textEmailAddress"
+                            android:paddingTop="16dp"
+                            android:paddingBottom="16dp"
+                            android:textColor="#313131"
+                            android:textColorHint="#313131" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilPassword"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:hint="Password"
+                        app:boxBackgroundColor="#FFFFFF"
+                        app:boxCornerRadiusBottomEnd="18dp"
+                        app:boxCornerRadiusBottomStart="18dp"
+                        app:boxCornerRadiusTopEnd="18dp"
+                        app:boxCornerRadiusTopStart="18dp"
+                        app:boxStrokeColor="#313131"
+                        app:endIconMode="password_toggle"
+                        app:endIconTint="#970705"
+                        app:hintTextColor="#313131"
+                        app:startIconDrawable="@android:drawable/ic_lock_lock"
+                        app:startIconTint="#970705">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etPassword"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPassword"
+                            android:paddingTop="16dp"
+                            android:paddingBottom="16dp"
+                            android:textColor="#313131"
+                            android:textColorHint="#313131" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilConfirmPassword"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:hint="Confirm Password"
+                        app:boxBackgroundColor="#FFFFFF"
+                        app:boxCornerRadiusBottomEnd="18dp"
+                        app:boxCornerRadiusBottomStart="18dp"
+                        app:boxCornerRadiusTopEnd="18dp"
+                        app:boxCornerRadiusTopStart="18dp"
+                        app:boxStrokeColor="#313131"
+                        app:endIconMode="password_toggle"
+                        app:endIconTint="#970705"
+                        app:hintTextColor="#313131"
+                        app:startIconDrawable="@android:drawable/ic_lock_lock"
+                        app:startIconTint="#970705">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etConfirmPassword"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPassword"
+                            android:paddingTop="16dp"
+                            android:paddingBottom="16dp"
+                            android:textColor="#313131"
+                            android:textColorHint="#313131" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnRegister"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginTop="18dp"
+                        android:text="Create Account"
+                        android:textAllCaps="false"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        app:backgroundTint="#970705"
+                        app:cornerRadius="18dp"
+                        app:elevation="0dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:gravity="center"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:alpha="0.75"
+                            android:text="Already have an account?"
+                            android:textColor="#313131"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tvSignIn"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="Log In"
+                            android:textColor="#970705"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+
+        </LinearLayout>
+    </ScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+
+
+    <!--                    <TextView-->
+    <!--                        android:layout_width="wrap_content"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:layout_marginTop="6dp"-->
+    <!--                        android:alpha="0.75"-->
+    <!--                        android:text="Use your issued school ID and complete the details below"-->
+    <!--                        android:textColor="#313131"-->
+    <!--                        android:textSize="14sp" />-->
+
+    <!--                    <TextView-->
+    <!--                        android:layout_width="wrap_content"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:layout_marginTop="20dp"-->
+    <!--                        android:text="User type"-->
+    <!--                        android:textColor="#313131"-->
+    <!--                        android:textSize="14sp"-->
+    <!--                        android:textStyle="bold" />-->
+
+    <!--                    <com.google.android.material.chip.ChipGroup-->
+    <!--                        android:layout_width="match_parent"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:layout_marginTop="10dp"-->
+    <!--                        app:selectionRequired="true"-->
+    <!--                        app:singleSelection="true">-->
+
+    <!--                        <com.google.android.material.chip.Chip-->
+    <!--                            android:id="@+id/chipStudent"-->
+    <!--                            style="@style/Widget.Material3.Chip.Filter"-->
+    <!--                            android:layout_width="wrap_content"-->
+    <!--                            android:layout_height="wrap_content"-->
+    <!--                            android:text="Student"-->
+    <!--                            android:textColor="#313131"-->
+    <!--                            app:checkedIconVisible="false"-->
+    <!--                            app:chipBackgroundColor="#FFFFFF"-->
+    <!--                            app:chipCornerRadius="18dp"-->
+    <!--                            app:chipStrokeColor="#313131"-->
+    <!--                            app:chipStrokeWidth="1dp" />-->
+
+    <!--                        <com.google.android.material.chip.Chip-->
+    <!--                            android:id="@+id/chipFaculty"-->
+    <!--                            style="@style/Widget.Material3.Chip.Filter"-->
+    <!--                            android:layout_width="wrap_content"-->
+    <!--                            android:layout_height="wrap_content"-->
+    <!--                            android:text="Faculty"-->
+    <!--                            android:textColor="#313131"-->
+    <!--                            app:checkedIconVisible="false"-->
+    <!--                            app:chipBackgroundColor="#FFFFFF"-->
+    <!--                            app:chipCornerRadius="18dp"-->
+    <!--                            app:chipStrokeColor="#313131"-->
+    <!--                            app:chipStrokeWidth="1dp" />-->
+
+    <!--                        <com.google.android.material.chip.Chip-->
+    <!--                            android:id="@+id/chipAdmin"-->
+    <!--                            style="@style/Widget.Material3.Chip.Filter"-->
+    <!--                            android:layout_width="wrap_content"-->
+    <!--                            android:layout_height="wrap_content"-->
+    <!--                            android:text="Visitor"-->
+    <!--                            android:textColor="#313131"-->
+    <!--                            app:checkedIconVisible="false"-->
+    <!--                            app:chipBackgroundColor="#FFFFFF"-->
+    <!--                            app:chipCornerRadius="18dp"-->
+    <!--                            app:chipStrokeColor="#313131"-->
+    <!--                            app:chipStrokeWidth="1dp" />-->
+    <!--                    </com.google.android.material.chip.ChipGroup>-->
+
+    <!--<?xml version="1.0" encoding="utf-8"?>-->
+    <!--<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"-->
+    <!--    xmlns:app="http://schemas.android.com/apk/res-auto"-->
+    <!--    xmlns:tools="http://schemas.android.com/tools"-->
+    <!--    android:id="@+id/registerAct"-->
+    <!--    android:layout_width="match_parent"-->
+    <!--    android:layout_height="match_parent"-->
+    <!--    android:background="#FFFFFF"-->
+    <!--    tools:context=".RegisterActivity">-->
+
+    <!--    <ScrollView-->
+    <!--        android:layout_width="0dp"-->
+    <!--        android:layout_height="0dp"-->
+    <!--        android:fillViewport="true"-->
+    <!--        app:layout_constraintTop_toTopOf="parent"-->
+    <!--        app:layout_constraintBottom_toBottomOf="parent"-->
+    <!--        app:layout_constraintStart_toStartOf="parent"-->
+    <!--        app:layout_constraintEnd_toEndOf="parent">-->
+
+    <!--        <LinearLayout-->
+    <!--            android:layout_width="match_parent"-->
+    <!--            android:layout_height="wrap_content"-->
+    <!--            android:orientation="vertical"-->
+    <!--            android:padding="24dp">-->
+
+    <!--            <LinearLayout-->
+    <!--                android:layout_width="match_parent"-->
+    <!--                android:layout_height="wrap_content"-->
+    <!--                android:gravity="center_horizontal"-->
+    <!--                android:orientation="vertical"-->
+    <!--                android:paddingTop="20dp"-->
+    <!--                android:paddingBottom="18dp">-->
+
+    <!--                <com.google.android.material.card.MaterialCardView-->
+    <!--                    android:layout_width="84dp"-->
+    <!--                    android:layout_height="84dp"-->
+    <!--                    app:cardBackgroundColor="#ffffff"-->
+    <!--                    app:cardCornerRadius="26dp"-->
+    <!--                    app:cardElevation="6dp">-->
+
+    <!--                    <ImageView-->
+    <!--                        android:id="@+id/imageView3"-->
+    <!--                        android:layout_width="wrap_content"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        app:srcCompat="@drawable/images" />-->
+    <!--                </com.google.android.material.card.MaterialCardView>-->
+
+    <!--                <TextView-->
+    <!--                    android:layout_width="wrap_content"-->
+    <!--                    android:layout_height="wrap_content"-->
+    <!--                    android:layout_marginTop="16dp"-->
+    <!--                    android:text="Create Account"-->
+    <!--                    android:textColor="#313131"-->
+    <!--                    android:textSize="28sp"-->
+    <!--                    android:textStyle="bold" />-->
+
+    <!--                <TextView-->
+    <!--                    android:layout_width="wrap_content"-->
+    <!--                    android:layout_height="wrap_content"-->
+    <!--                    android:layout_marginTop="6dp"-->
+    <!--                    android:gravity="center"-->
+    <!--                    android:text="Register your CNSC FacilityHub account"-->
+    <!--                    android:textColor="#313131"-->
+    <!--                    android:alpha="0.75"-->
+    <!--                    android:textSize="15sp" />-->
+    <!--            </LinearLayout>-->
+
+    <!--            <com.google.android.material.card.MaterialCardView-->
+    <!--                android:layout_width="match_parent"-->
+    <!--                android:layout_height="wrap_content"-->
+    <!--                app:cardBackgroundColor="#FFFFFF"-->
+    <!--                app:cardCornerRadius="26dp"-->
+    <!--                app:cardElevation="8dp"-->
+    <!--                app:strokeColor="#970705"-->
+    <!--                app:strokeWidth="1dp">-->
+
+    <!--                <LinearLayout-->
+    <!--                    android:layout_width="match_parent"-->
+    <!--                    android:layout_height="wrap_content"-->
+    <!--                    android:orientation="vertical"-->
+    <!--                    android:padding="24dp">-->
+
+    <!--                    <TextView-->
+    <!--                        android:layout_width="wrap_content"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:text="Account Information"-->
+    <!--                        android:textColor="#313131"-->
+    <!--                        android:textSize="22sp"-->
+    <!--                        android:textStyle="bold" />-->
+
+    <!--                    <TextView-->
+    <!--                        android:layout_width="wrap_content"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:layout_marginTop="6dp"-->
+    <!--                        android:text="Use your issued school ID and complete the details below"-->
+    <!--                        android:textColor="#313131"-->
+    <!--                        android:alpha="0.75"-->
+    <!--                        android:textSize="14sp" />-->
+
+    <!--                    <TextView-->
+    <!--                        android:layout_width="wrap_content"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:layout_marginTop="20dp"-->
+    <!--                        android:text="User type"-->
+    <!--                        android:textColor="#313131"-->
+    <!--                        android:textSize="14sp"-->
+    <!--                        android:textStyle="bold" />-->
+
+    <!--                    <com.google.android.material.chip.ChipGroup-->
+    <!--                        android:layout_width="match_parent"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:layout_marginTop="10dp"-->
+    <!--                        app:selectionRequired="true"-->
+    <!--                        app:singleSelection="true">-->
+
+    <!--                        <com.google.android.material.chip.Chip-->
+    <!--                            android:id="@+id/chipStudent"-->
+    <!--                            style="@style/Widget.Material3.Chip.Filter"-->
+    <!--                            android:layout_width="wrap_content"-->
+    <!--                            android:layout_height="wrap_content"-->
+
+    <!--                            android:text="Student"-->
+    <!--                            android:textColor="#313131"-->
+    <!--                            app:checkedIconVisible="false"-->
+    <!--                            app:chipBackgroundColor="#FFFFFF"-->
+    <!--                            app:chipCornerRadius="18dp"-->
+
+    <!--                            app:chipStrokeWidth="1dp" />-->
+
+    <!--                        &lt;!&ndash;android:checked="true"-->
+    <!--                        app:chipStrokeColor="#970705"&ndash;&gt;-->
+    <!--                        <com.google.android.material.chip.Chip-->
+    <!--                            android:id="@+id/chipFaculty"-->
+    <!--                            style="@style/Widget.Material3.Chip.Filter"-->
+    <!--                            android:layout_width="wrap_content"-->
+    <!--                            android:layout_height="wrap_content"-->
+    <!--                            android:text="Faculty"-->
+    <!--                            android:textColor="#313131"-->
+    <!--                            app:checkedIconVisible="false"-->
+    <!--                            app:chipBackgroundColor="#FFFFFF"-->
+    <!--                            app:chipCornerRadius="18dp"-->
+    <!--                            app:chipStrokeColor="#313131"-->
+    <!--                            app:chipStrokeWidth="1dp" />-->
+
+    <!--                        <com.google.android.material.chip.Chip-->
+    <!--                            android:id="@+id/chipAdmin"-->
+    <!--                            style="@style/Widget.Material3.Chip.Filter"-->
+    <!--                            android:layout_width="wrap_content"-->
+    <!--                            android:layout_height="wrap_content"-->
+    <!--                            android:text="Visitor"-->
+    <!--                            android:textColor="#313131"-->
+    <!--                            app:checkedIconVisible="false"-->
+    <!--                            app:chipBackgroundColor="#FFFFFF"-->
+    <!--                            app:chipCornerRadius="18dp"-->
+    <!--                            app:chipStrokeColor="#313131"-->
+    <!--                            app:chipStrokeWidth="1dp" />-->
+    <!--                    </com.google.android.material.chip.ChipGroup>-->
+
+    <!--                    <com.google.android.material.textfield.TextInputLayout-->
+    <!--                        android:id="@+id/tilFullName"-->
+    <!--                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"-->
+    <!--                        android:layout_width="match_parent"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:layout_marginTop="22dp"-->
+    <!--                        android:hint="Full Name"-->
+    <!--                        app:boxBackgroundColor="#FFFFFF"-->
+    <!--                        app:boxCornerRadiusBottomEnd="18dp"-->
+    <!--                        app:boxCornerRadiusBottomStart="18dp"-->
+    <!--                        app:boxCornerRadiusTopEnd="18dp"-->
+    <!--                        app:boxCornerRadiusTopStart="18dp"-->
+    <!--                        app:boxStrokeColor="#313131"-->
+    <!--                        app:hintTextColor="#313131"-->
+    <!--                        app:startIconDrawable="@android:drawable/ic_menu_myplaces"-->
+    <!--                        app:startIconTint="#970705">-->
+
+    <!--                        <com.google.android.material.textfield.TextInputEditText-->
+    <!--                            android:id="@+id/etFullName"-->
+    <!--                            android:layout_width="match_parent"-->
+    <!--                            android:layout_height="wrap_content"-->
+    <!--                            android:inputType="textPersonName"-->
+    <!--                            android:paddingTop="16dp"-->
+    <!--                            android:paddingBottom="16dp"-->
+    <!--                            android:textColor="#313131"-->
+    <!--                            android:textColorHint="#313131" />-->
+    <!--                    </com.google.android.material.textfield.TextInputLayout>-->
+
+    <!--                    <com.google.android.material.textfield.TextInputLayout-->
+    <!--                        android:id="@+id/tilEmail"-->
+    <!--                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"-->
+    <!--                        android:layout_width="match_parent"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:layout_marginTop="16dp"-->
+    <!--                        android:hint="Email Address"-->
+    <!--                        app:boxBackgroundColor="#FFFFFF"-->
+    <!--                        app:boxCornerRadiusBottomEnd="18dp"-->
+    <!--                        app:boxCornerRadiusBottomStart="18dp"-->
+    <!--                        app:boxCornerRadiusTopEnd="18dp"-->
+    <!--                        app:boxCornerRadiusTopStart="18dp"-->
+    <!--                        app:boxStrokeColor="#313131"-->
+    <!--                        app:hintTextColor="#313131"-->
+    <!--                        app:startIconDrawable="@android:drawable/ic_dialog_email"-->
+    <!--                        app:startIconTint="#970705">-->
+
+    <!--                        <com.google.android.material.textfield.TextInputEditText-->
+    <!--                            android:id="@+id/etEmail"-->
+    <!--                            android:layout_width="match_parent"-->
+    <!--                            android:layout_height="wrap_content"-->
+    <!--                            android:inputType="textEmailAddress"-->
+    <!--                            android:paddingTop="16dp"-->
+    <!--                            android:paddingBottom="16dp"-->
+    <!--                            android:textColor="#313131"-->
+    <!--                            android:textColorHint="#313131" />-->
+    <!--                    </com.google.android.material.textfield.TextInputLayout>-->
+
+    <!--                    <com.google.android.material.textfield.TextInputLayout-->
+    <!--                        android:id="@+id/tilPassword"-->
+    <!--                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"-->
+    <!--                        android:layout_width="match_parent"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:layout_marginTop="16dp"-->
+    <!--                        android:hint="Password"-->
+    <!--                        app:boxBackgroundColor="#FFFFFF"-->
+    <!--                        app:boxCornerRadiusBottomEnd="18dp"-->
+    <!--                        app:boxCornerRadiusBottomStart="18dp"-->
+    <!--                        app:boxCornerRadiusTopEnd="18dp"-->
+    <!--                        app:boxCornerRadiusTopStart="18dp"-->
+    <!--                        app:boxStrokeColor="#313131"-->
+    <!--                        app:endIconMode="password_toggle"-->
+    <!--                        app:endIconTint="#970705"-->
+    <!--                        app:hintTextColor="#313131"-->
+    <!--                        app:startIconDrawable="@android:drawable/ic_lock_lock"-->
+    <!--                        app:startIconTint="#970705">-->
+
+    <!--                        <com.google.android.material.textfield.TextInputEditText-->
+    <!--                            android:id="@+id/etPassword"-->
+    <!--                            android:layout_width="match_parent"-->
+    <!--                            android:layout_height="wrap_content"-->
+    <!--                            android:inputType="textPassword"-->
+    <!--                            android:paddingTop="16dp"-->
+    <!--                            android:paddingBottom="16dp"-->
+    <!--                            android:textColor="#313131"-->
+    <!--                            android:textColorHint="#313131" />-->
+    <!--                    </com.google.android.material.textfield.TextInputLayout>-->
+
+    <!--                    <com.google.android.material.textfield.TextInputLayout-->
+    <!--                        android:id="@+id/tilConfirmPassword"-->
+    <!--                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"-->
+    <!--                        android:layout_width="match_parent"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:layout_marginTop="16dp"-->
+    <!--                        android:hint="Confirm Password"-->
+    <!--                        app:boxBackgroundColor="#FFFFFF"-->
+    <!--                        app:boxCornerRadiusBottomEnd="18dp"-->
+    <!--                        app:boxCornerRadiusBottomStart="18dp"-->
+    <!--                        app:boxCornerRadiusTopEnd="18dp"-->
+    <!--                        app:boxCornerRadiusTopStart="18dp"-->
+    <!--                        app:boxStrokeColor="#313131"-->
+    <!--                        app:endIconMode="password_toggle"-->
+    <!--                        app:endIconTint="#970705"-->
+    <!--                        app:hintTextColor="#313131"-->
+    <!--                        app:startIconDrawable="@android:drawable/ic_lock_lock"-->
+    <!--                        app:startIconTint="#970705">-->
+
+    <!--                        <com.google.android.material.textfield.TextInputEditText-->
+    <!--                            android:id="@+id/etConfirmPassword"-->
+    <!--                            android:layout_width="match_parent"-->
+    <!--                            android:layout_height="wrap_content"-->
+    <!--                            android:inputType="textPassword"-->
+    <!--                            android:paddingTop="16dp"-->
+    <!--                            android:paddingBottom="16dp"-->
+    <!--                            android:textColor="#313131"-->
+    <!--                            android:textColorHint="#313131" />-->
+    <!--                    </com.google.android.material.textfield.TextInputLayout>-->
+
+    <!--                    <com.google.android.material.button.MaterialButton-->
+    <!--                        android:id="@+id/btnRegister"-->
+    <!--                        android:layout_width="match_parent"-->
+    <!--                        android:layout_height="56dp"-->
+    <!--                        android:layout_marginTop="18dp"-->
+    <!--                        android:text="Create Account"-->
+    <!--                        android:textAllCaps="false"-->
+    <!--                        android:textColor="#FFFFFF"-->
+    <!--                        android:textSize="16sp"-->
+    <!--                        android:textStyle="bold"-->
+    <!--                        app:backgroundTint="#970705"-->
+    <!--                        app:cornerRadius="18dp"-->
+    <!--                        app:elevation="0dp" />-->
+
+    <!--                    <LinearLayout-->
+    <!--                        android:layout_width="match_parent"-->
+    <!--                        android:layout_height="wrap_content"-->
+    <!--                        android:layout_marginTop="18dp"-->
+    <!--                        android:gravity="center"-->
+    <!--                        android:orientation="horizontal">-->
+
+    <!--                        <TextView-->
+    <!--                            android:layout_width="wrap_content"-->
+    <!--                            android:layout_height="wrap_content"-->
+    <!--                            android:text="Already have an account?"-->
+    <!--                            android:textColor="#313131"-->
+    <!--                            android:alpha="0.75"-->
+    <!--                            android:textSize="14sp" />-->
+
+    <!--                        <TextView-->
+    <!--                            android:id="@+id/tvSignIn"-->
+    <!--                            android:layout_width="wrap_content"-->
+    <!--                            android:layout_height="wrap_content"-->
+    <!--                            android:layout_marginStart="6dp"-->
+    <!--                            android:text="Log In"-->
+    <!--                            android:textColor="#970705"-->
+    <!--                            android:textSize="14sp"-->
+    <!--                            android:textStyle="bold" />-->
+    <!--                    </LinearLayout>-->
+    <!--                </LinearLayout>-->
+    <!--            </com.google.android.material.card.MaterialCardView>-->
+
+    <!--        </LinearLayout>-->
+    <!--    </ScrollView>-->
+
+    <!--</androidx.constraintlayout.widget.ConstraintLayout>-->

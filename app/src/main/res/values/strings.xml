@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">CNSCFacilityHubProject</string>
+    <string name="insert_btn_txt">Insert Data</string>
+    <string name="read_btn_txt">Read Database</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="change_password_tv">Change Password</string>
+</resources>

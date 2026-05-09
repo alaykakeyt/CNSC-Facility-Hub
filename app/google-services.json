@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "188059294840",
+    "project_id": "cnsc-facility-hub-6cf36",
+    "storage_bucket": "cnsc-facility-hub-6cf36.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:188059294840:android:629fa54ef48a3233efa18d",
+        "android_client_info": {
+          "package_name": "com.example.cnscfacilityhubproject"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDaHczjleZn0NsTIFXB0DKjUTnTCbexeN8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
