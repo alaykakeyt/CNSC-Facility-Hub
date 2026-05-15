@@ -98,6 +98,7 @@ public class RegisterActivity extends AppCompatActivity {
 
                                 // 🔥 Create user data map
                                 Map<String, Object> userMap = new HashMap<>();
+                                userMap.put("uid", userId);
                                 userMap.put("fullName", fullNameText);
                                 userMap.put("contactNum", contactNumText);
                                 userMap.put("department", colDeptAgencyText);
