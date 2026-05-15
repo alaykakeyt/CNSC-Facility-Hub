@@ -5,4 +5,6 @@
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="change_password_tv">Change Password</string>
+    <string name="splash_cnsc_text">Camarines Norte State College</string>
+    <string name="cnsc_splash_text2">CNSC Facility Hub</string>
 </resources>
