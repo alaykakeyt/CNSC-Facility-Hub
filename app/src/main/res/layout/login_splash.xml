@@ -82,37 +82,41 @@
 
         <Button
             android:id="@+id/button"
-            android:layout_width="match_parent"
+            android:layout_width="200dp"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
             android:backgroundTint="#970705"
-            android:text="General Services Office"
+            android:text="GSO"
             android:textSize="14sp"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/button2"
-            android:layout_width="match_parent"
+            android:layout_width="200dp"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
             android:backgroundTint="#970705"
-            android:text="Information Technology Services Office"
+            android:text="ITSO"
             android:textSize="14sp"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/button3"
-            android:layout_width="match_parent"
+            android:layout_width="200dp"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
             android:backgroundTint="#970705"
-            android:text="Student Activity Center"
+            android:text="SAC"
             android:textSize="14sp"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/button4"
-            android:layout_width="match_parent"
+            android:layout_width="200dp"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
             android:backgroundTint="#970705"
-            android:text="Requestor"
+            android:text="REQUESTOR"
             android:textSize="14sp"
             android:textStyle="bold" />
     </LinearLayout>

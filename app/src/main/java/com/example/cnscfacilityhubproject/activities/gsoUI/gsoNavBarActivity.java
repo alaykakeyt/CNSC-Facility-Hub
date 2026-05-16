@@ -27,17 +27,22 @@ public class gsoNavBarActivity extends AppCompatActivity {
     private TextView textHome, textRequests, textReports, textUsers, textProfile;
     private ImageView iconHome, iconRequests, iconReports, iconUsers, iconProfile;
 
+    private FirebaseAuth auth;
+    private FirebaseFirestore db;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_gso_nav_bar);
 
-        if (FirebaseAuth.getInstance().getCurrentUser() == null){
-            Toast.makeText(this, "No user is logged in", Toast.LENGTH_LONG).show();
+        auth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
 
-            startActivity(new Intent(gsoNavBarActivity.this, LoginActivity.class));
-            finish();
+        if (!ensureUserLoggedIn()) {
+            return;
         }
+
+        verifyUserRole("GSO");
 
         navHome = findViewById(R.id.navHome);
         navRequests = findViewById(R.id.navRequests);
@@ -84,8 +89,6 @@ public class gsoNavBarActivity extends AppCompatActivity {
 
         navProfile.setOnClickListener(v -> {
             loadFragment(new gsoProfileFragment());
-            Bundle bundle = new Bundle();
-
             setSelectedTab(Tab.PROFILE);
         });
     }
@@ -143,6 +146,58 @@ public class gsoNavBarActivity extends AppCompatActivity {
         iconUsers.setImageTintList(ColorStateList.valueOf(dark));
         iconProfile.setImageTintList(ColorStateList.valueOf(dark));
     }
+
+
+
+    private boolean ensureUserLoggedIn() {
+        if (auth.getCurrentUser() != null) {
+            return true;
+        }
+
+        redirectToLogin("Please log in first.");
+        return false;
+    }
+
+    private void verifyUserRole(String expectedRole) {
+        if (auth.getCurrentUser() == null) {
+            redirectToLogin("Please log in first.");
+            return;
+        }
+
+        db.collection("users")
+                .document(auth.getCurrentUser().getUid())
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+
+                    if (!documentSnapshot.exists()) {
+                        auth.signOut();
+                        redirectToLogin("User profile not found. Please contact the administrator.");
+                        return;
+                    }
+
+                    String userType = documentSnapshot.getString("userType");
+
+                    if (userType == null || !expectedRole.equalsIgnoreCase(userType.trim())) {
+                        auth.signOut();
+                        redirectToLogin("Access denied. Please log in with a " + expectedRole + " account.");
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    auth.signOut();
+                    redirectToLogin("Unable to verify user role.");
+                });
+    }
+
+    private void redirectToLogin(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+
+        startActivity(intent);
+        finish();
+    }
+
 
     private enum Tab {
         HOME, REQUESTS, REPORTS, USERS, PROFILE
