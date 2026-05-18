@@ -16,6 +16,9 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.models.ProposalFileItem;
+import com.example.cnscfacilityhubproject.utils.ProposalFilesUiHelper;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.textfield.TextInputEditText;
@@ -56,6 +59,7 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
     private TextView tvProposalFile;
     private TextView tvRoute;
     private TextView tvRemarks;
+    private LinearLayout layoutProposalFiles;
 
     private TextInputEditText etReturnReason;
     private boolean isReturnReasonBoxShown = false;
@@ -115,6 +119,7 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         tvProposalFile = view.findViewById(R.id.tvProposalFile);
         tvRoute = view.findViewById(R.id.tvRoute);
         tvRemarks = view.findViewById(R.id.tvRemarks);
+        layoutProposalFiles = view.findViewById(R.id.layoutProposalFiles);
         etReturnReason = view.findViewById(R.id.etReturnReason);
     }
 
@@ -167,11 +172,6 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         String activityType = getStringValue(doc, "activityType");
         String displayStatus = getGSODisplayStatus(doc);
 
-        String startDate = getStringValue(doc, "startDateText");
-        String endDate = getStringValue(doc, "endDateText");
-        String startTime = getStringValue(doc, "timeStartText");
-        String endTime = getStringValue(doc, "timeEndText");
-
         String requestorName = firstNonEmpty(getStringValue(doc, "requestorName"), getStringValue(doc, "fullName"));
         String contactNumber = firstNonEmpty(getStringValue(doc, "contactNumber"), getStringValue(doc, "contactNum"));
         String department = firstNonEmpty(getStringValue(doc, "collegeDepartment"), getStringValue(doc, "department"));
@@ -179,18 +179,21 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
 
         String participants = getStringValue(doc, "participants");
         String numberOfParticipants = getLongString(doc, "numberOfParticipants");
-        String facility = getFinalFacility(doc);
         String notificationTarget = getStringValue(doc, "notificationTarget");
-        String proposalFileName = getStringValue(doc, "proposalFileName");
-        proposalFileUrl = getStringValue(doc, "proposalFileUrl");
+        List<ProposalFileItem> proposalFiles = RequestDataHelper.getProposalFiles(doc);
+        if (!proposalFiles.isEmpty()) {
+            proposalFileUrl = proposalFiles.get(0).getFileUrl();
+        } else {
+            proposalFileUrl = getStringValue(doc, "proposalFileUrl");
+        }
 
         chipStatus.setText(displayStatus);
         styleStatusChip(displayStatus);
 
         tvPurpose.setText(!purpose.isEmpty() ? purpose : "Request Details");
         tvActivityType.setText(!activityType.isEmpty() ? activityType : "Facility booking request");
-        tvSchedule.setText("Schedule: " + buildSchedule(startDate, endDate, startTime, endTime));
-        tvFacility.setText("Facility: " + fallback(facility));
+        tvSchedule.setText("Schedule:\n" + RequestDataHelper.getScheduleDisplay(doc));
+        tvFacility.setText("Facilities: " + RequestDataHelper.getFacilitiesDisplay(doc));
 
         tvRequestorInfo.setText(
                 "Name: " + fallback(requestorName) +
@@ -208,11 +211,19 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         tvAmenities.setText(buildAmenities(doc));
         tvTechnicalList.setText("Technical Requirements:\n" + buildTechnicalList(doc));
         tvConnectors.setText("Connectors / Cables: " + fallback(getStringValue(doc, "connectors")));
-        tvProposalFile.setText("Proposal File: " + fallback(proposalFileName));
+        tvProposalFile.setText(proposalFiles.isEmpty()
+                ? "Proposal files: none"
+                : "Proposal files: " + proposalFiles.size());
         tvRoute.setText("Route: " + fallback(notificationTarget));
         tvRemarks.setText("Remarks: " + fallback(getRemarks(doc)));
 
-        btnOpenProposal.setVisibility(proposalFileUrl.isEmpty() ? View.GONE : View.VISIBLE);
+        ProposalFilesUiHelper.bindFiles(
+                requireContext(),
+                layoutProposalFiles,
+                tvProposalFile,
+                btnOpenProposal,
+                proposalFiles
+        );
 
         if ("Pending".equalsIgnoreCase(displayStatus)) {
             layoutActionButtons.setVisibility(View.VISIBLE);

@@ -15,12 +15,14 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RoleGuardHelper;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
 import android.content.Intent;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.example.cnscfacilityhubproject.activities.LoginActivity;
@@ -54,17 +56,30 @@ public class RequestorNavBarActivity extends AppCompatActivity {
             return;
         }
 
-        verifyUserRole("Requestor");
-
         bindViews();
         setupBadgeStyle();
         setupNavigationClicks();
         listenForIncomingNotificationBadge();
 
-        if (savedInstanceState == null) {
-            loadFragment(new RequestorHomeFragment());
-            setSelectedTab(Tab.HOME);
-        }
+        // Use RoleGuardHelper to verify role before loading fragments
+        ProgressBar progressBar = findViewById(R.id.roleVerificationProgress);
+        RoleGuardHelper roleGuard = new RoleGuardHelper(this, progressBar);
+        
+        roleGuard.verifyAndProceed("Requestor", new RoleGuardHelper.OnRoleVerified() {
+            @Override
+            public void onSuccess() {
+                // Role verified! Now safe to load fragments
+                if (savedInstanceState == null) {
+                    loadFragment(new RequestorHomeFragment());
+                    setSelectedTab(Tab.HOME);
+                }
+            }
+
+            @Override
+            public void onFailure(String message) {
+                // Already handled by RoleGuardHelper (redirected to login)
+            }
+        });
     }
 
     @Override
@@ -268,36 +283,6 @@ public class RequestorNavBarActivity extends AppCompatActivity {
 
         redirectToLogin("Please log in first.");
         return false;
-    }
-
-    private void verifyUserRole(String expectedRole) {
-        if (auth.getCurrentUser() == null) {
-            redirectToLogin("Please log in first.");
-            return;
-        }
-
-        db.collection("users")
-                .document(auth.getCurrentUser().getUid())
-                .get()
-                .addOnSuccessListener(documentSnapshot -> {
-
-                    if (!documentSnapshot.exists()) {
-                        auth.signOut();
-                        redirectToLogin("User profile not found. Please contact the administrator.");
-                        return;
-                    }
-
-                    String userType = documentSnapshot.getString("userType");
-
-                    if (userType == null || !expectedRole.equalsIgnoreCase(userType.trim())) {
-                        auth.signOut();
-                        redirectToLogin("Access denied. Please log in with a " + expectedRole + " account.");
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    auth.signOut();
-                    redirectToLogin("Unable to verify user role.");
-                });
     }
 
     private void redirectToLogin(String message) {

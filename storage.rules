@@ -1,0 +1,121 @@
+// Cloud Storage Security Rules for CNSC Facility Hub
+// Deploy using: firebase deploy --only storage
+//
+// These rules control access to proposal files and attachments:
+// - proposal_files/{requestId}/{fileName}: User uploads for facility requests
+// - Equipment lists, floor plans, capacity documents
+//
+// IMPORTANT: After editing these rules:
+// 1. Test thoroughly in Firebase Console
+// 2. Deploy with: firebase deploy --only storage
+// 3. Monitor Storage activity in Firebase Console
+
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserType() {
+      return get(/databases/(default)/documents/users/$(request.auth.uid)).data.userType;
+    }
+    
+    function isStaff() {
+      let userType = getUserType();
+      return userType.lower() in ['gso', 'itso', 'sac'];
+    }
+    
+    function getRequestUserId(requestId) {
+      return get(/databases/(default)/documents/requests/$(requestId)).data.userId;
+    }
+    
+    // ============================================
+    // PROPOSAL FILES
+    // proposal_files/{requestId}/{fileName}
+    // ============================================
+    match /proposal_files/{requestId}/{allFiles=**} {
+      
+      // Authenticated user can upload files only for requests they own
+      allow create, update: if isAuthenticated()
+        && request.auth.uid == getRequestUserId(requestId)
+        && request.resource.size < 10 * 1024 * 1024; // Max 10MB per file
+      
+      // Owner can read their own files
+      allow read: if isAuthenticated()
+        && request.auth.uid == getRequestUserId(requestId);
+      
+      // Staff can read files for requests they need to process
+      allow read: if isAuthenticated()
+        && isStaff();
+      
+      // Owner can delete their own files
+      allow delete: if isAuthenticated()
+        && request.auth.uid == getRequestUserId(requestId);
+      
+      // Staff cannot modify or delete user files directly
+      allow write: if false;
+    }
+    
+    // ============================================
+    // PROFILE PICTURES
+    // profile_pictures/{userId}/avatar.jpg
+    // ============================================
+    match /profile_pictures/{userId}/avatar.jpg {
+      
+      // User can upload/update own profile picture
+      allow write: if isAuthenticated()
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024; // Max 5MB for images
+      
+      // Anyone authenticated can read profile pictures
+      allow read: if isAuthenticated();
+      
+      // User can delete own profile picture
+      allow delete: if isAuthenticated()
+        && request.auth.uid == userId;
+    }
+    
+    // ============================================
+    // FACILITY FLOOR PLANS & DOCUMENTS
+    // facility_docs/{facilityId}/{fileName}
+    // ============================================
+    match /facility_docs/{facilityId}/{allFiles=**} {
+      
+      // GSO can manage facility documents
+      allow read, write, delete: if isAuthenticated()
+        && getUserType().lower() == 'gso';
+      
+      // Staff can read facility documents
+      allow read: if isAuthenticated()
+        && isStaff();
+      
+      // Requestor can read facility documents
+      allow read: if isAuthenticated();
+      
+      // Deny other operations
+      allow write, delete: if false;
+    }
+    
+    // ============================================
+    // REPORTS & EXPORTS
+    // reports/{fileName}
+    // ============================================
+    match /reports/{allFiles=**} {
+      
+      // GSO only
+      allow read, write, delete: if isAuthenticated()
+        && getUserType().lower() == 'gso';
+      
+      // Deny all others
+      allow read, write, delete: if false;
+    }
+    
+    // Deny all other paths by default
+    match /{allPaths=**} {
+      allow read, write, delete: if false;
+    }
+  }
+}

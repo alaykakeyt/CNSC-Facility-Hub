@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -15,6 +16,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
 import com.example.cnscfacilityhubproject.activities.LoginActivity;
+import com.example.cnscfacilityhubproject.utils.RoleGuardHelper;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
@@ -42,8 +44,31 @@ public class gsoNavBarActivity extends AppCompatActivity {
             return;
         }
 
-        verifyUserRole("GSO");
+        bindNavViews();
+        setupNavClickListeners();
 
+        // Use RoleGuardHelper to verify role before loading fragments
+        ProgressBar progressBar = findViewById(R.id.roleVerificationProgress);
+        RoleGuardHelper roleGuard = new RoleGuardHelper(this, progressBar);
+        
+        roleGuard.verifyAndProceed("GSO", new RoleGuardHelper.OnRoleVerified() {
+            @Override
+            public void onSuccess() {
+                // Role verified! Now safe to load fragments
+                if (savedInstanceState == null) {
+                    loadFragment(new gsoHomeFragment());
+                    setSelectedTab(Tab.HOME);
+                }
+            }
+
+            @Override
+            public void onFailure(String message) {
+                // Already handled by RoleGuardHelper (redirected to login)
+            }
+        });
+    }
+
+    private void bindNavViews() {
         navHome = findViewById(R.id.navHome);
         navRequests = findViewById(R.id.navRequests);
         navReports = findViewById(R.id.navReports);
@@ -61,12 +86,9 @@ public class gsoNavBarActivity extends AppCompatActivity {
         iconReports = findViewById(R.id.iconReports);
         iconUsers = findViewById(R.id.iconUsers);
         iconProfile = findViewById(R.id.iconProfile);
+    }
 
-        if (savedInstanceState == null) {
-            loadFragment(new gsoHomeFragment());
-            setSelectedTab(Tab.HOME);
-        }
-
+    private void setupNavClickListeners() {
         navHome.setOnClickListener(v -> {
             loadFragment(new gsoHomeFragment());
             setSelectedTab(Tab.HOME);
@@ -156,36 +178,6 @@ public class gsoNavBarActivity extends AppCompatActivity {
 
         redirectToLogin("Please log in first.");
         return false;
-    }
-
-    private void verifyUserRole(String expectedRole) {
-        if (auth.getCurrentUser() == null) {
-            redirectToLogin("Please log in first.");
-            return;
-        }
-
-        db.collection("users")
-                .document(auth.getCurrentUser().getUid())
-                .get()
-                .addOnSuccessListener(documentSnapshot -> {
-
-                    if (!documentSnapshot.exists()) {
-                        auth.signOut();
-                        redirectToLogin("User profile not found. Please contact the administrator.");
-                        return;
-                    }
-
-                    String userType = documentSnapshot.getString("userType");
-
-                    if (userType == null || !expectedRole.equalsIgnoreCase(userType.trim())) {
-                        auth.signOut();
-                        redirectToLogin("Access denied. Please log in with a " + expectedRole + " account.");
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    auth.signOut();
-                    redirectToLogin("Unable to verify user role.");
-                });
     }
 
     private void redirectToLogin(String message) {

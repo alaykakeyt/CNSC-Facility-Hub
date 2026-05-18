@@ -16,7 +16,12 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.models.ProposalFileItem;
+import com.example.cnscfacilityhubproject.utils.ProposalFilesUiHelper;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
+
+import java.util.List;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -39,6 +44,7 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     private TextView tvPurpose, tvActivityType, tvSchedule, tvFacility;
     private TextView tvRequestorInfo, tvParticipants, tvPurposeFull, tvAmenities;
     private TextView tvProposalFile, tvRoute;
+    private LinearLayout layoutProposalFiles;
 
     public sacRequestsViewDetailsFragment() {
         super(R.layout.fragment_sac_requests_view_details);
@@ -94,6 +100,7 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         tvAmenities = view.findViewById(R.id.tvAmenities);
         tvProposalFile = view.findViewById(R.id.tvProposalFile);
         tvRoute = view.findViewById(R.id.tvRoute);
+        layoutProposalFiles = view.findViewById(R.id.layoutProposalFiles);
     }
 
     private void setupButtons() {
@@ -145,11 +152,6 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         String activityType = getStringValue(doc, "activityType");
         String displayStatus = getDisplayStatus(doc);
 
-        String startDate = getStringValue(doc, "startDateText");
-        String endDate = getStringValue(doc, "endDateText");
-        String startTime = getStringValue(doc, "timeStartText");
-        String endTime = getStringValue(doc, "timeEndText");
-
         String requestorName = firstNonEmpty(
                 getStringValue(doc, "requestorName"),
                 getStringValue(doc, "fullName")
@@ -172,18 +174,20 @@ public class sacRequestsViewDetailsFragment extends Fragment {
 
         String participants = getStringValue(doc, "participants");
         String numberOfParticipants = getLongString(doc, "numberOfParticipants");
-        String facility = getFinalFacility(doc);
-
-        String proposalFileName = getStringValue(doc, "proposalFileName");
-        proposalFileUrl = getStringValue(doc, "proposalFileUrl");
+        List<ProposalFileItem> proposalFiles = RequestDataHelper.getProposalFiles(doc);
+        if (!proposalFiles.isEmpty()) {
+            proposalFileUrl = proposalFiles.get(0).getFileUrl();
+        } else {
+            proposalFileUrl = getStringValue(doc, "proposalFileUrl");
+        }
 
         chipStatus.setText(displayStatus);
         styleStatusChip(displayStatus);
 
         tvPurpose.setText(!purpose.isEmpty() ? purpose : "Request Details");
         tvActivityType.setText(!activityType.isEmpty() ? activityType : "Student Center booking request");
-        tvSchedule.setText("Schedule: " + buildSchedule(startDate, endDate, startTime, endTime));
-        tvFacility.setText("Facility: " + fallback(facility));
+        tvSchedule.setText("Schedule:\n" + RequestDataHelper.getScheduleDisplay(doc));
+        tvFacility.setText("Facilities: " + RequestDataHelper.getFacilitiesDisplay(doc));
 
         tvRequestorInfo.setText(
                 "Name: " + fallback(requestorName) +
@@ -199,12 +203,20 @@ public class sacRequestsViewDetailsFragment extends Fragment {
 
         tvPurposeFull.setText("Purpose: " + fallback(purpose));
         tvAmenities.setText(buildAmenities(doc));
-        tvProposalFile.setText("Proposal File: " + fallback(proposalFileName));
+        tvProposalFile.setText(proposalFiles.isEmpty()
+                ? "Proposal files: none"
+                : "Proposal files: " + proposalFiles.size());
         tvRoute.setText(buildRouteText(doc));
 
         etSacRemarks.setText(getStringValue(doc, "sacRemarks"));
 
-        btnOpenProposal.setVisibility(proposalFileUrl.isEmpty() ? View.GONE : View.VISIBLE);
+        ProposalFilesUiHelper.bindFiles(
+                requireContext(),
+                layoutProposalFiles,
+                tvProposalFile,
+                btnOpenProposal,
+                proposalFiles
+        );
 
         layoutApprovalActions.setVisibility(
                 "Pending".equalsIgnoreCase(displayStatus) ? View.VISIBLE : View.GONE

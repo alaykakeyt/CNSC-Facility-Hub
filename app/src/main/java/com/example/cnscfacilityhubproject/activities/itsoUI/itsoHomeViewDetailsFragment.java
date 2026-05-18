@@ -16,13 +16,18 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
-import com.example.cnscfacilityhubproject.activities.gsoUI.gsoRequestsFragment;
+import com.example.cnscfacilityhubproject.models.ProposalFileItem;
+import com.example.cnscfacilityhubproject.utils.ItsoReminderHelper;
+import com.example.cnscfacilityhubproject.utils.ProposalFilesUiHelper;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+
+import com.example.cnscfacilityhubproject.activities.gsoUI.gsoRequestsFragment;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +62,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     private TextView tvProposalFile;
     private TextView tvRoute;
     private TextView tvRemarks;
+    private LinearLayout layoutProposalFiles;
 
     public itsoHomeViewDetailsFragment() {
         super(R.layout.fragment_itso_home_view_details);
@@ -115,6 +121,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         tvProposalFile = view.findViewById(R.id.tvProposalFile);
         tvRoute = view.findViewById(R.id.tvRoute);
         tvRemarks = view.findViewById(R.id.tvRemarks);
+        layoutProposalFiles = view.findViewById(R.id.layoutProposalFiles);
     }
 
     private void setupButtons() {
@@ -172,11 +179,6 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         String activityType = getStringValue(doc, "activityType");
         String displayStatus = getITSODisplayStatus(doc);
 
-        String startDate = getStringValue(doc, "startDateText");
-        String endDate = getStringValue(doc, "endDateText");
-        String startTime = getStringValue(doc, "timeStartText");
-        String endTime = getStringValue(doc, "timeEndText");
-
         String requestorName = firstNonEmpty(
                 getStringValue(doc, "requestorName"),
                 getStringValue(doc, "fullName")
@@ -199,19 +201,21 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
         String participants = getStringValue(doc, "participants");
         String numberOfParticipants = getLongString(doc, "numberOfParticipants");
-        String facility = getFinalFacility(doc);
         String notificationTarget = getStringValue(doc, "notificationTarget");
-
-        String proposalFileName = getStringValue(doc, "proposalFileName");
-        proposalFileUrl = getStringValue(doc, "proposalFileUrl");
+        List<ProposalFileItem> proposalFiles = RequestDataHelper.getProposalFiles(doc);
+        if (!proposalFiles.isEmpty()) {
+            proposalFileUrl = proposalFiles.get(0).getFileUrl();
+        } else {
+            proposalFileUrl = getStringValue(doc, "proposalFileUrl");
+        }
 
         chipStatus.setText(displayStatus);
         styleStatusChip(displayStatus);
 
         tvPurpose.setText(!purpose.isEmpty() ? purpose : "Request Details");
         tvActivityType.setText(!activityType.isEmpty() ? activityType : "Technical support request");
-        tvSchedule.setText("Schedule: " + buildSchedule(startDate, endDate, startTime, endTime));
-        tvFacility.setText("Facility: " + fallback(facility));
+        tvSchedule.setText("Schedule:\n" + RequestDataHelper.getScheduleDisplay(doc));
+        tvFacility.setText("Facilities: " + RequestDataHelper.getFacilitiesDisplay(doc));
 
         tvRequestorInfo.setText(
                 "Name: " + fallback(requestorName) +
@@ -231,7 +235,9 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         tvTechnicalList.setText("Technical Requirements:\n" + buildTechnicalList(doc));
         tvConnectors.setText("Connectors / Cables: " + fallback(getStringValue(doc, "connectors")));
 
-        tvProposalFile.setText("Proposal File: " + fallback(proposalFileName));
+        tvProposalFile.setText(proposalFiles.isEmpty()
+                ? "Proposal files: none"
+                : "Proposal files: " + proposalFiles.size());
         tvRoute.setText("Route: " + fallback(notificationTarget));
 
         if (tvRemarks != null) {
@@ -242,11 +248,33 @@ public class itsoHomeViewDetailsFragment extends Fragment {
             etItsoRemarks.setText(getStringValue(doc, "itsoRemarks"));
         }
 
-        btnOpenProposal.setVisibility(proposalFileUrl.isEmpty() ? View.GONE : View.VISIBLE);
+        ProposalFilesUiHelper.bindFiles(
+                requireContext(),
+                layoutProposalFiles,
+                tvProposalFile,
+                btnOpenProposal,
+                proposalFiles
+        );
 
         layoutAvailabilityActions.setVisibility(
                 "Pending".equalsIgnoreCase(displayStatus) ? View.VISIBLE : View.GONE
         );
+
+        markReminderSeenIfUpcoming(doc);
+    }
+
+    private void markReminderSeenIfUpcoming(DocumentSnapshot doc) {
+        if (!ItsoReminderHelper.isUpcomingTechnicalEvent(doc)) {
+            return;
+        }
+
+        db.collection("requests")
+                .document(requestId)
+                .update(
+                        "itsoReminderSeen", true,
+                        "itsoUpcomingReminder", true,
+                        "updatedAt", FieldValue.serverTimestamp()
+                );
     }
 
     private void markTechnicalStatusAndRoute(String itsoStatus, String itsoAvailability) {

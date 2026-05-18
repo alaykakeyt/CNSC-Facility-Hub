@@ -14,6 +14,8 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.ItsoReminderHelper;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -148,7 +150,8 @@ public class itsoNotificationFragment extends Fragment {
                     List<DocumentSnapshot> incomingDocs = new ArrayList<>();
 
                     for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
-                        if (isIncomingITSORequest(doc)) {
+                        if (isIncomingITSORequest(doc)
+                                || ItsoReminderHelper.isUpcomingTechnicalEvent(doc)) {
                             incomingDocs.add(doc);
                         }
                     }
@@ -255,19 +258,22 @@ public class itsoNotificationFragment extends Fragment {
         if (index == 2) requestId3 = doc.getId();
 
         String purpose = getStringValue(doc, "purpose");
-        String facility = getFinalFacility(doc);
-        String startDateText = getStringValue(doc, "startDateText");
-        String endDateText = getStringValue(doc, "endDateText");
-        String timeStart = getStringValue(doc, "timeStartText");
-        String timeEnd = getStringValue(doc, "timeEndText");
+        boolean upcoming = ItsoReminderHelper.isUpcomingTechnicalEvent(doc);
 
-        tvTitle.setText(!purpose.isEmpty() ? purpose : "Untitled Request");
-        tvMeta.setText(buildMetaText(facility, startDateText, endDateText, timeStart, timeEnd));
-        tvDesc.setText(buildTechnicalSummary(doc));
+        tvTitle.setText(upcoming
+                ? "Tomorrow: " + (!purpose.isEmpty() ? purpose : "Technical Event")
+                : (!purpose.isEmpty() ? purpose : "Untitled Request"));
+        tvMeta.setText(RequestDataHelper.getFacilitiesDisplay(doc) + " • "
+                + RequestDataHelper.getScheduleDisplay(doc).replace("\n", " "));
+        tvDesc.setText(upcoming
+                ? ItsoReminderHelper.buildReminderSummary(doc)
+                : buildTechnicalSummary(doc));
 
-        chipStatus.setText("Incoming");
-        chipStatus.setTextColor(Color.parseColor("#970705"));
-        chipStatus.setChipBackgroundColor(ColorStateList.valueOf(Color.parseColor("#F5E5E5")));
+        chipStatus.setText(upcoming ? "Upcoming" : "Incoming");
+        chipStatus.setTextColor(Color.parseColor(upcoming ? "#F57C00" : "#970705"));
+        chipStatus.setChipBackgroundColor(ColorStateList.valueOf(
+                Color.parseColor(upcoming ? "#FFF3E0" : "#F5E5E5")
+        ));
 
         card.setVisibility(View.VISIBLE);
     }

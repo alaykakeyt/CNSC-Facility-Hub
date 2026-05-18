@@ -9,12 +9,14 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RoleGuardHelper;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -73,26 +75,37 @@ public class sacNavBarActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_sac_nav_bar);
 
-
         auth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
-
 
         if (!ensureUserLoggedIn()) {
             return;
         }
-
-        verifyUserRole("SAC");
 
         bindViews();
         setupBadgeStyle();
         setupNavigation();
         listenForIncomingSACNotifications();
 
-        if (savedInstanceState == null) {
-            loadFragment(new sacHomeFragment());
-            setSelectedTab(Tab.HOME);
-        }
+        // Use RoleGuardHelper to verify role before loading fragments
+        ProgressBar progressBar = findViewById(R.id.roleVerificationProgress);
+        RoleGuardHelper roleGuard = new RoleGuardHelper(this, progressBar);
+        
+        roleGuard.verifyAndProceed("SAC", new RoleGuardHelper.OnRoleVerified() {
+            @Override
+            public void onSuccess() {
+                // Role verified! Now safe to load fragments
+                if (savedInstanceState == null) {
+                    loadFragment(new sacHomeFragment());
+                    setSelectedTab(Tab.HOME);
+                }
+            }
+
+            @Override
+            public void onFailure(String message) {
+                // Already handled by RoleGuardHelper (redirected to login)
+            }
+        });
     }
 
     @Override
@@ -494,36 +507,6 @@ public class sacNavBarActivity extends AppCompatActivity {
 
         redirectToLogin("Please log in first.");
         return false;
-    }
-
-    private void verifyUserRole(String expectedRole) {
-        if (auth.getCurrentUser() == null) {
-            redirectToLogin("Please log in first.");
-            return;
-        }
-
-        db.collection("users")
-                .document(auth.getCurrentUser().getUid())
-                .get()
-                .addOnSuccessListener(documentSnapshot -> {
-
-                    if (!documentSnapshot.exists()) {
-                        auth.signOut();
-                        redirectToLogin("User profile not found. Please contact the administrator.");
-                        return;
-                    }
-
-                    String userType = documentSnapshot.getString("userType");
-
-                    if (userType == null || !expectedRole.equalsIgnoreCase(userType.trim())) {
-                        auth.signOut();
-                        redirectToLogin("Access denied. Please log in with a " + expectedRole + " account.");
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    auth.signOut();
-                    redirectToLogin("Unable to verify user role.");
-                });
     }
 
     private void redirectToLogin(String message) {

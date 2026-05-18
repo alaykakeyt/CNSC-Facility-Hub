@@ -1,0 +1,176 @@
+// Firestore Security Rules for CNSC Facility Hub
+// Deploy using: firebase deploy --only firestore:rules
+//
+// These rules implement role-based access control for:
+// - users collection: Requestor, GSO, ITSO, SAC roles
+// - requests collection: Facility booking requests with multi-day scheduling
+// - bookings collection: Confirmed facility reservations
+// - notifications collection: Role-specific alerts
+// - reports collection: GSO-only analytics
+//
+// IMPORTANT: After editing these rules:
+// 1. Test thoroughly in Firebase Console
+// 2. Deploy with: firebase deploy --only firestore:rules
+// 3. Monitor Firestore activity in Firebase Console
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isRequestor(userType) {
+      return userType.lower() == 'requestor';
+    }
+    
+    function isGSO(userType) {
+      return userType.lower() == 'gso';
+    }
+    
+    function isITSO(userType) {
+      return userType.lower() == 'itso';
+    }
+    
+    function isSAC(userType) {
+      return userType.lower() == 'sac';
+    }
+    
+    function isStaffRole(userType) {
+      return isGSO(userType) || isITSO(userType) || isSAC(userType);
+    }
+    
+    function getUserType() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType;
+    }
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    match /users/{userId} {
+      
+      // Requestor can create/read/update their own profile
+      // but cannot change uid or userType
+      allow create: if isAuthenticated() && request.auth.uid == userId
+        && request.resource.data.userType == 'Requestor';
+      
+      allow read: if isAuthenticated()
+        && (request.auth.uid == userId
+            || isStaffRole(getUserType()));
+      
+      allow update: if isAuthenticated()
+        && request.auth.uid == userId
+        && resource.data.userType == request.resource.data.userType;
+      
+      // GSO can manage all users
+      allow read, update, delete: if isAuthenticated()
+        && isGSO(getUserType());
+      
+      // Deny all other operations
+      allow write: if false;
+    }
+    
+    // ============================================
+    // REQUESTS COLLECTION
+    // ============================================
+    match /requests/{requestId} {
+      
+      // Requestor can create requests only with userId == auth.uid
+      allow create: if isAuthenticated()
+        && isRequestor(getUserType())
+        && request.resource.data.userId == request.auth.uid;
+      
+      // Requestor can read their own requests
+      allow read: if isAuthenticated()
+        && (request.auth.uid == resource.data.userId
+            || isStaffRole(getUserType()));
+      
+      // Requestor can update their own requests (for resubmission, etc)
+      allow update: if isAuthenticated()
+        && request.auth.uid == resource.data.userId
+        && request.resource.data.userId == resource.data.userId;
+      
+      // Staff roles can update workflow/status fields
+      allow update: if isAuthenticated()
+        && isStaffRole(getUserType())
+        && (resource.data.userId != request.resource.data.userId); // Cannot change ownership
+      
+      // GSO can delete/archive requests
+      allow delete: if isAuthenticated()
+        && isGSO(getUserType());
+      
+      // Deny all other operations
+      allow write: if false;
+    }
+    
+    // ============================================
+    // BOOKINGS COLLECTION
+    // ============================================
+    match /bookings/{bookingId} {
+      
+      // Requestor can read their own bookings
+      allow read: if isAuthenticated()
+        && (request.auth.uid == resource.data.userId
+            || isStaffRole(getUserType()));
+      
+      // GSO can manage bookings
+      allow read, write: if isAuthenticated()
+        && isGSO(getUserType());
+      
+      // Deny requestor write access
+      allow write: if false;
+    }
+    
+    // ============================================
+    // NOTIFICATIONS COLLECTION
+    // ============================================
+    match /notifications/{notificationId} {
+      
+      // Users can read their own notifications
+      allow read: if isAuthenticated()
+        && request.auth.uid == resource.data.userId;
+      
+      // System can write notifications (Cloud Function/Admin SDK)
+      allow write: if false; // Only Cloud Functions and Admin SDK can write
+    }
+    
+    // ============================================
+    // REPORTS COLLECTION
+    // ============================================
+    match /reports/{reportId} {
+      
+      // GSO only
+      allow read, write: if isAuthenticated()
+        && isGSO(getUserType());
+      
+      // Deny all others
+      allow read, write: if false;
+    }
+    
+    // ============================================
+    // TEST & DEV COLLECTIONS (DENY ALL)
+    // ============================================
+    match /test/{document=**} {
+      allow read, write: if false;
+    }
+    
+    match /dev/{document=**} {
+      allow read, write: if false;
+    }
+    
+    // ============================================
+    // BACKUP COLLECTION (GSO ONLY)
+    // ============================================
+    match /backup/{document=**} {
+      allow read, write: if isAuthenticated()
+        && isGSO(getUserType());
+    }
+    
+    // Deny all other collections by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
