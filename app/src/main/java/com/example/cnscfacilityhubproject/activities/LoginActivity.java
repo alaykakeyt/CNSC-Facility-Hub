@@ -25,7 +25,9 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class LoginActivity extends AppCompatActivity {
@@ -70,13 +72,11 @@ public class LoginActivity extends AppCompatActivity {
     }
 
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_login);
-
 
         FirebaseAuth auth = FirebaseAuth.getInstance();
         FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -114,7 +114,7 @@ public class LoginActivity extends AppCompatActivity {
                                     .document(auth.getCurrentUser().getUid())
                                             .get()
                                                     .addOnSuccessListener(documentSnapshot -> {
-                                                        Toast.makeText(LoginActivity.this, "Login Success", Toast.LENGTH_SHORT).show();
+//                                                        Toast.makeText(LoginActivity.this, "Login Success", Toast.LENGTH_SHORT).show();
                                                         if (documentSnapshot.exists()){
                                                             String userTypeRaw = documentSnapshot.getString("userType");
                                                             if (userTypeRaw != null) {
