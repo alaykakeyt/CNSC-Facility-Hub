@@ -108,7 +108,7 @@ public class LoginActivity extends AppCompatActivity {
 
             auth.signInWithEmailAndPassword(userEmail, userPass)
                     .addOnCompleteListener(task -> {
-                        if (task.isSuccessful()) {
+                        if (task.isSuccessful() && auth.getCurrentUser() != null) {
 
                             db.collection("users")
                                     .document(auth.getCurrentUser().getUid())
@@ -116,51 +116,58 @@ public class LoginActivity extends AppCompatActivity {
                                                     .addOnSuccessListener(documentSnapshot -> {
                                                         Toast.makeText(LoginActivity.this, "Login Success", Toast.LENGTH_SHORT).show();
                                                         if (documentSnapshot.exists()){
-                                                            Intent intent;
-                                                            String userType = documentSnapshot.getString("userType").toLowerCase();
+                                                            String userTypeRaw = documentSnapshot.getString("userType");
+                                                            if (userTypeRaw != null) {
+                                                                String userType = userTypeRaw.toLowerCase();
 
-                                                            if (userType.equals("requestor")) {
+                                                                if (userType.equals("requestor")) {
 
-                                                                startActivity(new Intent(
-                                                                        LoginActivity.this,
-                                                                        RequestorNavBarActivity.class
-                                                                ));
-                                                                finish();
+                                                                    startActivity(new Intent(
+                                                                            LoginActivity.this,
+                                                                            RequestorNavBarActivity.class
+                                                                    ));
+                                                                    finish();
 
-                                                            } else if (userType.equals("itso")) {
+                                                                } else if (userType.equals("itso")) {
 
-                                                                startActivity(new Intent(
-                                                                        LoginActivity.this,
-                                                                        itsoNavBarActivity.class
-                                                                ));
-                                                                finish();
+                                                                    startActivity(new Intent(
+                                                                            LoginActivity.this,
+                                                                            itsoNavBarActivity.class
+                                                                    ));
+                                                                    finish();
 
-                                                            } else if (userType.equals("sac")) {
+                                                                } else if (userType.equals("sac")) {
 
-                                                                startActivity(new Intent(
-                                                                        LoginActivity.this,
-                                                                        sacNavBarActivity.class
-                                                                ));
-                                                                finish();
+                                                                    startActivity(new Intent(
+                                                                            LoginActivity.this,
+                                                                            sacNavBarActivity.class
+                                                                    ));
+                                                                    finish();
 
-                                                            } else if (userType.equals("gso")) {
+                                                                } else if (userType.equals("gso")) {
 
-                                                                startActivity(new Intent(
-                                                                        LoginActivity.this,
-                                                                        gsoNavBarActivity.class
-                                                                ));
-                                                                finish();
+                                                                    startActivity(new Intent(
+                                                                            LoginActivity.this,
+                                                                            gsoNavBarActivity.class
+                                                                    ));
+                                                                    finish();
 
+                                                                } else {
+
+                                                                    Toast.makeText(
+                                                                            LoginActivity.this,
+                                                                            "Unknown user role.",
+                                                                            Toast.LENGTH_SHORT
+                                                                    ).show();
+                                                                }
                                                             } else {
-
-                                                                Toast.makeText(
-                                                                        LoginActivity.this,
-                                                                        "Unknown user role.",
-                                                                        Toast.LENGTH_SHORT
-                                                                ).show();
+                                                                Toast.makeText(LoginActivity.this, "User role not found in profile.", Toast.LENGTH_SHORT).show();
                                                             }
+                                                        } else {
+                                                            Toast.makeText(LoginActivity.this, "User profile not found.", Toast.LENGTH_SHORT).show();
                                                         }
-                                                    });
+                                                    })
+                                                    .addOnFailureListener(e -> Toast.makeText(LoginActivity.this, "Firestore Error: " + e.getMessage(), Toast.LENGTH_LONG).show());
 
                         } else {
                             Toast.makeText(LoginActivity.this, "Login Failed", Toast.LENGTH_SHORT).show();
