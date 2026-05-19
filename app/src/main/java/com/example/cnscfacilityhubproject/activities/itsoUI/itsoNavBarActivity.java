@@ -17,6 +17,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
 import com.example.cnscfacilityhubproject.utils.ItsoReminderHelper;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.example.cnscfacilityhubproject.utils.RoleGuardHelper;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
@@ -228,9 +229,10 @@ public class itsoNavBarActivity extends AppCompatActivity {
                     }
 
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (isIncomingITSORequest(doc)
+                        if (RequestDataHelper.shouldShowInRequestList(doc)
+                                && (isIncomingITSORequest(doc)
                                 || (ItsoReminderHelper.isUpcomingTechnicalEvent(doc)
-                                && ItsoReminderHelper.isReminderUnseen(doc))) {
+                                && ItsoReminderHelper.isReminderUnseen(doc)))) {
                             unseenNotificationIds.add(doc.getId());
                         }
                     }

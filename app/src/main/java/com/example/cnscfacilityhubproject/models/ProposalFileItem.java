@@ -12,16 +12,20 @@ public class ProposalFileItem {
     private String fileName;
     private String fileUrl;
     private String fileType;
-    private Object uploadedAt;
+    private String source;
 
     public ProposalFileItem() {
     }
 
-    public ProposalFileItem(String fileName, String fileUrl, String fileType) {
+    public ProposalFileItem(String fileName, String fileUrl, String fileType, String source) {
         this.fileName = fileName;
         this.fileUrl = fileUrl;
         this.fileType = fileType;
-        this.uploadedAt = FieldValue.serverTimestamp();
+        this.source = source;
+    }
+
+    public ProposalFileItem(String fileName, String fileUrl, String fileType) {
+        this(fileName, fileUrl, fileType, "external_link");
     }
 
     public String getFileName() {
@@ -36,12 +40,16 @@ public class ProposalFileItem {
         return fileType != null ? fileType : "";
     }
 
+    public String getSource() {
+        return source != null ? source : "external_link";
+    }
+
     public Map<String, Object> toFirestoreMap() {
         Map<String, Object> map = new HashMap<>();
         map.put("fileName", getFileName());
         map.put("fileUrl", getFileUrl());
         map.put("fileType", getFileType());
-        map.put("uploadedAt", uploadedAt != null ? uploadedAt : FieldValue.serverTimestamp());
+        map.put("source", getSource());
         return map;
     }
 }

@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.example.cnscfacilityhubproject.utils.RoleGuardHelper;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
@@ -360,7 +361,7 @@ public class sacNavBarActivity extends AppCompatActivity {
                             for (DocumentSnapshot doc :
                                     snapshot.getDocuments()) {
 
-                                if (isIncomingSACRequest(doc)) {
+                                if (RequestDataHelper.shouldShowInRequestList(doc) && isIncomingSACRequest(doc)) {
 
                                     unseenNotificationIds.add(
                                             doc.getId()

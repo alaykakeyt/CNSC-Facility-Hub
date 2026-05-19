@@ -188,6 +188,7 @@ public class itsoHomeFragment extends Fragment {
 
                     for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
                         if (!isITSORequest(doc)) continue;
+                        if (!RequestDataHelper.shouldShowInRequestList(doc)) continue;
 
                         String displayStatus = getDisplayStatus(doc);
 

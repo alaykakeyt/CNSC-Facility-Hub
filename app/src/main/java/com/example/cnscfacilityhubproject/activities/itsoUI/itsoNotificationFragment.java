@@ -1,6 +1,5 @@
 package com.example.cnscfacilityhubproject.activities.itsoUI;
 
-import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -12,38 +11,36 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.adapters.ItsoNotificationAdapter;
 import com.example.cnscfacilityhubproject.utils.ItsoReminderHelper;
 import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.chip.Chip;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * ITSO Notification Fragment - displays incoming requests and technical event reminders.
+ * Uses RecyclerView for dynamic rendering of all notifications (no 3-card limit).
+ */
 public class itsoNotificationFragment extends Fragment {
 
     private View layoutEmptyState, layoutNotificationList;
-    private View cardNotification1, cardNotification2, cardNotification3;
-
-    private MaterialButton btnViewRequest1, btnViewRequest2, btnViewRequest3;
+    private RecyclerView recyclerViewNotifications;
 
     private TextView tvIncomingCount, badgeNotification;
 
-    private TextView tvNotificationTitle1, tvNotificationMeta1, tvNotificationDesc1;
-    private TextView tvNotificationTitle2, tvNotificationMeta2, tvNotificationDesc2;
-    private TextView tvNotificationTitle3, tvNotificationMeta3, tvNotificationDesc3;
-
-    private Chip chipNotificationStatus1, chipNotificationStatus2, chipNotificationStatus3;
+    private ItsoNotificationAdapter notificationAdapter;
 
     private FirebaseFirestore db;
     private ListenerRegistration incomingNotificationListener;
-
-    private String requestId1, requestId2, requestId3;
 
     public itsoNotificationFragment() {
         super(R.layout.fragment_itso_notification);
@@ -57,7 +54,7 @@ public class itsoNotificationFragment extends Fragment {
 
         bindViews(view);
         setupBadgeStyle();
-        setupActions();
+        setupRecyclerView();
         listenForIncomingNotifications();
     }
 
@@ -80,33 +77,10 @@ public class itsoNotificationFragment extends Fragment {
     private void bindViews(View view) {
         layoutEmptyState = view.findViewById(R.id.layoutEmptyState);
         layoutNotificationList = view.findViewById(R.id.layoutNotificationList);
-
-        cardNotification1 = view.findViewById(R.id.cardNotification1);
-        cardNotification2 = view.findViewById(R.id.cardNotification2);
-        cardNotification3 = view.findViewById(R.id.cardNotification3);
+        recyclerViewNotifications = view.findViewById(R.id.recyclerViewNotifications);
 
         tvIncomingCount = view.findViewById(R.id.tvIncomingCount);
         badgeNotification = view.findViewById(R.id.badgeNotification);
-
-        btnViewRequest1 = view.findViewById(R.id.btnViewRequest1);
-        btnViewRequest2 = view.findViewById(R.id.btnViewRequest2);
-        btnViewRequest3 = view.findViewById(R.id.btnViewRequest3);
-
-        tvNotificationTitle1 = view.findViewById(R.id.tvNotificationTitle1);
-        tvNotificationMeta1 = view.findViewById(R.id.tvNotificationMeta1);
-        tvNotificationDesc1 = view.findViewById(R.id.tvNotificationDesc1);
-
-        tvNotificationTitle2 = view.findViewById(R.id.tvNotificationTitle2);
-        tvNotificationMeta2 = view.findViewById(R.id.tvNotificationMeta2);
-        tvNotificationDesc2 = view.findViewById(R.id.tvNotificationDesc2);
-
-        tvNotificationTitle3 = view.findViewById(R.id.tvNotificationTitle3);
-        tvNotificationMeta3 = view.findViewById(R.id.tvNotificationMeta3);
-        tvNotificationDesc3 = view.findViewById(R.id.tvNotificationDesc3);
-
-        chipNotificationStatus1 = view.findViewById(R.id.chipNotificationStatus1);
-        chipNotificationStatus2 = view.findViewById(R.id.chipNotificationStatus2);
-        chipNotificationStatus3 = view.findViewById(R.id.chipNotificationStatus3);
     }
 
     private void setupBadgeStyle() {
@@ -124,10 +98,12 @@ public class itsoNotificationFragment extends Fragment {
         badgeNotification.setTypeface(null, android.graphics.Typeface.BOLD);
     }
 
-    private void setupActions() {
-        btnViewRequest1.setOnClickListener(v -> openRequestDetails(requestId1));
-        btnViewRequest2.setOnClickListener(v -> openRequestDetails(requestId2));
-        btnViewRequest3.setOnClickListener(v -> openRequestDetails(requestId3));
+    private void setupRecyclerView() {
+        if (recyclerViewNotifications == null) return;
+
+        recyclerViewNotifications.setLayoutManager(new LinearLayoutManager(requireContext()));
+        notificationAdapter = new ItsoNotificationAdapter(this::openRequestDetails);
+        recyclerViewNotifications.setAdapter(notificationAdapter);
     }
 
     private void listenForIncomingNotifications() {
@@ -150,8 +126,8 @@ public class itsoNotificationFragment extends Fragment {
                     List<DocumentSnapshot> incomingDocs = new ArrayList<>();
 
                     for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
-                        if (isIncomingITSORequest(doc)
-                                || ItsoReminderHelper.isUpcomingTechnicalEvent(doc)) {
+                        if (RequestDataHelper.shouldShowInRequestList(doc)
+                                && (isIncomingITSORequest(doc) || ItsoReminderHelper.isUpcomingTechnicalEvent(doc))) {
                             incomingDocs.add(doc);
                         }
                     }
@@ -165,13 +141,10 @@ public class itsoNotificationFragment extends Fragment {
                     updateNotificationBadge(count);
                     updateNotificationState(count > 0);
 
-                    requestId1 = null;
-                    requestId2 = null;
-                    requestId3 = null;
-
-                    bindNotificationCard(0, incomingDocs);
-                    bindNotificationCard(1, incomingDocs);
-                    bindNotificationCard(2, incomingDocs);
+                    // Update adapter with all notifications (no 3-card limit)
+                    if (notificationAdapter != null) {
+                        notificationAdapter.setNotifications(incomingDocs);
+                    }
                 });
     }
 
@@ -219,65 +192,6 @@ public class itsoNotificationFragment extends Fragment {
         badgeNotification.setText(count > 99 ? "99+" : String.valueOf(count));
     }
 
-    private void bindNotificationCard(int index, List<DocumentSnapshot> docs) {
-        View card;
-        TextView tvTitle;
-        TextView tvMeta;
-        TextView tvDesc;
-        Chip chipStatus;
-
-        if (index == 0) {
-            card = cardNotification1;
-            tvTitle = tvNotificationTitle1;
-            tvMeta = tvNotificationMeta1;
-            tvDesc = tvNotificationDesc1;
-            chipStatus = chipNotificationStatus1;
-        } else if (index == 1) {
-            card = cardNotification2;
-            tvTitle = tvNotificationTitle2;
-            tvMeta = tvNotificationMeta2;
-            tvDesc = tvNotificationDesc2;
-            chipStatus = chipNotificationStatus2;
-        } else {
-            card = cardNotification3;
-            tvTitle = tvNotificationTitle3;
-            tvMeta = tvNotificationMeta3;
-            tvDesc = tvNotificationDesc3;
-            chipStatus = chipNotificationStatus3;
-        }
-
-        if (index >= docs.size()) {
-            card.setVisibility(View.GONE);
-            return;
-        }
-
-        DocumentSnapshot doc = docs.get(index);
-
-        if (index == 0) requestId1 = doc.getId();
-        if (index == 1) requestId2 = doc.getId();
-        if (index == 2) requestId3 = doc.getId();
-
-        String purpose = getStringValue(doc, "purpose");
-        boolean upcoming = ItsoReminderHelper.isUpcomingTechnicalEvent(doc);
-
-        tvTitle.setText(upcoming
-                ? "Tomorrow: " + (!purpose.isEmpty() ? purpose : "Technical Event")
-                : (!purpose.isEmpty() ? purpose : "Untitled Request"));
-        tvMeta.setText(RequestDataHelper.getFacilitiesDisplay(doc) + " • "
-                + RequestDataHelper.getScheduleDisplay(doc).replace("\n", " "));
-        tvDesc.setText(upcoming
-                ? ItsoReminderHelper.buildReminderSummary(doc)
-                : buildTechnicalSummary(doc));
-
-        chipStatus.setText(upcoming ? "Upcoming" : "Incoming");
-        chipStatus.setTextColor(Color.parseColor(upcoming ? "#F57C00" : "#970705"));
-        chipStatus.setChipBackgroundColor(ColorStateList.valueOf(
-                Color.parseColor(upcoming ? "#FFF3E0" : "#F5E5E5")
-        ));
-
-        card.setVisibility(View.VISIBLE);
-    }
-
     private void openRequestDetails(String requestId) {
         if (requestId == null || requestId.trim().isEmpty()) {
             Toast.makeText(requireContext(), "No request found.", Toast.LENGTH_SHORT).show();
@@ -299,82 +213,8 @@ public class itsoNotificationFragment extends Fragment {
         layoutEmptyState.setVisibility(hasIncomingBookings ? View.GONE : View.VISIBLE);
     }
 
-    private String buildMetaText(String facility, String startDate, String endDate, String startTime, String endTime) {
-        StringBuilder metaBuilder = new StringBuilder();
-
-        if (!facility.isEmpty()) metaBuilder.append(facility);
-
-        if (!startDate.isEmpty()) {
-            if (metaBuilder.length() > 0) metaBuilder.append(" • ");
-
-            if (!endDate.isEmpty() && !startDate.equalsIgnoreCase(endDate)) {
-                metaBuilder.append(startDate).append(" - ").append(endDate);
-            } else {
-                metaBuilder.append(startDate);
-            }
-        }
-
-        if (!startTime.isEmpty()) {
-            if (metaBuilder.length() > 0) metaBuilder.append(" • ");
-
-            if (!endTime.isEmpty()) {
-                metaBuilder.append(startTime).append(" - ").append(endTime);
-            } else {
-                metaBuilder.append(startTime);
-            }
-        }
-
-        return metaBuilder.length() == 0 ? "No schedule details" : metaBuilder.toString();
-    }
-
-    private String buildTechnicalSummary(DocumentSnapshot doc) {
-        StringBuilder sb = new StringBuilder();
-
-        appendIfTrue(sb, doc.getBoolean("soundSystemSetup"), "Sound system");
-        appendIfTrue(sb, doc.getBoolean("microphones"), "Microphones");
-        appendIfTrue(sb, doc.getBoolean("portableSpeaker"), "Portable speaker");
-        appendIfTrue(sb, doc.getBoolean("lights"), "Lights");
-        appendIfTrue(sb, doc.getBoolean("livestreamingServices"), "Livestreaming");
-        appendIfTrue(sb, doc.getBoolean("zoomHosting"), "Zoom hosting");
-        appendIfTrue(sb, doc.getBoolean("gmeetHosting"), "GMeet hosting");
-        appendIfTrue(sb, doc.getBoolean("webCamera"), "Web camera");
-        appendIfTrue(sb, doc.getBoolean("tripod"), "Tripod");
-        appendIfTrue(sb, doc.getBoolean("multimediaProjector"), "Projector");
-
-        String connectors = getStringValue(doc, "connectors");
-
-        if (!connectors.isEmpty()) {
-            if (sb.length() > 0) sb.append(", ");
-            sb.append("Connectors: ").append(connectors);
-        }
-
-        return sb.length() == 0 ? "Technical support request submitted." : sb.toString();
-    }
-
-    private void appendIfTrue(StringBuilder sb, Boolean value, String label) {
-        if (Boolean.TRUE.equals(value)) {
-            if (sb.length() > 0) sb.append(", ");
-            sb.append(label);
-        }
-    }
-
-    private String getFinalFacility(DocumentSnapshot doc) {
-        String finalFacilityName = getStringValue(doc, "finalFacilityName");
-
-        if (!finalFacilityName.isEmpty()) return finalFacilityName;
-
-        String facility = getStringValue(doc, "facility");
-        String otherFacility = getStringValue(doc, "otherFacility");
-
-        if ("Others".equalsIgnoreCase(facility) && !otherFacility.isEmpty()) {
-            return otherFacility;
-        }
-
-        return facility;
-    }
-
-    private String getStringValue(DocumentSnapshot doc, String field) {
-        String value = doc.getString(field);
+    private String getStringValue(DocumentSnapshot doc, String fieldName) {
+        String value = doc.getString(fieldName);
         return value != null ? value.trim() : "";
     }
 }

@@ -1,17 +1,14 @@
 package com.example.cnscfacilityhubproject.utils;
 
-import android.content.Context;
 import android.net.Uri;
+import android.util.Log;
 
-import com.example.cnscfacilityhubproject.models.LocalFileItem;
 import com.example.cnscfacilityhubproject.models.ProposalFileItem;
 import com.example.cnscfacilityhubproject.models.ScheduleDayItem;
+import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
-import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,15 +17,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Builds Firestore request maps and uploads proposal files to Firebase Storage.
+ * Builds Firestore request maps and handles proposal links.
+ * Firebase Storage upload has been removed to avoid billing dependencies.
  */
 public final class RequestSubmissionHelper {
-
-    public interface UploadCallback {
-        void onSuccess(List<ProposalFileItem> uploadedFiles);
-
-        void onFailure(String message);
-    }
 
     private RequestSubmissionHelper() {
     }
@@ -74,7 +66,8 @@ public final class RequestSubmissionHelper {
             boolean sendToITSO,
             boolean sendToGSO,
             String notificationTarget,
-            String workflowStage
+            String workflowStage,
+            List<ProposalFileItem> proposalLinks
     ) {
         Map<String, Object> requestMap = new HashMap<>();
 
@@ -108,8 +101,8 @@ public final class RequestSubmissionHelper {
             requestMap.put("endDateText", last.getDateText());
             requestMap.put("timeStartText", first.getStartTimeText());
             requestMap.put("timeEndText", last.getEndTimeText());
-            requestMap.put("startDate", first.getDate() != null ? first.getDate() : Timestamp.now());
-            requestMap.put("endDate", last.getDate() != null ? last.getDate() : Timestamp.now());
+            requestMap.put("startDate", first.getDate() != null ? first.getDate() : com.google.firebase.Timestamp.now());
+            requestMap.put("endDate", last.getDate() != null ? last.getDate() : com.google.firebase.Timestamp.now());
         }
 
         requestMap.put("participants", participants);
@@ -123,9 +116,24 @@ public final class RequestSubmissionHelper {
         requestMap.put("otherAmenities", otherAmenities);
         requestMap.put("agreementAccepted", agreementAccepted);
 
-        requestMap.put("proposalFiles", new ArrayList<Map<String, Object>>());
-        requestMap.put("proposalFileName", "");
-        requestMap.put("proposalFileUrl", "");
+        // Handle Proposal Links
+        List<Map<String, Object>> linkMaps = new ArrayList<>();
+        String firstLinkName = "";
+        String firstLinkUrl = "";
+
+        if (proposalLinks != null && !proposalLinks.isEmpty()) {
+            for (ProposalFileItem link : proposalLinks) {
+                linkMaps.add(link.toFirestoreMap());
+            }
+            firstLinkName = proposalLinks.get(0).getFileName();
+            firstLinkUrl = proposalLinks.get(0).getFileUrl();
+        }
+
+        requestMap.put("proposalFiles", linkMaps);
+        requestMap.put("proposalFileName", firstLinkName);
+        requestMap.put("proposalFileUrl", firstLinkUrl);
+        requestMap.put("proposalSource", "external_link");
+        requestMap.put("hasProposalLinks", !linkMaps.isEmpty());
 
         requestMap.put("technicalNeeded", technicalNeeded);
         requestMap.put("connectors", technicalNeeded ? connectors : "");
@@ -167,98 +175,15 @@ public final class RequestSubmissionHelper {
 
         requestMap.put("notificationTarget", notificationTarget);
         requestMap.put("workflowStage", workflowStage);
+
+        // New submissions are complete by default as they use external links
         requestMap.put("status", "Pending");
+        requestMap.put("uploadStatus", "Not Required");
+        requestMap.put("isSubmissionComplete", true);
+
         requestMap.put("createdAt", FieldValue.serverTimestamp());
         requestMap.put("updatedAt", FieldValue.serverTimestamp());
 
         return requestMap;
-    }
-
-    public static void uploadProposalFiles(
-            Context context,
-            String requestId,
-            List<LocalFileItem> files,
-            UploadCallback callback
-    ) {
-        if (files == null || files.isEmpty()) {
-            callback.onSuccess(new ArrayList<>());
-            return;
-        }
-
-        FirebaseStorage storage = FirebaseStorage.getInstance();
-        List<com.google.android.gms.tasks.Task<ProposalFileItem>> tasks = new ArrayList<>();
-
-        for (LocalFileItem file : files) {
-            String safeName = file.getFileName().replaceAll("[^a-zA-Z0-9._-]", "_");
-            String storagePath = "proposal_files/" + requestId + "/" + UUID.randomUUID() + "_" + safeName;
-            StorageReference reference = storage.getReference().child(storagePath);
-
-            com.google.android.gms.tasks.Task<ProposalFileItem> task = reference.putFile(file.getUri())
-                    .continueWithTask(taskSnapshot -> reference.getDownloadUrl())
-                    .continueWith(urlTask -> {
-                        if (!urlTask.isSuccessful() || urlTask.getResult() == null) {
-                            throw urlTask.getException() != null
-                                    ? urlTask.getException()
-                                    : new Exception("Upload failed.");
-                        }
-                        Uri downloadUrl = urlTask.getResult();
-                        return new ProposalFileItem(
-                                file.getFileName(),
-                                downloadUrl.toString(),
-                                RequestDataHelper.guessTypeFromName(file.getFileName())
-                        );
-                    });
-
-            tasks.add(task);
-        }
-
-        Tasks.whenAllSuccess(tasks)
-                .addOnSuccessListener(results -> {
-                    List<ProposalFileItem> uploaded = new ArrayList<>();
-                    for (Object item : results) {
-                        if (item instanceof ProposalFileItem) {
-                            uploaded.add((ProposalFileItem) item);
-                        }
-                    }
-                    callback.onSuccess(uploaded);
-                })
-                .addOnFailureListener(e -> callback.onFailure(
-                        e.getMessage() != null ? e.getMessage() : "Upload failed."
-                ));
-    }
-
-    public interface FailureCallback {
-        void onFailure(String message);
-    }
-
-    public static void attachUploadedFiles(
-            String requestId,
-            List<ProposalFileItem> uploadedFiles,
-            Runnable onSuccess,
-            FailureCallback onFailure
-    ) {
-        List<Map<String, Object>> fileMaps = new ArrayList<>();
-        for (ProposalFileItem file : uploadedFiles) {
-            fileMaps.add(file.toFirestoreMap());
-        }
-
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("proposalFiles", fileMaps);
-        updates.put("updatedAt", FieldValue.serverTimestamp());
-
-        if (!uploadedFiles.isEmpty()) {
-            ProposalFileItem first = uploadedFiles.get(0);
-            updates.put("proposalFileName", first.getFileName());
-            updates.put("proposalFileUrl", first.getFileUrl());
-        }
-
-        FirebaseFirestore.getInstance()
-                .collection("requests")
-                .document(requestId)
-                .update(updates)
-                .addOnSuccessListener(unused -> onSuccess.run())
-                .addOnFailureListener(e -> onFailure.onFailure(
-                        e.getMessage() != null ? e.getMessage() : "Failed to save file links."
-                ));
     }
 }

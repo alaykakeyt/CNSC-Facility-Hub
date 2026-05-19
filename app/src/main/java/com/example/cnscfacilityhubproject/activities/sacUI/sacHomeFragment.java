@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -118,28 +119,28 @@ public class sacHomeFragment extends Fragment {
                     layoutRecentRequests.removeAllViews();
 
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (!isSACRelatedRequest(doc)) continue;
+                        if (RequestDataHelper.shouldShowInRequestList(doc) && isSACRelatedRequest(doc)) {
+                            String status = getDisplayStatus(doc);
 
-                        String status = getDisplayStatus(doc);
+                            if ("Pending".equalsIgnoreCase(status)) {
+                                pending++;
+                            }
 
-                        if ("Pending".equalsIgnoreCase(status)) {
-                            pending++;
-                        }
+                            if ("Approved".equalsIgnoreCase(status)) {
+                                approved++;
+                            }
 
-                        if ("Approved".equalsIgnoreCase(status)) {
-                            approved++;
-                        }
-
-                        if (recentCount < 3) {
-                            layoutRecentRequests.addView(
-                                    SACViewFactory.createCompactRequestCard(
-                                            requireContext(),
-                                            doc,
-                                            status,
-                                            v -> openDetails(doc.getId())
-                                    )
-                            );
-                            recentCount++;
+                            if (recentCount < 3) {
+                                layoutRecentRequests.addView(
+                                        SACViewFactory.createCompactRequestCard(
+                                                requireContext(),
+                                                doc,
+                                                status,
+                                                v -> openDetails(doc.getId())
+                                        )
+                                );
+                                recentCount++;
+                            }
                         }
                     }
 

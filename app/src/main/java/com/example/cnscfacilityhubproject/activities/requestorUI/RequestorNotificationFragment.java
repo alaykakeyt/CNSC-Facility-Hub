@@ -15,6 +15,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
@@ -131,7 +132,8 @@ public class RequestorNotificationFragment extends Fragment {
                         Boolean requestorNotificationSeen = doc.getBoolean("requestorNotificationSeen");
                         Boolean notificationForRequestor = doc.getBoolean("notificationForRequestor");
 
-                        if (Boolean.TRUE.equals(notificationForRequestor)
+                        if (RequestDataHelper.shouldShowInRequestList(doc)
+                                && Boolean.TRUE.equals(notificationForRequestor)
                                 && !Boolean.TRUE.equals(requestorSeen)
                                 && !Boolean.TRUE.equals(requestorNotificationSeen)) {
                             requestList.add(doc);

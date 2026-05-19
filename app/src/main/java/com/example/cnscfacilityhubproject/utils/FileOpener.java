@@ -21,7 +21,16 @@ public final class FileOpener {
             Toast.makeText(context, "File link is not available.", Toast.LENGTH_SHORT).show();
             return;
         }
-        openUrl(context, file.getFileUrl(), file.getFileName());
+        String url = file.getFileUrl();
+        if (url.startsWith("content://")) {
+            Toast.makeText(
+                    context,
+                    "This file was uploaded using an older local URI and may not be accessible on this device.",
+                    Toast.LENGTH_LONG
+            ).show();
+            return;
+        }
+        openUrl(context, url, file.getFileName());
     }
 
     public static void openUrl(Context context, String url, String label) {

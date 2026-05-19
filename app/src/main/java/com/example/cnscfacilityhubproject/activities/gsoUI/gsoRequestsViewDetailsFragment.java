@@ -181,10 +181,20 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         String numberOfParticipants = getLongString(doc, "numberOfParticipants");
         String notificationTarget = getStringValue(doc, "notificationTarget");
         List<ProposalFileItem> proposalFiles = RequestDataHelper.getProposalFiles(doc);
+        boolean hasContentUri = false;
         if (!proposalFiles.isEmpty()) {
             proposalFileUrl = proposalFiles.get(0).getFileUrl();
+            for (ProposalFileItem f : proposalFiles) {
+                if (f.getFileUrl().startsWith("content://")) {
+                    hasContentUri = true;
+                    break;
+                }
+            }
         } else {
             proposalFileUrl = getStringValue(doc, "proposalFileUrl");
+            if (proposalFileUrl.startsWith("content://")) {
+                hasContentUri = true;
+            }
         }
 
         chipStatus.setText(displayStatus);
@@ -211,9 +221,17 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         tvAmenities.setText(buildAmenities(doc));
         tvTechnicalList.setText("Technical Requirements:\n" + buildTechnicalList(doc));
         tvConnectors.setText("Connectors / Cables: " + fallback(getStringValue(doc, "connectors")));
-        tvProposalFile.setText(proposalFiles.isEmpty()
-                ? "Proposal files: none"
-                : "Proposal files: " + proposalFiles.size());
+        
+        if (hasContentUri) {
+            tvProposalFile.setText("Warning: This request contains files with local URIs that may not open correctly.");
+            tvProposalFile.setTextColor(Color.RED);
+        } else {
+            tvProposalFile.setText(proposalFiles.isEmpty()
+                    ? "Proposal files: none"
+                    : "Proposal files: " + proposalFiles.size());
+            tvProposalFile.setTextColor(Color.parseColor("#313131"));
+        }
+
         tvRoute.setText("Route: " + fallback(notificationTarget));
         tvRemarks.setText("Remarks: " + fallback(getRemarks(doc)));
 

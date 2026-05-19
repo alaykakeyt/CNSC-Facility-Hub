@@ -177,7 +177,8 @@ public final class RequestDataHelper {
                         ProposalFileItem file = new ProposalFileItem(
                                 String.valueOf(map.get("fileName")),
                                 String.valueOf(map.get("fileUrl")),
-                                String.valueOf(map.get("fileType"))
+                                String.valueOf(map.get("fileType")),
+                                String.valueOf(map.get("source") != null ? map.get("source") : "external_link")
                         );
                         files.add(file);
                     }
@@ -195,7 +196,8 @@ public final class RequestDataHelper {
             files.add(new ProposalFileItem(
                     legacyName.isEmpty() ? "Proposal file" : legacyName,
                     legacyUrl,
-                    guessTypeFromName(legacyName)
+                    guessTypeFromName(legacyName),
+                    ""
             ));
         }
 
@@ -382,6 +384,37 @@ public final class RequestDataHelper {
 
     private static String safeString(String value) {
         return value != null ? value.trim() : "";
+    }
+
+    /**
+     * Whether a request should appear in normal request lists.
+     * Hides incomplete uploads; keeps legacy documents without isSubmissionComplete.
+     */
+    public static boolean shouldShowInRequestList(DocumentSnapshot doc) {
+        if (doc == null) {
+            return false;
+        }
+
+        Boolean isSubmissionComplete = doc.getBoolean("isSubmissionComplete");
+        if (Boolean.FALSE.equals(isSubmissionComplete)) {
+            return false;
+        }
+
+        if (Boolean.TRUE.equals(isSubmissionComplete)) {
+            return true;
+        }
+
+        String status = safeString(doc.getString("status"));
+        String uploadStatus = safeString(doc.getString("uploadStatus"));
+
+        if ("Uploading".equalsIgnoreCase(status)
+                || "Upload Failed".equalsIgnoreCase(status)
+                || "Uploading".equalsIgnoreCase(uploadStatus)
+                || "Failed".equalsIgnoreCase(uploadStatus)) {
+            return false;
+        }
+
+        return true;
     }
 
     /** Tiny helper to avoid importing android.text.TextUtils in a util used widely. */

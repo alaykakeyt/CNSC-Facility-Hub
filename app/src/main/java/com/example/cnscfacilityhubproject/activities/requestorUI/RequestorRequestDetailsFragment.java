@@ -239,10 +239,20 @@ public class RequestorRequestDetailsFragment extends Fragment {
         String connectors = getStringValue(doc, "connectors");
 
         List<ProposalFileItem> proposalFiles = RequestDataHelper.getProposalFiles(doc);
+        boolean hasContentUri = false;
         if (!proposalFiles.isEmpty()) {
             proposalFileUrl = proposalFiles.get(0).getFileUrl();
+            for (ProposalFileItem f : proposalFiles) {
+                if (f.getFileUrl().startsWith("content://")) {
+                    hasContentUri = true;
+                    break;
+                }
+            }
         } else {
             proposalFileUrl = getStringValue(doc, "proposalFileUrl");
+            if (proposalFileUrl.startsWith("content://")) {
+                hasContentUri = true;
+            }
         }
 
         String notificationTarget = getStringValue(doc, "notificationTarget");
@@ -300,9 +310,16 @@ public class RequestorRequestDetailsFragment extends Fragment {
             tvDetailConnectors.setText("Connectors / Cables: None");
         }
 
-        tvDetailProposalFileName.setText(proposalFiles.isEmpty()
-                ? "Proposal files: none"
-                : "Proposal files: " + proposalFiles.size());
+        if (hasContentUri) {
+            tvDetailProposalFileName.setText("Warning: This request contains files with local URIs that may not open correctly on other devices.");
+            tvDetailProposalFileName.setTextColor(Color.RED);
+        } else {
+            tvDetailProposalFileName.setText(proposalFiles.isEmpty()
+                    ? "Proposal files: none"
+                    : "Proposal files: " + proposalFiles.size());
+            tvDetailProposalFileName.setTextColor(Color.parseColor("#313131"));
+        }
+
         tvDetailNotificationTarget.setText("Sent To: " + fallback(notificationTarget));
         tvDetailAgreement.setText("Agreement Accepted: " + (agreementAccepted ? "Yes" : "No"));
 

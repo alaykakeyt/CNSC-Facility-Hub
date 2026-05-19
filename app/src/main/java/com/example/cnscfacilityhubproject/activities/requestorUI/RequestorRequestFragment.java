@@ -8,6 +8,7 @@ import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,13 +19,9 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
-import com.example.cnscfacilityhubproject.models.FileUtils;
-import com.example.cnscfacilityhubproject.models.LocalFileItem;
 import com.example.cnscfacilityhubproject.models.ProposalFileItem;
 import com.example.cnscfacilityhubproject.models.ScheduleDayItem;
 import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
@@ -98,47 +95,25 @@ public class RequestorRequestFragment extends Fragment {
     private LinearLayout layoutSingleDayTimes;
     private LinearLayout layoutScheduleDays;
     private TextView tvScheduleHint;
+    
+    private TextInputEditText etLinkLabel;
+    private TextInputEditText etLinkUrl;
+    private MaterialButton btnAddLink;
     private LinearLayout layoutSelectedFiles;
-
-    private MaterialButton btnUploadProposal;
-    private MaterialButton btnSubmitRequest;
     private TextView tvSelectedFile;
+
+    private MaterialButton btnSubmitRequest;
     private ProgressBar progressSubmit;
     private TextView tvSubmitStatus;
 
     private String selectedActivityType = "Institutional";
 
-    private final List<LocalFileItem> selectedFiles = new ArrayList<>();
+    private final List<ProposalFileItem> proposalLinks = new ArrayList<>();
     private final Map<String, TextInputEditText> perDayStartFields = new HashMap<>();
     private final Map<String, TextInputEditText> perDayEndFields = new HashMap<>();
 
     private FirebaseAuth auth;
     private FirebaseFirestore db;
-
-    private final ActivityResultLauncher<String[]> filePickerLauncher =
-            registerForActivityResult(new ActivityResultContracts.OpenMultipleDocuments(), uris -> {
-                if (uris == null || uris.isEmpty()) {
-                    return;
-                }
-
-                for (Uri uri : uris) {
-                    if (uri == null) continue;
-
-                    try {
-                        requireContext().getContentResolver().takePersistableUriPermission(
-                                uri,
-                                Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        );
-                    } catch (SecurityException ignored) {
-                    }
-
-                    String fileName = FileUtils.getFileName(requireContext(), uri);
-                    String mimeType = requireContext().getContentResolver().getType(uri);
-                    selectedFiles.add(new LocalFileItem(uri, fileName, mimeType));
-                }
-
-                refreshSelectedFilesUi();
-            });
 
     public RequestorRequestFragment() {
         super(R.layout.fragment_requestor_request);
@@ -159,7 +134,7 @@ public class RequestorRequestFragment extends Fragment {
         setupTimePickers();
         setupAmenitiesInputs();
         setupTechnicalOptions();
-        setupFilePicker();
+        setupLinkActions();
         setupSubmit();
         loadRequestorInformation();
     }
@@ -214,11 +189,14 @@ public class RequestorRequestFragment extends Fragment {
         layoutSingleDayTimes = view.findViewById(R.id.layoutSingleDayTimes);
         layoutScheduleDays = view.findViewById(R.id.layoutScheduleDays);
         tvScheduleHint = view.findViewById(R.id.tvScheduleHint);
+        
+        etLinkLabel = view.findViewById(R.id.etLinkLabel);
+        etLinkUrl = view.findViewById(R.id.etLinkUrl);
+        btnAddLink = view.findViewById(R.id.btnAddLink);
         layoutSelectedFiles = view.findViewById(R.id.layoutSelectedFiles);
-
-        btnUploadProposal = view.findViewById(R.id.btnUploadProposal);
-        btnSubmitRequest = view.findViewById(R.id.btnSubmitRequest);
         tvSelectedFile = view.findViewById(R.id.tvSelectedFile);
+
+        btnSubmitRequest = view.findViewById(R.id.btnSubmitRequest);
         progressSubmit = view.findViewById(R.id.progressSubmit);
         tvSubmitStatus = view.findViewById(R.id.tvSubmitStatus);
     }
@@ -548,17 +526,40 @@ public class RequestorRequestFragment extends Fragment {
         return card;
     }
 
-    private void setupFilePicker() {
-        btnUploadProposal.setOnClickListener(v -> {
-            try {
-                filePickerLauncher.launch(new String[]{
-                        "image/jpeg",
-                        "image/png",
-                        "application/pdf",
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                });
-            } catch (ActivityNotFoundException e) {
-                Toast.makeText(requireContext(), "No file picker found.", Toast.LENGTH_SHORT).show();
+    private void setupLinkActions() {
+        btnAddLink.setOnClickListener(v -> {
+            String label = getText(etLinkLabel);
+            String url = getText(etLinkUrl);
+
+            if (label.isEmpty()) {
+                etLinkLabel.setError("Enter a label (e.g. Proposal)");
+                return;
+            }
+
+            if (url.isEmpty()) {
+                etLinkUrl.setError("Paste a link");
+                return;
+            }
+
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                etLinkUrl.setError("Link must start with http:// or https://");
+                return;
+            }
+
+            if (url.startsWith("content://")) {
+                etLinkUrl.setError("Local device links are not allowed.");
+                return;
+            }
+
+            proposalLinks.add(new ProposalFileItem(label, url, "link", "external_link"));
+            etLinkLabel.setText("");
+            etLinkUrl.setText("");
+            etLinkLabel.setError(null);
+            etLinkUrl.setError(null);
+            refreshSelectedFilesUi();
+
+            if (url.contains("drive.google.com")) {
+                Toast.makeText(requireContext(), "Reminder: Ensure your Google Drive link is set to 'Anyone with the link can view'.", Toast.LENGTH_LONG).show();
             }
         });
     }
@@ -566,15 +567,16 @@ public class RequestorRequestFragment extends Fragment {
     private void refreshSelectedFilesUi() {
         layoutSelectedFiles.removeAllViews();
 
-        if (selectedFiles.isEmpty()) {
-            tvSelectedFile.setText("Accepted: PDF, DOCX, JPG, PNG (multiple files allowed)");
+        if (proposalLinks.isEmpty()) {
+            tvSelectedFile.setText("No links added. At least one is required.");
+            tvSelectedFile.setTextColor(requireContext().getColor(R.color.cnsc_text_primary));
             return;
         }
 
-        tvSelectedFile.setText(selectedFiles.size() + " file(s) selected");
+        tvSelectedFile.setText(proposalLinks.size() + " link(s) added");
+        tvSelectedFile.setTextColor(requireContext().getColor(R.color.cnsc_primary));
 
-        for (LocalFileItem file : new ArrayList<>(selectedFiles)) {
-
+        for (ProposalFileItem link : new ArrayList<>(proposalLinks)) {
             MaterialCardView row = new MaterialCardView(requireContext());
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -590,18 +592,28 @@ public class RequestorRequestFragment extends Fragment {
             LinearLayout inner = new LinearLayout(requireContext());
             inner.setOrientation(LinearLayout.HORIZONTAL);
             inner.setGravity(Gravity.CENTER_VERTICAL);
-            inner.setPadding(dp(10), dp(10), dp(10), dp(10));
+            inner.setPadding(dp(12), dp(8), dp(12), dp(8));
 
             TextView name = new TextView(requireContext());
-            name.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-            name.setText(file.getFileName());
+            LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            name.setLayoutParams(nameParams);
+            name.setText(link.getFileName());
             name.setTextColor(requireContext().getColor(R.color.cnsc_text_primary));
+            name.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+            name.setSingleLine(true);
+            name.setPadding(0, 0, dp(8), 0);
 
-            MaterialButton remove = new MaterialButton(requireContext());
+            MaterialButton remove = new MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
             remove.setText("Remove");
+            remove.setPadding(dp(8), 0, dp(8), 0);
+            remove.setMinimumWidth(0);
+            remove.setMinimumHeight(0);
             remove.setAllCaps(false);
+            remove.setTextSize(12f);
+            remove.setStrokeColorResource(R.color.cnsc_text_secondary);
+            remove.setTextColor(requireContext().getColor(R.color.cnsc_text_secondary));
             remove.setOnClickListener(v -> {
-                selectedFiles.remove(file);
+                proposalLinks.remove(link);
                 refreshSelectedFilesUi();
             });
 
@@ -615,6 +627,7 @@ public class RequestorRequestFragment extends Fragment {
     private void setupSubmit() {
         btnSubmitRequest.setOnClickListener(v -> {
             if (!validateForm()) return;
+            Log.d("CNSC_RequestSubmit", "Form validation passed");
             if (auth.getCurrentUser() == null) {
                 Toast.makeText(requireContext(), "No logged in user found.", Toast.LENGTH_SHORT).show();
                 return;
@@ -683,7 +696,7 @@ public class RequestorRequestFragment extends Fragment {
                         return;
                     }
 
-                    createRequestAndUploadFiles(facilityNames, facilityKeys, scheduleDays);
+                    createRequestWithLinks(facilityNames, facilityKeys, scheduleDays);
                 })
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
@@ -694,11 +707,13 @@ public class RequestorRequestFragment extends Fragment {
                 });
     }
 
-    private void createRequestAndUploadFiles(
+    private void createRequestWithLinks(
             List<String> facilityNames,
             List<String> facilityKeys,
             List<ScheduleDayItem> scheduleDays
     ) {
+        String TAG = "CNSC_RequestSubmit";
+        Log.d(TAG, "Preparing request map for submission...");
         setSubmitting(true, "Submitting request...");
 
         String userId = auth.getCurrentUser().getUid();
@@ -804,56 +819,23 @@ public class RequestorRequestFragment extends Fragment {
                 sendToITSO,
                 sendToGSO,
                 notificationTarget,
-                workflowStage
+                workflowStage,
+                proposalLinks
         );
 
+        Log.d(TAG, "Adding request document to Firestore...");
         db.collection("requests")
                 .add(requestMap)
                 .addOnSuccessListener(documentReference -> {
                     if (!isAdded()) return;
-
-                    String requestId = documentReference.getId();
-                    setSubmitting(true, "Uploading files...");
-
-                    RequestSubmissionHelper.uploadProposalFiles(
-                            requireContext(),
-                            requestId,
-                            selectedFiles,
-                            new RequestSubmissionHelper.UploadCallback() {
-                                @Override
-                                public void onSuccess(List<ProposalFileItem> uploadedFiles) {
-                                    RequestSubmissionHelper.attachUploadedFiles(
-                                            requestId,
-                                            uploadedFiles,
-                                            () -> {
-                                                if (!isAdded()) return;
-                                                setSubmitting(false, "");
-                                                showSuccessToast(needsSAC, needsITSO);
-                                                clearForm();
-                                            },
-                                            message -> {
-                                                if (!isAdded()) return;
-                                                setSubmitting(false, "");
-                                                Toast.makeText(requireContext(),
-                                                        "Request saved but files failed: " + message,
-                                                        Toast.LENGTH_LONG).show();
-                                            }
-                                    );
-                                }
-
-                                @Override
-                                public void onFailure(String message) {
-                                    if (!isAdded()) return;
-                                    setSubmitting(false, "");
-                                    Toast.makeText(requireContext(),
-                                            "Request saved but upload failed: " + message,
-                                            Toast.LENGTH_LONG).show();
-                                }
-                            }
-                    );
+                    Log.d(TAG, "Firestore document created with ID: " + documentReference.getId());
+                    setSubmitting(false, "");
+                    showSuccessToast(needsSAC, needsITSO);
+                    clearForm();
                 })
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
+                    Log.e(TAG, "Failed to create Firestore document: " + e.getMessage());
                     setSubmitting(false, "");
                     Toast.makeText(requireContext(),
                             "Failed to submit request: " + e.getMessage(),
@@ -862,28 +844,14 @@ public class RequestorRequestFragment extends Fragment {
     }
 
     private void showSuccessToast(boolean needsSAC, boolean needsITSO) {
-        if (needsSAC && needsITSO) {
-            Toast.makeText(requireContext(),
-                    "Request submitted and sent to SAC. ITSO review follows SAC approval.",
-                    Toast.LENGTH_LONG).show();
-        } else if (needsSAC) {
-            Toast.makeText(requireContext(),
-                    "Request submitted successfully and sent to SAC.",
-                    Toast.LENGTH_LONG).show();
-        } else if (needsITSO) {
-            Toast.makeText(requireContext(),
-                    "Request submitted successfully and sent to ITSO.",
-                    Toast.LENGTH_LONG).show();
-        } else {
-            Toast.makeText(requireContext(),
-                    "Request submitted successfully and sent to GSO.",
-                    Toast.LENGTH_LONG).show();
-        }
+        Toast.makeText(requireContext(),
+                "Request submitted successfully.",
+                Toast.LENGTH_LONG).show();
     }
 
     private void setSubmitting(boolean submitting, String statusText) {
         btnSubmitRequest.setEnabled(!submitting);
-        btnUploadProposal.setEnabled(!submitting);
+        btnAddLink.setEnabled(!submitting);
         progressSubmit.setVisibility(submitting ? View.VISIBLE : View.GONE);
 
         if (statusText == null || statusText.isEmpty()) {
@@ -972,8 +940,8 @@ public class RequestorRequestFragment extends Fragment {
             return false;
         }
 
-        if (selectedFiles.isEmpty()) {
-            Toast.makeText(requireContext(), "Please upload at least one proposal file.", Toast.LENGTH_SHORT).show();
+        if (proposalLinks.isEmpty()) {
+            Toast.makeText(requireContext(), "Please add at least one proposal link.", Toast.LENGTH_SHORT).show();
             return false;
         }
 
@@ -1016,7 +984,7 @@ public class RequestorRequestFragment extends Fragment {
         selectedActivityType = "Institutional";
         chipGroupFacility.clearCheck();
 
-        selectedFiles.clear();
+        proposalLinks.clear();
         refreshSelectedFilesUi();
         rebuildScheduleDayCards();
 

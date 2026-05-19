@@ -175,10 +175,20 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         String participants = getStringValue(doc, "participants");
         String numberOfParticipants = getLongString(doc, "numberOfParticipants");
         List<ProposalFileItem> proposalFiles = RequestDataHelper.getProposalFiles(doc);
+        boolean hasContentUri = false;
         if (!proposalFiles.isEmpty()) {
             proposalFileUrl = proposalFiles.get(0).getFileUrl();
+            for (ProposalFileItem f : proposalFiles) {
+                if (f.getFileUrl().startsWith("content://")) {
+                    hasContentUri = true;
+                    break;
+                }
+            }
         } else {
             proposalFileUrl = getStringValue(doc, "proposalFileUrl");
+            if (proposalFileUrl.startsWith("content://")) {
+                hasContentUri = true;
+            }
         }
 
         chipStatus.setText(displayStatus);
@@ -203,9 +213,17 @@ public class sacRequestsViewDetailsFragment extends Fragment {
 
         tvPurposeFull.setText("Purpose: " + fallback(purpose));
         tvAmenities.setText(buildAmenities(doc));
-        tvProposalFile.setText(proposalFiles.isEmpty()
-                ? "Proposal files: none"
-                : "Proposal files: " + proposalFiles.size());
+        
+        if (hasContentUri) {
+            tvProposalFile.setText("Warning: This request contains files with local URIs that may not open correctly.");
+            tvProposalFile.setTextColor(Color.RED);
+        } else {
+            tvProposalFile.setText(proposalFiles.isEmpty()
+                    ? "Proposal files: none"
+                    : "Proposal files: " + proposalFiles.size());
+            tvProposalFile.setTextColor(Color.parseColor("#313131"));
+        }
+
         tvRoute.setText(buildRouteText(doc));
 
         etSacRemarks.setText(getStringValue(doc, "sacRemarks"));

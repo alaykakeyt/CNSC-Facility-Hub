@@ -11,6 +11,22 @@ import java.util.Set;
 
 /**
  * Detects schedule conflicts for multi-facility and multi-day requests.
+ * 
+ * CONFLICT DETECTION RULES:
+ * - Checks if requested facilities overlap with existing requests
+ * - Compares each day's schedule for overlapping time slots
+ * - Only considers requests with conflict statuses: Pending, Approved, Approved - Available, Booked
+ * - Excludes: Rejected, Returned, Cancelled, Upload Failed, etc.
+ * 
+ * SAFETY APPROACH:
+ * - If time parsing fails due to invalid format, returns a conflict (blocks submission)
+ * - This is conservative - better to block invalid data than to allow silent conflicts
+ * - Trims and normalizes all time strings before comparison
+ * 
+ * LIMITATIONS:
+ * - Scans all requests (no Firestore query optimization available)
+ * - Firestore doesn't support complex array/time queries needed for filtering
+ * - At scale, consider Cloud Functions or Firestore collection indexes
  */
 public final class ScheduleConflictChecker {
 
@@ -37,7 +53,8 @@ public final class ScheduleConflictChecker {
         Set<String> requestedKeys = new HashSet<>(requestedFacilityKeys);
 
         for (QueryDocumentSnapshot doc : existingRequests) {
-            if (!isConflictStatus(doc.getString("status"))) {
+            String status = doc.getString("status");
+            if (!isConflictStatus(status)) {
                 continue;
             }
 
@@ -61,12 +78,14 @@ public final class ScheduleConflictChecker {
                         continue;
                     }
 
-                    if (isTimeOverlapping(
+                    TimeOverlapResult overlap = isTimeOverlappingWithValidation(
                             newDay.getStartTimeText(),
                             newDay.getEndTimeText(),
                             existingDay.getStartTimeText(),
                             existingDay.getEndTimeText()
-                    )) {
+                    );
+                    
+                    if (overlap.hasConflict) {
                         return buildConflictMessage(
                                 facilityLabel,
                                 existingDay.getDateText(),
@@ -74,11 +93,30 @@ public final class ScheduleConflictChecker {
                                 existingDay.getEndTimeText()
                         );
                     }
+                    
+                    // If time parsing failed, treat it as a conflict (conservative approach)
+                    if (overlap.parsingFailed) {
+                        return "Unable to verify schedule availability due to invalid time format. "
+                                + "Please check your times and try again.";
+                    }
                 }
             }
         }
 
         return "";
+    }
+
+    /**
+     * Helper class to track both conflict detection and parsing errors
+     */
+    private static class TimeOverlapResult {
+        boolean hasConflict;
+        boolean parsingFailed;
+        
+        TimeOverlapResult(boolean hasConflict, boolean parsingFailed) {
+            this.hasConflict = hasConflict;
+            this.parsingFailed = parsingFailed;
+        }
     }
 
     public static boolean isConflictStatus(String status) {
@@ -104,7 +142,12 @@ public final class ScheduleConflictChecker {
         return dateA.trim().equalsIgnoreCase(dateB.trim());
     }
 
-    private static boolean isTimeOverlapping(
+    /**
+     * Check time overlap with validation and error tracking
+     * 
+     * @return TimeOverlapResult with hasConflict and parsingFailed flags
+     */
+    private static TimeOverlapResult isTimeOverlappingWithValidation(
             String newStart,
             String newEnd,
             String existingStart,
@@ -115,11 +158,30 @@ public final class ScheduleConflictChecker {
         long existingStartMs = RequestDataHelper.parseTimeToMillis(existingStart);
         long existingEndMs = RequestDataHelper.parseTimeToMillis(existingEnd);
 
+        // If any time parsing failed, report parsing error (conservative approach)
         if (newStartMs == -1 || newEndMs == -1 || existingStartMs == -1 || existingEndMs == -1) {
-            return false;
+            return new TimeOverlapResult(false, true);
         }
 
-        return newStartMs < existingEndMs && newEndMs > existingStartMs;
+        // Check if times overlap: new event starts before existing event ends AND new event ends after existing starts
+        boolean overlap = newStartMs < existingEndMs && newEndMs > existingStartMs;
+        return new TimeOverlapResult(overlap, false);
+    }
+
+    /**
+     * Legacy method for backward compatibility (treats parse errors as no conflict)
+     * Deprecated: Use isTimeOverlappingWithValidation instead
+     */
+    @Deprecated
+    private static boolean isTimeOverlapping(
+            String newStart,
+            String newEnd,
+            String existingStart,
+            String existingEnd
+    ) {
+        TimeOverlapResult result = isTimeOverlappingWithValidation(newStart, newEnd, existingStart, existingEnd);
+        // Legacy behavior: if parsing failed, treat as no conflict (less safe)
+        return result.hasConflict;
     }
 
     public static String buildConflictMessage(
