@@ -8,7 +8,9 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -415,6 +417,134 @@ public final class RequestDataHelper {
         }
 
         return true;
+    }
+
+    public static boolean isActiveAppointment(DocumentSnapshot doc) {
+        if (doc == null) return false;
+
+        // Basic requirement: must be submitted
+        if (!shouldShowInRequestList(doc)) return false;
+
+        String status = doc.getString("status");
+        if (status == null) status = "";
+
+        String workflowStage = doc.getString("workflowStage");
+        if (workflowStage == null) workflowStage = "";
+
+        // Non-active statuses (if it's already definitively finished)
+        if (status.equalsIgnoreCase("Rejected") ||
+                status.equalsIgnoreCase("Returned") ||
+                status.equalsIgnoreCase("Cancelled") ||
+                status.equalsIgnoreCase("Completed") ||
+                status.equalsIgnoreCase("Upload Failed")) {
+            return false;
+        }
+
+        // Active statuses or workflow stages
+        List<String> activeStatuses = Arrays.asList(
+                "Pending", "Approved", "Approved - Available", "Booked",
+                "For SAC Review", "For ITSO Review", "For GSO Review",
+                "SAC_REVIEW", "ITSO_REVIEW", "GSO_REVIEW"
+        );
+
+        List<String> activeStages = Arrays.asList(
+                "SAC_REVIEW", "ITSO_REVIEW", "WAITING_ITSO_APPROVAL",
+                "WAITING_SAC_APPROVAL", "GSO_REVIEW", "APPROVED"
+        );
+
+        boolean isStatusActive = false;
+        for (String s : activeStatuses) {
+            if (status.equalsIgnoreCase(s)) {
+                isStatusActive = true;
+                break;
+            }
+        }
+
+        if (!isStatusActive) {
+            for (String s : activeStages) {
+                if (workflowStage.equalsIgnoreCase(s)) {
+                    isStatusActive = true;
+                    break;
+                }
+            }
+        }
+
+        // If it's one of the active statuses/stages, check if it has ended yet.
+        if (isStatusActive) {
+            return !hasAppointmentEnded(doc);
+        }
+
+        return false;
+    }
+
+    public static boolean hasAppointmentEnded(DocumentSnapshot doc) {
+        long endMillis = getAppointmentEndMillis(doc);
+        if (endMillis == -1) return false;
+        return System.currentTimeMillis() > endMillis;
+    }
+
+    public static long getAppointmentEndMillis(DocumentSnapshot doc) {
+        List<ScheduleDayItem> days = getScheduleDays(doc);
+        if (days.isEmpty()) {
+            return -1;
+        }
+
+        // Find the day with the latest date
+        ScheduleDayItem latestDay = null;
+        long latestDateMillis = -1;
+
+        for (ScheduleDayItem day : days) {
+            long dateMillis = parseDateToMillis(day.getDateText());
+            if (dateMillis > latestDateMillis) {
+                latestDateMillis = dateMillis;
+                latestDay = day;
+            }
+        }
+
+        if (latestDay == null) return -1;
+
+        // Combine date and time
+        try {
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTimeInMillis(latestDateMillis);
+
+            String endTime = latestDay.getEndTimeText();
+            if (endTime.isEmpty()) {
+                // If no end time, assume end of day (11:59 PM)
+                calendar.set(Calendar.HOUR_OF_DAY, 23);
+                calendar.set(Calendar.MINUTE, 59);
+                calendar.set(Calendar.SECOND, 59);
+                return calendar.getTimeInMillis();
+            }
+
+            SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.getDefault());
+            java.util.Date time = sdf.parse(endTime);
+            if (time != null) {
+                Calendar timeCal = Calendar.getInstance();
+                timeCal.setTime(time);
+                calendar.set(Calendar.HOUR_OF_DAY, timeCal.get(Calendar.HOUR_OF_DAY));
+                calendar.set(Calendar.MINUTE, timeCal.get(Calendar.MINUTE));
+                calendar.set(Calendar.SECOND, 0);
+                calendar.set(Calendar.MILLISECOND, 0);
+            }
+            return calendar.getTimeInMillis();
+        } catch (Exception e) {
+            return latestDateMillis;
+        }
+    }
+
+    public static boolean isRequestorNotificationUnseen(DocumentSnapshot doc) {
+        if (doc == null) return false;
+        
+        Boolean notificationForRequestor = doc.getBoolean("notificationForRequestor");
+        Boolean requestorSeen = doc.getBoolean("requestorSeen");
+        Boolean requestorNotificationSeen = doc.getBoolean("requestorNotificationSeen");
+        Boolean requestorApprovedSeen = doc.getBoolean("requestorApprovedSeen");
+
+        return Boolean.TRUE.equals(notificationForRequestor)
+                && !Boolean.TRUE.equals(requestorSeen)
+                && !Boolean.TRUE.equals(requestorNotificationSeen)
+                && !Boolean.TRUE.equals(requestorApprovedSeen);
     }
 
     /** Tiny helper to avoid importing android.text.TextUtils in a util used widely. */

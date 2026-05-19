@@ -19,6 +19,7 @@ import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.example.cnscfacilityhubproject.utils.RoleGuardHelper;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
@@ -147,18 +148,43 @@ public class RequestorNavBarActivity extends AppCompatActivity {
             setSelectedTab(Tab.REQUESTS);
         });
 
-        // IMPORTANT:
-        // Do NOT mark notifications as seen here.
-        // Notification should only disappear when requestor clicks View Request.
         navNotification.setOnClickListener(v -> {
             loadFragment(new RequestorNotificationFragment());
             setSelectedTab(Tab.NOTIFICATION);
+            markAllNotificationsAsSeen();
         });
 
         navProfile.setOnClickListener(v -> {
             loadFragment(new RequestorProfileFragment());
             setSelectedTab(Tab.PROFILE);
         });
+    }
+
+    private void markAllNotificationsAsSeen() {
+        if (auth.getCurrentUser() == null) return;
+
+        String userId = auth.getCurrentUser().getUid();
+
+        db.collection("requests")
+                .whereEqualTo("userId", userId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot == null || snapshot.isEmpty()) return;
+
+                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                        if (RequestDataHelper.isRequestorNotificationUnseen(doc)) {
+                            doc.getReference().update(
+                                    "requestorSeen", true,
+                                    "requestorNotificationSeen", true,
+                                    "requestorApprovedSeen", true,
+                                    "notificationForRequestor", false,
+                                    "requestorNotificationOpenedAt", FieldValue.serverTimestamp(),
+                                    "updatedAt", FieldValue.serverTimestamp()
+                            );
+                        }
+                    }
+                    updateIncomingBadge(0);
+                });
     }
 
     private void loadFragment(Fragment fragment) {
@@ -190,23 +216,13 @@ public class RequestorNavBarActivity extends AppCompatActivity {
                     int unseenCount = 0;
 
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (RequestDataHelper.shouldShowInRequestList(doc) && isRequestorNotificationUnseen(doc)) {
+                        if (RequestDataHelper.shouldShowInRequestList(doc) && RequestDataHelper.isRequestorNotificationUnseen(doc)) {
                             unseenCount++;
                         }
                     }
 
                     updateIncomingBadge(unseenCount);
                 });
-    }
-
-    private boolean isRequestorNotificationUnseen(DocumentSnapshot doc) {
-        Boolean notificationForRequestor = doc.getBoolean("notificationForRequestor");
-        Boolean requestorSeen = doc.getBoolean("requestorSeen");
-        Boolean requestorNotificationSeen = doc.getBoolean("requestorNotificationSeen");
-
-        return Boolean.TRUE.equals(notificationForRequestor)
-                && !Boolean.TRUE.equals(requestorSeen)
-                && !Boolean.TRUE.equals(requestorNotificationSeen);
     }
 
     private void updateIncomingBadge(int count) {

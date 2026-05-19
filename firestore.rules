@@ -88,7 +88,7 @@ service cloud.firestore {
               resource.data.isSubmissionComplete == false
               || resource.data.status in ["Uploading", "Upload Failed"]
               // Allow marking as seen even if complete
-              || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['requestorSeen', 'requestorNotificationSeen', 'updatedAt'])
+              || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['requestorSeen', 'requestorNotificationSeen', 'requestorApprovedSeen', 'requestorNotificationOpenedAt', 'requestorSeenAt', 'updatedAt', 'notificationForRequestor'])
             )
           )
         );

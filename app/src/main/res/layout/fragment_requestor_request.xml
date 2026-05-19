@@ -35,6 +35,94 @@
             android:textSize="14sp" />
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardActiveAppointment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="#FFF0D8"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="4dp"
+            app:strokeColor="#F57C00"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:id="@+id/tvActiveAppointmentTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Current Active Appointment"
+                    android:textColor="#313131"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/tvActiveAppointmentStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Status: Pending"
+                    android:textColor="#F57C00"
+                    app:chipBackgroundColor="#FFF3E0"
+                    app:chipStrokeWidth="0dp" />
+
+                <TextView
+                    android:id="@+id/tvActiveAppointmentFacility"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Facility: Student Center"
+                    android:textColor="#313131"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/tvActiveAppointmentSchedule"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Schedule: MMMM dd, yyyy • 08:00 AM - 05:00 PM"
+                    android:textColor="#313131"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/tvActiveAppointmentPurpose"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Purpose: Event Title"
+                    android:textColor="#313131"
+                    android:textSize="14sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnViewActiveAppointment"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="16dp"
+                    android:text="View Details"
+                    android:textAllCaps="false"
+                    app:backgroundTint="#313131"
+                    app:cornerRadius="14dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:text="You may submit another request after this appointment has ended."
+                    android:textColor="#970705"
+                    android:textSize="12sp"
+                    android:textStyle="italic" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardRequestForm"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"

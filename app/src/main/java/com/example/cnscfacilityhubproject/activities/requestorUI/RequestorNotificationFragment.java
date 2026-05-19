@@ -128,14 +128,8 @@ public class RequestorNotificationFragment extends Fragment {
                     requestList.clear();
 
                     for (DocumentSnapshot doc : docs) {
-                        Boolean requestorSeen = doc.getBoolean("requestorSeen");
-                        Boolean requestorNotificationSeen = doc.getBoolean("requestorNotificationSeen");
-                        Boolean notificationForRequestor = doc.getBoolean("notificationForRequestor");
-
                         if (RequestDataHelper.shouldShowInRequestList(doc)
-                                && Boolean.TRUE.equals(notificationForRequestor)
-                                && !Boolean.TRUE.equals(requestorSeen)
-                                && !Boolean.TRUE.equals(requestorNotificationSeen)) {
+                                && RequestDataHelper.isRequestorNotificationUnseen(doc)) {
                             requestList.add(doc);
                         }
                     }
@@ -351,8 +345,11 @@ public class RequestorNotificationFragment extends Fragment {
                 .update(
                         "requestorSeen", true,
                         "requestorNotificationSeen", true,
+                        "requestorApprovedSeen", true,
                         "notificationForRequestor", false,
-                        "requestorSeenAt", FieldValue.serverTimestamp()
+                        "requestorSeenAt", FieldValue.serverTimestamp(),
+                        "requestorNotificationOpenedAt", FieldValue.serverTimestamp(),
+                        "updatedAt", FieldValue.serverTimestamp()
                 );
 
         RequestorRequestDetailsFragment fragment =

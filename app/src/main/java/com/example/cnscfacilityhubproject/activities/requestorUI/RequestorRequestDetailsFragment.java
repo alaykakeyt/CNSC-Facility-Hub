@@ -23,6 +23,7 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
@@ -190,6 +191,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
                     displayRequestDetails(documentSnapshot);
                     loadRequestorInfoIfNeeded(documentSnapshot);
+                    markAsSeenIfUnseen(documentSnapshot);
                 })
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
@@ -506,6 +508,20 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
     private String fallback(String value) {
         return value != null && !value.trim().isEmpty() ? value.trim() : "—";
+    }
+
+    private void markAsSeenIfUnseen(DocumentSnapshot doc) {
+        if (RequestDataHelper.isRequestorNotificationUnseen(doc)) {
+            doc.getReference().update(
+                    "requestorSeen", true,
+                    "requestorNotificationSeen", true,
+                    "requestorApprovedSeen", true,
+                    "notificationForRequestor", false,
+                    "requestorSeenAt", FieldValue.serverTimestamp(),
+                    "requestorNotificationOpenedAt", FieldValue.serverTimestamp(),
+                    "updatedAt", FieldValue.serverTimestamp()
+            );
+        }
     }
 
     private void goBack() {

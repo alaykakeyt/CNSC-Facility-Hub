@@ -34,7 +34,9 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -106,6 +108,15 @@ public class RequestorRequestFragment extends Fragment {
     private ProgressBar progressSubmit;
     private TextView tvSubmitStatus;
 
+    private MaterialCardView cardActiveAppointment;
+    private TextView tvActiveAppointmentTitle;
+    private Chip tvActiveAppointmentStatus;
+    private TextView tvActiveAppointmentFacility;
+    private TextView tvActiveAppointmentSchedule;
+    private TextView tvActiveAppointmentPurpose;
+    private MaterialButton btnViewActiveAppointment;
+    private MaterialCardView cardRequestForm;
+
     private String selectedActivityType = "Institutional";
 
     private final List<ProposalFileItem> proposalLinks = new ArrayList<>();
@@ -137,6 +148,7 @@ public class RequestorRequestFragment extends Fragment {
         setupLinkActions();
         setupSubmit();
         loadRequestorInformation();
+        checkActiveAppointment();
     }
 
     private void bindViews(View view) {
@@ -199,6 +211,15 @@ public class RequestorRequestFragment extends Fragment {
         btnSubmitRequest = view.findViewById(R.id.btnSubmitRequest);
         progressSubmit = view.findViewById(R.id.progressSubmit);
         tvSubmitStatus = view.findViewById(R.id.tvSubmitStatus);
+
+        cardActiveAppointment = view.findViewById(R.id.cardActiveAppointment);
+        tvActiveAppointmentTitle = view.findViewById(R.id.tvActiveAppointmentTitle);
+        tvActiveAppointmentStatus = view.findViewById(R.id.tvActiveAppointmentStatus);
+        tvActiveAppointmentFacility = view.findViewById(R.id.tvActiveAppointmentFacility);
+        tvActiveAppointmentSchedule = view.findViewById(R.id.tvActiveAppointmentSchedule);
+        tvActiveAppointmentPurpose = view.findViewById(R.id.tvActiveAppointmentPurpose);
+        btnViewActiveAppointment = view.findViewById(R.id.btnViewActiveAppointment);
+        cardRequestForm = view.findViewById(R.id.cardRequestForm);
     }
 
     private void loadRequestorInformation() {
@@ -632,8 +653,101 @@ public class RequestorRequestFragment extends Fragment {
                 Toast.makeText(requireContext(), "No logged in user found.", Toast.LENGTH_SHORT).show();
                 return;
             }
-            checkConflictsAndSubmit();
+
+            // Re-check active appointment immediately before saving.
+            setSubmitting(true, "Verifying active appointments...");
+            String userId = auth.getCurrentUser().getUid();
+            db.collection("requests")
+                    .whereEqualTo("userId", userId)
+                    .get()
+                    .addOnSuccessListener(snapshot -> {
+                        if (!isAdded()) return;
+
+                        boolean hasActive = false;
+                        if (snapshot != null) {
+                            for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                                if (RequestDataHelper.isActiveAppointment(doc)) {
+                                    hasActive = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (hasActive) {
+                            setSubmitting(false, "");
+                            Toast.makeText(requireContext(),
+                                    "You already have an active appointment. You can submit a new request after your current appointment has ended.",
+                                    Toast.LENGTH_LONG).show();
+                            checkActiveAppointment(); // Refresh UI
+                            return;
+                        }
+
+                        checkConflictsAndSubmit();
+                    })
+                    .addOnFailureListener(e -> {
+                        if (!isAdded()) return;
+                        setSubmitting(false, "");
+                        Toast.makeText(requireContext(), "Failed to verify active appointment: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    });
         });
+    }
+
+    private void checkActiveAppointment() {
+        if (auth.getCurrentUser() == null) return;
+
+        String userId = auth.getCurrentUser().getUid();
+
+        db.collection("requests")
+                .whereEqualTo("userId", userId)
+                .addSnapshotListener((snapshot, error) -> {
+                    if (!isAdded()) return;
+                    if (error != null || snapshot == null) return;
+
+                    DocumentSnapshot activeDoc = null;
+                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                        if (RequestDataHelper.isActiveAppointment(doc)) {
+                            activeDoc = doc;
+                            break;
+                        }
+                    }
+
+                    if (activeDoc != null) {
+                        showActiveAppointmentCard(activeDoc);
+                    } else {
+                        hideActiveAppointmentCard();
+                    }
+                });
+    }
+
+    private void showActiveAppointmentCard(DocumentSnapshot doc) {
+        cardActiveAppointment.setVisibility(View.VISIBLE);
+        cardRequestForm.setVisibility(View.GONE);
+
+        String status = doc.getString("status");
+        String purpose = doc.getString("purpose");
+        String facility = RequestDataHelper.getFacilitiesDisplay(doc);
+        String schedule = RequestDataHelper.getScheduleDisplay(doc);
+        String requestId = doc.getId();
+
+        tvActiveAppointmentStatus.setText("Status: " + status);
+        tvActiveAppointmentPurpose.setText("Purpose: " + purpose);
+        tvActiveAppointmentFacility.setText("Facility: " + facility);
+        tvActiveAppointmentSchedule.setText("Schedule: " + schedule);
+
+        btnViewActiveAppointment.setOnClickListener(v -> {
+            RequestorRequestDetailsFragment fragment = RequestorRequestDetailsFragment.newInstance(requestId);
+            requireActivity()
+                    .getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, fragment)
+                    .addToBackStack(null)
+                    .commit();
+        });
+    }
+
+    private void hideActiveAppointmentCard() {
+        cardActiveAppointment.setVisibility(View.GONE);
+        cardRequestForm.setVisibility(View.VISIBLE);
     }
 
     private List<ScheduleDayItem> buildScheduleDaysForSubmit() {
