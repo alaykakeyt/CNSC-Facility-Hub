@@ -16,6 +16,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
@@ -100,7 +101,7 @@ public class gsoNotificationsActivity extends AppCompatActivity {
                     gsoNotifications.clear();
 
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (isIncomingGSORequest(doc)) {
+                        if (RequestDataHelper.shouldShowInRequestList(doc) && isIncomingGSORequest(doc)) {
                             gsoNotifications.add(doc);
                         }
                     }

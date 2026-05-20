@@ -15,6 +15,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
@@ -127,13 +128,8 @@ public class RequestorNotificationFragment extends Fragment {
                     requestList.clear();
 
                     for (DocumentSnapshot doc : docs) {
-                        Boolean requestorSeen = doc.getBoolean("requestorSeen");
-                        Boolean requestorNotificationSeen = doc.getBoolean("requestorNotificationSeen");
-                        Boolean notificationForRequestor = doc.getBoolean("notificationForRequestor");
-
-                        if (Boolean.TRUE.equals(notificationForRequestor)
-                                && !Boolean.TRUE.equals(requestorSeen)
-                                && !Boolean.TRUE.equals(requestorNotificationSeen)) {
+                        if (RequestDataHelper.shouldShowInRequestList(doc)
+                                && RequestDataHelper.isRequestorNotificationUnseen(doc)) {
                             requestList.add(doc);
                         }
                     }
@@ -349,8 +345,11 @@ public class RequestorNotificationFragment extends Fragment {
                 .update(
                         "requestorSeen", true,
                         "requestorNotificationSeen", true,
+                        "requestorApprovedSeen", true,
                         "notificationForRequestor", false,
-                        "requestorSeenAt", FieldValue.serverTimestamp()
+                        "requestorSeenAt", FieldValue.serverTimestamp(),
+                        "requestorNotificationOpenedAt", FieldValue.serverTimestamp(),
+                        "updatedAt", FieldValue.serverTimestamp()
                 );
 
         RequestorRequestDetailsFragment fragment =

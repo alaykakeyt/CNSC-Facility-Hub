@@ -20,6 +20,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
@@ -165,7 +166,7 @@ public class itsoRequestsFragment extends Fragment {
                     itsoRequestList.clear();
 
                     for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
-                        if (isITSORequest(doc)) {
+                        if (isITSORequest(doc) && RequestDataHelper.shouldShowInRequestList(doc)) {
                             itsoRequestList.add(doc);
                         }
                     }

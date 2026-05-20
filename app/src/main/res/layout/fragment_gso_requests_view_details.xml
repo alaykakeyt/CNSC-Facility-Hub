@@ -355,6 +355,13 @@
                     app:backgroundTint="#313131"
                     app:cornerRadius="18dp"
                     app:elevation="0dp" />
+
+                <LinearLayout
+                    android:id="@+id/layoutProposalFiles"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="vertical" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

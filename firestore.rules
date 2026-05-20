@@ -1,0 +1,141 @@
+// Firestore Security Rules for CNSC Facility Hub
+// IMPORTANT: After editing, you must deploy these using: firebase deploy --only firestore:rules
+// OR copy and paste them into the Firebase Console -> Build -> Firestore Database -> Rules tab.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function role() {
+      return userDoc().data.userType;
+    }
+
+    function isGSO() {
+      return signedIn() && role().lower() == "gso";
+    }
+
+    function isITSO() {
+      return signedIn() && role().lower() == "itso";
+    }
+
+    function isSAC() {
+      return signedIn() && role().lower() == "sac";
+    }
+
+    function isStaff() {
+      return isGSO() || isITSO() || isSAC();
+    }
+
+    function isRequestOwner() {
+      return signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    function isNewRequestOwner() {
+      return signedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    function isIncompleteRequest() {
+      return resource.data.isSubmissionComplete == false
+        || resource.data.status in ["Uploading", "Upload Failed"];
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.userType.lower() in ["requestor", "gso", "itso", "sac"];
+
+      allow read: if signedIn()
+        && (request.auth.uid == userId || isStaff());
+
+      allow update: if signedIn()
+        && (
+          isGSO()
+          || (
+            request.auth.uid == userId
+            && request.resource.data.userType == resource.data.userType
+          )
+        );
+
+      allow delete: if isGSO();
+    }
+
+    match /requests/{requestId} {
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid;
+
+      // This read rule is temporary for current conflict checking.
+      // For production, move public schedule data into a separate collection such as facilitySchedules or publicBookings.
+      allow read: if signedIn();
+
+      // Request owner can update only incomplete upload state or marking as seen.
+      // Staff can update workflow requests.
+      allow update: if signedIn()
+        && (
+          isStaff()
+          || (
+            resource.data.userId == request.auth.uid
+            && request.resource.data.userId == resource.data.userId
+            && (
+              resource.data.isSubmissionComplete == false
+              || resource.data.status in ["Uploading", "Upload Failed"]
+              // Allow marking as seen even if complete
+              || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['requestorSeen', 'requestorNotificationSeen', 'requestorApprovedSeen', 'requestorNotificationOpenedAt', 'requestorSeenAt', 'updatedAt', 'notificationForRequestor'])
+            )
+          )
+        );
+
+      // Request owner can delete only incomplete upload-failed documents.
+      // GSO can delete/admin-manage requests.
+      allow delete: if signedIn()
+        && (
+          isGSO()
+          || (
+            resource.data.userId == request.auth.uid
+            && (
+              resource.data.isSubmissionComplete == false
+              || resource.data.status in ["Uploading", "Upload Failed"]
+            )
+          )
+        );
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if signedIn();
+      allow write: if isGSO();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /reports/{reportId} {
+      allow read, write: if isGSO();
+    }
+
+    match /backup/{document=**} {
+      allow read, write: if isGSO();
+    }
+
+    match /test/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /dev/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

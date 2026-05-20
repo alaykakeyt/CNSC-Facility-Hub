@@ -16,6 +16,8 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.ItsoReminderHelper;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
@@ -40,6 +42,8 @@ public class itsoHomeFragment extends Fragment {
     private MaterialButton btnViewRequests;
 
     private LinearLayout itsoPendingReq, itsoApprovedReq, layoutRecentRequests;
+    private LinearLayout layoutUpcomingReminders;
+    private TextView tvUpcomingEmpty;
 
     private FirebaseAuth auth;
     private FirebaseFirestore db;
@@ -89,6 +93,8 @@ public class itsoHomeFragment extends Fragment {
         itsoPendingReq = view.findViewById(R.id.itsoPendingReq);
         itsoApprovedReq = view.findViewById(R.id.itsoApprovedReq);
         layoutRecentRequests = view.findViewById(R.id.layoutRecentRequests);
+        layoutUpcomingReminders = view.findViewById(R.id.layoutUpcomingReminders);
+        tvUpcomingEmpty = view.findViewById(R.id.tvUpcomingEmpty);
     }
 
     private void setGreetingByTime() {
@@ -175,12 +181,14 @@ public class itsoHomeFragment extends Fragment {
                     }
 
                     List<DocumentSnapshot> todayRecentRequests = new ArrayList<>();
+                    List<DocumentSnapshot> upcomingReminders = new ArrayList<>();
 
                     int pending = 0;
                     int approvedAvailable = 0;
 
                     for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
                         if (!isITSORequest(doc)) continue;
+                        if (!RequestDataHelper.shouldShowInRequestList(doc)) continue;
 
                         String displayStatus = getDisplayStatus(doc);
 
@@ -188,6 +196,10 @@ public class itsoHomeFragment extends Fragment {
                             pending++;
                         } else if ("Approved - Available".equalsIgnoreCase(displayStatus)) {
                             approvedAvailable++;
+                        }
+
+                        if (ItsoReminderHelper.isUpcomingTechnicalEvent(doc)) {
+                            upcomingReminders.add(doc);
                         }
 
                         if (isRequestWithinToday(doc)) {
@@ -202,8 +214,84 @@ public class itsoHomeFragment extends Fragment {
                     if (tvPendingCount != null) tvPendingCount.setText(formatCount(pending));
                     if (tvApprovedCount != null) tvApprovedCount.setText(formatCount(approvedAvailable));
 
+                    renderUpcomingReminders(upcomingReminders);
                     renderRecentRequests(todayRecentRequests);
                 });
+    }
+
+    private void renderUpcomingReminders(List<DocumentSnapshot> upcoming) {
+        if (layoutUpcomingReminders == null || tvUpcomingEmpty == null) {
+            return;
+        }
+
+        layoutUpcomingReminders.removeAllViews();
+
+        if (upcoming.isEmpty()) {
+            tvUpcomingEmpty.setVisibility(View.VISIBLE);
+            return;
+        }
+
+        tvUpcomingEmpty.setVisibility(View.GONE);
+
+        for (DocumentSnapshot doc : upcoming) {
+            layoutUpcomingReminders.addView(createUpcomingReminderCard(doc));
+        }
+    }
+
+    private View createUpcomingReminderCard(DocumentSnapshot doc) {
+        String requestId = doc.getId();
+        String purpose = getStringValue(doc, "purpose");
+
+        MaterialCardView card = new MaterialCardView(requireContext());
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        cardParams.setMargins(0, 0, 0, dp(12));
+        card.setLayoutParams(cardParams);
+        card.setCardBackgroundColor(requireContext().getColor(R.color.cnsc_warning_light));
+        card.setRadius(dp(22));
+        card.setStrokeWidth(dp(1));
+        card.setStrokeColor(requireContext().getColor(R.color.cnsc_warning));
+
+        LinearLayout container = new LinearLayout(requireContext());
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dp(16), dp(16), dp(16), dp(16));
+
+        TextView title = new TextView(requireContext());
+        title.setText("Tomorrow: " + (purpose.isEmpty() ? "Technical Event" : purpose));
+        title.setTextColor(requireContext().getColor(R.color.cnsc_text_primary));
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        TextView summary = new TextView(requireContext());
+        summary.setText(ItsoReminderHelper.buildReminderSummary(doc));
+        summary.setTextColor(requireContext().getColor(R.color.cnsc_text_secondary));
+        summary.setTextSize(13f);
+        LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        summaryParams.topMargin = dp(8);
+        summary.setLayoutParams(summaryParams);
+
+        MaterialButton btnView = new MaterialButton(requireContext());
+        btnView.setText("View Details");
+        btnView.setAllCaps(false);
+        btnView.setBackgroundTintList(ColorStateList.valueOf(requireContext().getColor(R.color.cnsc_primary)));
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(46)
+        );
+        btnParams.topMargin = dp(12);
+        btnView.setLayoutParams(btnParams);
+        btnView.setOnClickListener(v -> openViewDetails(requestId));
+
+        container.addView(title);
+        container.addView(summary);
+        container.addView(btnView);
+        card.addView(container);
+
+        return card;
     }
 
     private void renderRecentRequests(List<DocumentSnapshot> recentRequests) {

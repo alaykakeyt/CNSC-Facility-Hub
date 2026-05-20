@@ -29,6 +29,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.firebase.auth.FirebaseUser;
+
+import java.util.Locale;
+
 
 public class LoginActivity extends AppCompatActivity {
 
@@ -93,88 +97,159 @@ public class LoginActivity extends AppCompatActivity {
 
         loginBtn.setOnClickListener(v -> {
 
-            String userEmail = email.getText().toString();
+            String userEmail = email.getText().toString().trim();
             String userPass = password.getText().toString();
 
-
-            if (userEmail.isEmpty()){
+            if (userEmail.isEmpty()) {
                 Toast.makeText(LoginActivity.this, "Please enter your email.", Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (userPass.isEmpty()){
+
+            if (userPass.isEmpty()) {
                 Toast.makeText(LoginActivity.this, "Please enter your password.", Toast.LENGTH_SHORT).show();
                 return;
             }
 
             auth.signInWithEmailAndPassword(userEmail, userPass)
                     .addOnCompleteListener(task -> {
-                        if (task.isSuccessful() && auth.getCurrentUser() != null) {
 
-                            db.collection("users")
-                                    .document(auth.getCurrentUser().getUid())
-                                            .get()
-                                                    .addOnSuccessListener(documentSnapshot -> {
-//                                                        Toast.makeText(LoginActivity.this, "Login Success", Toast.LENGTH_SHORT).show();
-                                                        if (documentSnapshot.exists()){
-                                                            String userTypeRaw = documentSnapshot.getString("userType");
-                                                            if (userTypeRaw != null) {
-                                                                String userType = userTypeRaw.toLowerCase();
+                        if (!task.isSuccessful()) {
+                            String errorMessage = task.getException() != null
+                                    ? task.getException().getMessage()
+                                    : "Login failed.";
 
-                                                                if (userType.equals("requestor")) {
-
-                                                                    startActivity(new Intent(
-                                                                            LoginActivity.this,
-                                                                            RequestorNavBarActivity.class
-                                                                    ));
-                                                                    finish();
-
-                                                                } else if (userType.equals("itso")) {
-
-                                                                    startActivity(new Intent(
-                                                                            LoginActivity.this,
-                                                                            itsoNavBarActivity.class
-                                                                    ));
-                                                                    finish();
-
-                                                                } else if (userType.equals("sac")) {
-
-                                                                    startActivity(new Intent(
-                                                                            LoginActivity.this,
-                                                                            sacNavBarActivity.class
-                                                                    ));
-                                                                    finish();
-
-                                                                } else if (userType.equals("gso")) {
-
-                                                                    startActivity(new Intent(
-                                                                            LoginActivity.this,
-                                                                            gsoNavBarActivity.class
-                                                                    ));
-                                                                    finish();
-
-                                                                } else {
-
-                                                                    Toast.makeText(
-                                                                            LoginActivity.this,
-                                                                            "Unknown user role.",
-                                                                            Toast.LENGTH_SHORT
-                                                                    ).show();
-                                                                }
-                                                            } else {
-                                                                Toast.makeText(LoginActivity.this, "User role not found in profile.", Toast.LENGTH_SHORT).show();
-                                                            }
-                                                        } else {
-                                                            Toast.makeText(LoginActivity.this, "User profile not found.", Toast.LENGTH_SHORT).show();
-                                                        }
-                                                    })
-                                                    .addOnFailureListener(e -> Toast.makeText(LoginActivity.this, "Firestore Error: " + e.getMessage(), Toast.LENGTH_LONG).show());
-
-                        } else {
-                            Toast.makeText(LoginActivity.this, "Login Failed", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(LoginActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+                            return;
                         }
+
+                        FirebaseUser currentUser = auth.getCurrentUser();
+
+                        if (currentUser == null) {
+                            Toast.makeText(LoginActivity.this, "Login failed. Please try again.", Toast.LENGTH_LONG).show();
+                            return;
+                        }
+
+                        db.collection("users")
+                                .document(currentUser.getUid())
+                                .get()
+                                .addOnSuccessListener(documentSnapshot -> {
+
+                                    if (!documentSnapshot.exists()) {
+                                        auth.signOut();
+                                        Toast.makeText(
+                                                LoginActivity.this,
+                                                "User profile not found. Please contact the administrator.",
+                                                Toast.LENGTH_LONG
+                                        ).show();
+                                        return;
+                                    }
+
+                                    String userType = documentSnapshot.getString("userType");
+
+                                    if (userType == null || userType.trim().isEmpty()) {
+                                        auth.signOut();
+                                        Toast.makeText(
+                                                LoginActivity.this,
+                                                "User role is missing. Please contact the administrator.",
+                                                Toast.LENGTH_LONG
+                                        ).show();
+                                        return;
+                                    }
+
+                                    routeUserByRole(userType.trim().toLowerCase(Locale.ROOT), auth);
+                                })
+                                .addOnFailureListener(e -> {
+                                    auth.signOut();
+                                    Toast.makeText(
+                                            LoginActivity.this,
+                                            "Failed to load user profile: " + e.getMessage(),
+                                            Toast.LENGTH_LONG
+                                    ).show();
+                                });
                     });
         });
 
+
+
+//        loginBtn ORIGINAL LOGIC IS HERE
+//
+//        loginBtn.setOnClickListener(v -> {
+//
+//            String userEmail = email.getText().toString();
+//            String userPass = password.getText().toString();
+//
+//
+//            if (userEmail.isEmpty()){
+//                Toast.makeText(LoginActivity.this, "Please enter your email.", Toast.LENGTH_SHORT).show();
+//                return;
+//            }
+//            if (userPass.isEmpty()){
+//                Toast.makeText(LoginActivity.this, "Please enter your password.", Toast.LENGTH_SHORT).show();
+//                return;
+//            }
+//
+//            auth.signInWithEmailAndPassword(userEmail, userPass)
+//                    .addOnCompleteListener(task -> {
+//                        if (task.isSuccessful()) {
+//
+//                            db.collection("users")
+//                                    .document(auth.getCurrentUser().getUid())
+//                                            .get()
+//                                                    .addOnSuccessListener(documentSnapshot -> {
+////                                                        Toast.makeText(LoginActivity.this, "Login Success", Toast.LENGTH_SHORT).show();
+//                                                        if (documentSnapshot.exists()){
+//                                                            Intent intent;
+//                                                            String userType = documentSnapshot.getString("userType").toLowerCase();
+//
+//                                                            if (userType.equals("requestor")) {
+//
+//                                                                startActivity(new Intent(
+//                                                                        LoginActivity.this,
+//                                                                        RequestorNavBarActivity.class
+//                                                                ));
+//                                                                finish();
+//
+//                                                            } else if (userType.equals("itso")) {
+//
+//                                                                startActivity(new Intent(
+//                                                                        LoginActivity.this,
+//                                                                        itsoNavBarActivity.class
+//                                                                ));
+//                                                                finish();
+//
+//                                                            } else if (userType.equals("sac")) {
+//
+//                                                                startActivity(new Intent(
+//                                                                        LoginActivity.this,
+//                                                                        sacNavBarActivity.class
+//                                                                ));
+//                                                                finish();
+//
+//                                                            } else if (userType.equals("gso")) {
+//
+//                                                                startActivity(new Intent(
+//                                                                        LoginActivity.this,
+//                                                                        gsoNavBarActivity.class
+//                                                                ));
+//                                                                finish();
+//
+//                                                            } else {
+//
+//                                                                Toast.makeText(
+//                                                                        LoginActivity.this,
+//                                                                        "Unknown user role.",
+//                                                                        Toast.LENGTH_SHORT
+//                                                                ).show();
+//                                                            }
+//                                                        }
+//                                                    });
+//
+//                        } else {
+//                            Toast.makeText(LoginActivity.this, "Login Failed", Toast.LENGTH_SHORT).show();
+//                        }
+//                    });
+//        });
+//
 
 
         signUpTxt.setOnClickListener(new View.OnClickListener() {
@@ -194,4 +269,40 @@ public class LoginActivity extends AppCompatActivity {
             return insets;
         });
     }
+
+    private void routeUserByRole(String userType, FirebaseAuth auth) {
+        Intent intent;
+
+        switch (userType) {
+            case "requestor":
+                intent = new Intent(LoginActivity.this, RequestorNavBarActivity.class);
+                break;
+
+            case "itso":
+                intent = new Intent(LoginActivity.this, itsoNavBarActivity.class);
+                break;
+
+            case "sac":
+                intent = new Intent(LoginActivity.this, sacNavBarActivity.class);
+                break;
+
+            case "gso":
+                intent = new Intent(LoginActivity.this, gsoNavBarActivity.class);
+                break;
+
+            default:
+                auth.signOut();
+                Toast.makeText(
+                        LoginActivity.this,
+                        "Unknown user role: " + userType,
+                        Toast.LENGTH_LONG
+                ).show();
+                return;
+        }
+
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
 }

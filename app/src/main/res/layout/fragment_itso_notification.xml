@@ -49,6 +49,19 @@
                     android:textColor="#970705"
                     android:textSize="14sp"
                     android:textStyle="bold" />
+
+                <FrameLayout
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginTop="6dp">
+
+                    <TextView
+                        android:id="@+id/badgeNotification"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:text="0"
+                        android:visibility="gone" />
+                </FrameLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -113,313 +126,13 @@
             android:layout_marginTop="16dp"
             android:orientation="vertical">
 
-            <!-- Notification 1 -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardNotification1"
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerViewNotifications"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="24dp"
-                app:cardElevation="6dp"
-                app:strokeColor="#313131"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="18dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.card.MaterialCardView
-                            android:layout_width="46dp"
-                            android:layout_height="46dp"
-                            app:cardBackgroundColor="#970705"
-                            app:cardCornerRadius="15dp"
-                            app:cardElevation="0dp">
-
-                            <ImageView
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:contentDescription="Incoming booking"
-                                android:padding="10dp"
-                                android:src="@android:drawable/ic_menu_my_calendar"
-                                app:tint="#FFFFFF" />
-                        </com.google.android.material.card.MaterialCardView>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:id="@+id/tvNotificationTitle1"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Purpose / Activity"
-                                android:textColor="#313131"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvNotificationMeta1"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="3dp"
-                                android:alpha="0.65"
-                                android:text="Facility • Date • 8:00 AM"
-                                android:textColor="#313131"
-                                android:textSize="12sp" />
-                        </LinearLayout>
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chipNotificationStatus1"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Incoming"
-                            android:textColor="#970705"
-                            app:chipBackgroundColor="#F5E5E5"
-                            app:chipCornerRadius="16dp" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/tvNotificationDesc1"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:lineSpacingExtra="2dp"
-                        android:text="Technical details"
-                        android:textColor="#313131"
-                        android:textSize="14sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnViewRequest1"
-                        android:layout_width="match_parent"
-                        android:layout_height="46dp"
-                        android:layout_marginTop="14dp"
-                        android:text="View Request"
-                        android:textAllCaps="false"
-                        android:textColor="#FFFFFF"
-                        android:textStyle="bold"
-                        app:backgroundTint="#313131"
-                        app:cornerRadius="16dp"
-                        app:elevation="0dp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Notification 2 -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardNotification2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="24dp"
-                app:cardElevation="6dp"
-                app:strokeColor="#313131"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="18dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.card.MaterialCardView
-                            android:layout_width="46dp"
-                            android:layout_height="46dp"
-                            app:cardBackgroundColor="#313131"
-                            app:cardCornerRadius="15dp"
-                            app:cardElevation="0dp">
-
-                            <ImageView
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:contentDescription="Incoming booking"
-                                android:padding="10dp"
-                                android:src="@android:drawable/ic_menu_my_calendar"
-                                app:tint="#FFFFFF" />
-                        </com.google.android.material.card.MaterialCardView>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:id="@+id/tvNotificationTitle2"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Purpose / Activity"
-                                android:textColor="#313131"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvNotificationMeta2"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="3dp"
-                                android:alpha="0.65"
-                                android:text="Facility • Date • 1:00 PM"
-                                android:textColor="#313131"
-                                android:textSize="12sp" />
-                        </LinearLayout>
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chipNotificationStatus2"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Incoming"
-                            android:textColor="#970705"
-                            app:chipBackgroundColor="#F5E5E5"
-                            app:chipCornerRadius="16dp" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/tvNotificationDesc2"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:lineSpacingExtra="2dp"
-                        android:text="Technical details"
-                        android:textColor="#313131"
-                        android:textSize="14sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnViewRequest2"
-                        android:layout_width="match_parent"
-                        android:layout_height="46dp"
-                        android:layout_marginTop="14dp"
-                        android:text="View Request"
-                        android:textAllCaps="false"
-                        android:textColor="#FFFFFF"
-                        android:textStyle="bold"
-                        app:backgroundTint="#313131"
-                        app:cornerRadius="16dp"
-                        app:elevation="0dp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Notification 3 -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardNotification3"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="24dp"
-                app:cardElevation="6dp"
-                app:strokeColor="#313131"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="18dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.card.MaterialCardView
-                            android:layout_width="46dp"
-                            android:layout_height="46dp"
-                            app:cardBackgroundColor="#F3D9D9"
-                            app:cardCornerRadius="15dp"
-                            app:cardElevation="0dp">
-
-                            <ImageView
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:contentDescription="Incoming booking"
-                                android:padding="10dp"
-                                android:src="@android:drawable/ic_menu_my_calendar"
-                                app:tint="#970705" />
-                        </com.google.android.material.card.MaterialCardView>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:id="@+id/tvNotificationTitle3"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Purpose / Activity"
-                                android:textColor="#313131"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvNotificationMeta3"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="3dp"
-                                android:alpha="0.65"
-                                android:text="Facility • Date • 3:00 PM"
-                                android:textColor="#313131"
-                                android:textSize="12sp" />
-                        </LinearLayout>
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chipNotificationStatus3"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Incoming"
-                            android:textColor="#970705"
-                            app:chipBackgroundColor="#FBECEC"
-                            app:chipCornerRadius="16dp" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/tvNotificationDesc3"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:lineSpacingExtra="2dp"
-                        android:text="Technical details"
-                        android:textColor="#313131"
-                        android:textSize="14sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnViewRequest3"
-                        android:layout_width="match_parent"
-                        android:layout_height="46dp"
-                        android:layout_marginTop="14dp"
-                        android:text="View Request"
-                        android:textAllCaps="false"
-                        android:textColor="#FFFFFF"
-                        android:textStyle="bold"
-                        app:backgroundTint="#313131"
-                        app:cornerRadius="16dp"
-                        app:elevation="0dp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
+                android:nestedScrollingEnabled="false"
+                tools:itemCount="3"
+                tools:listitem="@layout/item_itso_notification" />
         </LinearLayout>
-
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

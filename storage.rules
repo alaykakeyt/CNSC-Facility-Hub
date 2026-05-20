@@ -1,0 +1,22 @@
+// Cloud Storage Security Rules for CNSC Facility Hub
+// IMPORTANT: After editing, you must deploy these using: firebase deploy --only storage
+// OR copy and paste them into the Firebase Console -> Build -> Storage -> Rules tab.
+//
+// NOTE: Firebase Storage is currently NOT used by the app.
+// Proposal files are stored as external links (Google Drive, etc.) in Firestore.
+
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Storage is deprecated in favor of external links to avoid billing dependencies.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
