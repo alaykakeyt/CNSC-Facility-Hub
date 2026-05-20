@@ -16,6 +16,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.ItsoReminderHelper;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
+import com.example.cnscfacilityhubproject.utils.RoleGuardHelper;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -23,6 +26,12 @@ import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.ArrayList;
 import java.util.List;
+import android.content.Intent;
+import android.widget.ProgressBar;
+import android.widget.Toast;
+
+import com.example.cnscfacilityhubproject.activities.LoginActivity;
+import com.google.firebase.auth.FirebaseAuth;
 
 public class itsoNavBarActivity extends AppCompatActivity {
 
@@ -34,6 +43,7 @@ public class itsoNavBarActivity extends AppCompatActivity {
     private TextView badgeNotifications;
 
     private FirebaseFirestore db;
+    private FirebaseAuth auth;
     private ListenerRegistration notificationBadgeListener;
 
     private final List<String> unseenNotificationIds = new ArrayList<>();
@@ -47,17 +57,37 @@ public class itsoNavBarActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_itso_nav_bar);
 
+        auth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
+
+        if (!ensureUserLoggedIn()) {
+            return;
+        }
 
         bindViews();
         setupBadgeStyle();
         setupNavigation();
         listenForIncomingITSONotifications();
 
-        if (savedInstanceState == null) {
-            loadFragment(new itsoHomeFragment());
-            setSelectedTab(Tab.HOME);
-        }
+        // Use RoleGuardHelper to verify role before loading fragments
+        ProgressBar progressBar = findViewById(R.id.roleVerificationProgress);
+        RoleGuardHelper roleGuard = new RoleGuardHelper(this, progressBar);
+        
+        roleGuard.verifyAndProceed("ITSO", new RoleGuardHelper.OnRoleVerified() {
+            @Override
+            public void onSuccess() {
+                // Role verified! Now safe to load fragments
+                if (savedInstanceState == null) {
+                    loadFragment(new itsoHomeFragment());
+                    setSelectedTab(Tab.HOME);
+                }
+            }
+
+            @Override
+            public void onFailure(String message) {
+                // Already handled by RoleGuardHelper (redirected to login)
+            }
+        });
     }
 
     @Override
@@ -199,7 +229,10 @@ public class itsoNavBarActivity extends AppCompatActivity {
                     }
 
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (isIncomingITSORequest(doc)) {
+                        if (RequestDataHelper.shouldShowInRequestList(doc)
+                                && (isIncomingITSORequest(doc)
+                                || (ItsoReminderHelper.isUpcomingTechnicalEvent(doc)
+                                && ItsoReminderHelper.isReminderUnseen(doc)))) {
                             unseenNotificationIds.add(doc.getId());
                         }
                     }
@@ -282,6 +315,26 @@ public class itsoNavBarActivity extends AppCompatActivity {
     private String getStringValue(DocumentSnapshot doc, String field) {
         Object value = doc.get(field);
         return value == null ? "" : String.valueOf(value).trim();
+    }
+
+
+    private boolean ensureUserLoggedIn() {
+        if (auth.getCurrentUser() != null) {
+            return true;
+        }
+
+        redirectToLogin("Please log in first.");
+        return false;
+    }
+
+    private void redirectToLogin(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+
+        startActivity(intent);
+        finish();
     }
 
     private enum Tab {

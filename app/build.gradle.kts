@@ -29,6 +29,11 @@ android {
             )
         }
     }
+
+    buildFeatures {
+        viewBinding = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -38,12 +43,13 @@ android {
 dependencies {
 
     implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
-    implementation("com.google.firebase:firebase-auth:22.0.0")
-    implementation("com.google.firebase:firebase-firestore:24.0.0")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
     implementation(libs.activity.ktx)
 
 
     implementation(libs.appcompat)
+    implementation(libs.cardview)
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)

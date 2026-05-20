@@ -21,6 +21,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
@@ -197,7 +198,7 @@ public class gsoHomeFragment extends Fragment {
                     int unseenCount = 0;
 
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (isIncomingGsoNotification(doc)) {
+                        if (RequestDataHelper.shouldShowInRequestList(doc) && isIncomingGsoNotification(doc)) {
                             unseenCount++;
                         }
                     }
@@ -346,6 +347,7 @@ public class gsoHomeFragment extends Fragment {
 
                     for (QueryDocumentSnapshot doc : snapshot) {
                         if (!isGSORequest(doc)) continue;
+                        if (!RequestDataHelper.shouldShowInRequestList(doc)) continue;
 
                         String status = getDisplayStatus(doc);
 
@@ -512,8 +514,14 @@ public class gsoHomeFragment extends Fragment {
         Boolean calendarVisible = doc.getBoolean("calendarVisible");
         Boolean isCalendarBooking = doc.getBoolean("isCalendarBooking");
 
+        // Show on calendar if any of these statuses:
+        // - Pending: Under review
+        // - Approved: Approved and scheduled
+        // - Approved - Available: Approved with variable availability
+        // - Booked: Confirmed reservation
         if ("Pending".equalsIgnoreCase(displayStatus)) return true;
         if ("Approved".equalsIgnoreCase(displayStatus)) return true;
+        if ("Approved - Available".equalsIgnoreCase(displayStatus)) return true;
         if ("Booked".equalsIgnoreCase(bookingStatus)) return true;
 
         return Boolean.TRUE.equals(calendarVisible) || Boolean.TRUE.equals(isCalendarBooking);

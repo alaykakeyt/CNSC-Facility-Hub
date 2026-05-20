@@ -185,6 +185,36 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/tvUpcomingTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Upcoming Technical Support (Tomorrow)"
+            android:textColor="@color/cnsc_text_primary"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvUpcomingEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:alpha="0.7"
+            android:gravity="center"
+            android:text="No technical events scheduled for tomorrow."
+            android:textColor="@color/cnsc_text_secondary"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/layoutUpcomingReminders"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:animateLayoutChanges="true"
+            android:orientation="vertical" />
+
+        <TextView
             android:id="@+id/tvRecentRequestsTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

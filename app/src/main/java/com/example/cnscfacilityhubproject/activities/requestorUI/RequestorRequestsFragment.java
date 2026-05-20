@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
@@ -189,11 +190,15 @@ public class RequestorRequestsFragment extends Fragment {
         List<DocumentSnapshot> filtered = new ArrayList<>();
 
         for (DocumentSnapshot doc : requestList) {
-            String status = getDisplayStatus(doc);
+            if (!RequestDataHelper.shouldShowInRequestList(doc)) {
+                continue;
+            }
+
+            String displayStatus = getDisplayStatus(doc);
 
             if ("All".equalsIgnoreCase(selectedFilter)) {
                 filtered.add(doc);
-            } else if (selectedFilter.equalsIgnoreCase(status)) {
+            } else if (selectedFilter.equalsIgnoreCase(displayStatus)) {
                 filtered.add(doc);
             }
         }

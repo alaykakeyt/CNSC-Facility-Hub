@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -99,7 +100,7 @@ public class sacNotificationFragment extends Fragment {
                             for (DocumentSnapshot doc :
                                     snapshot.getDocuments()) {
 
-                                if (isIncomingSACRequest(doc)) {
+                                if (RequestDataHelper.shouldShowInRequestList(doc) && isIncomingSACRequest(doc)) {
                                     incomingDocs.add(doc);
                                 }
                             }

@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -15,6 +16,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
 import com.example.cnscfacilityhubproject.activities.LoginActivity;
+import com.example.cnscfacilityhubproject.utils.RoleGuardHelper;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
@@ -27,18 +29,46 @@ public class gsoNavBarActivity extends AppCompatActivity {
     private TextView textHome, textRequests, textReports, textUsers, textProfile;
     private ImageView iconHome, iconRequests, iconReports, iconUsers, iconProfile;
 
+    private FirebaseAuth auth;
+    private FirebaseFirestore db;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_gso_nav_bar);
 
-        if (FirebaseAuth.getInstance().getCurrentUser() == null){
-            Toast.makeText(this, "No user is logged in", Toast.LENGTH_LONG).show();
+        auth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
 
-            startActivity(new Intent(gsoNavBarActivity.this, LoginActivity.class));
-            finish();
+        if (!ensureUserLoggedIn()) {
+            return;
         }
 
+        bindNavViews();
+        setupNavClickListeners();
+
+        // Use RoleGuardHelper to verify role before loading fragments
+        ProgressBar progressBar = findViewById(R.id.roleVerificationProgress);
+        RoleGuardHelper roleGuard = new RoleGuardHelper(this, progressBar);
+        
+        roleGuard.verifyAndProceed("GSO", new RoleGuardHelper.OnRoleVerified() {
+            @Override
+            public void onSuccess() {
+                // Role verified! Now safe to load fragments
+                if (savedInstanceState == null) {
+                    loadFragment(new gsoHomeFragment());
+                    setSelectedTab(Tab.HOME);
+                }
+            }
+
+            @Override
+            public void onFailure(String message) {
+                // Already handled by RoleGuardHelper (redirected to login)
+            }
+        });
+    }
+
+    private void bindNavViews() {
         navHome = findViewById(R.id.navHome);
         navRequests = findViewById(R.id.navRequests);
         navReports = findViewById(R.id.navReports);
@@ -56,12 +86,9 @@ public class gsoNavBarActivity extends AppCompatActivity {
         iconReports = findViewById(R.id.iconReports);
         iconUsers = findViewById(R.id.iconUsers);
         iconProfile = findViewById(R.id.iconProfile);
+    }
 
-        if (savedInstanceState == null) {
-            loadFragment(new gsoHomeFragment());
-            setSelectedTab(Tab.HOME);
-        }
-
+    private void setupNavClickListeners() {
         navHome.setOnClickListener(v -> {
             loadFragment(new gsoHomeFragment());
             setSelectedTab(Tab.HOME);
@@ -84,8 +111,6 @@ public class gsoNavBarActivity extends AppCompatActivity {
 
         navProfile.setOnClickListener(v -> {
             loadFragment(new gsoProfileFragment());
-            Bundle bundle = new Bundle();
-
             setSelectedTab(Tab.PROFILE);
         });
     }
@@ -143,6 +168,28 @@ public class gsoNavBarActivity extends AppCompatActivity {
         iconUsers.setImageTintList(ColorStateList.valueOf(dark));
         iconProfile.setImageTintList(ColorStateList.valueOf(dark));
     }
+
+
+
+    private boolean ensureUserLoggedIn() {
+        if (auth.getCurrentUser() != null) {
+            return true;
+        }
+
+        redirectToLogin("Please log in first.");
+        return false;
+    }
+
+    private void redirectToLogin(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+
+        startActivity(intent);
+        finish();
+    }
+
 
     private enum Tab {
         HOME, REQUESTS, REPORTS, USERS, PROFILE

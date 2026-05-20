@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
@@ -176,8 +177,13 @@ public class RequestorHomeFragment extends Fragment {
             bookingsListener.remove();
         }
 
+        // Show all relevant booking statuses for calendar display:
+        // - Pending: Awaiting approval
+        // - Approved: Approved and scheduled
+        // - Approved - Available: Approved but availability varies
+        // - Booked: Confirmed booking
         bookingsListener = db.collection("requests")
-                .whereIn("status", Arrays.asList("Pending", "Approved"))
+                .whereIn("status", Arrays.asList("Pending", "Approved", "Approved - Available", "Booked"))
                 .addSnapshotListener((snapshot, error) -> {
                     if (!isAdded()) return;
 
@@ -191,6 +197,10 @@ public class RequestorHomeFragment extends Fragment {
 
                     if (snapshot != null) {
                         for (QueryDocumentSnapshot doc : snapshot) {
+                            if (!RequestDataHelper.shouldShowInRequestList(doc)) {
+                                continue;
+                            }
+
                             List<String> dateKeys = getDateKeysFromDocument(doc);
 
                             for (String dateKey : dateKeys) {

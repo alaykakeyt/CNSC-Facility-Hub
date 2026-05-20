@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -15,10 +16,14 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.models.ProposalFileItem;
+import com.example.cnscfacilityhubproject.utils.ProposalFilesUiHelper;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
@@ -68,6 +73,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
     private TextView tvDetailProposalFileName;
     private TextView tvDetailNotificationTarget;
     private TextView tvDetailAgreement;
+    private LinearLayout layoutProposalFiles;
 
     private MaterialCardView cardAdminRemarks;
     private TextView tvDetailRemarks;
@@ -143,6 +149,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         tvDetailProposalFileName = view.findViewById(R.id.tvDetailProposalFileName);
         tvDetailNotificationTarget = view.findViewById(R.id.tvDetailNotificationTarget);
         tvDetailAgreement = view.findViewById(R.id.tvDetailAgreement);
+        layoutProposalFiles = view.findViewById(R.id.layoutProposalFiles);
 
         cardAdminRemarks = view.findViewById(R.id.cardAdminRemarks);
         tvDetailRemarks = view.findViewById(R.id.tvDetailRemarks);
@@ -184,6 +191,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
                     displayRequestDetails(documentSnapshot);
                     loadRequestorInfoIfNeeded(documentSnapshot);
+                    markAsSeenIfUnseen(documentSnapshot);
                 })
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
@@ -203,11 +211,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
         String status = getStringValue(doc, "status");
         String purpose = getStringValue(doc, "purpose");
 
-        String startDate = getStringValue(doc, "startDateText");
-        String endDate = getStringValue(doc, "endDateText");
-        String startTime = getStringValue(doc, "timeStartText");
-        String endTime = getStringValue(doc, "timeEndText");
-
         String requestorName = firstNonEmpty(
                 getStringValue(doc, "requestorName"),
                 getStringValue(doc, "fullName")
@@ -225,7 +228,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
                 getStringValue(doc, "course")
         );
 
-        String facility = getFinalFacility(doc);
         String participants = getStringValue(doc, "participants");
         String numberOfParticipants = getLongString(doc, "numberOfParticipants");
 
@@ -238,8 +240,22 @@ public class RequestorRequestDetailsFragment extends Fragment {
         boolean technicalNeeded = getBooleanValue(doc, "technicalNeeded") || getBooleanValue(doc, "needsITSO");
         String connectors = getStringValue(doc, "connectors");
 
-        String proposalFileName = getStringValue(doc, "proposalFileName");
-        proposalFileUrl = getStringValue(doc, "proposalFileUrl");
+        List<ProposalFileItem> proposalFiles = RequestDataHelper.getProposalFiles(doc);
+        boolean hasContentUri = false;
+        if (!proposalFiles.isEmpty()) {
+            proposalFileUrl = proposalFiles.get(0).getFileUrl();
+            for (ProposalFileItem f : proposalFiles) {
+                if (f.getFileUrl().startsWith("content://")) {
+                    hasContentUri = true;
+                    break;
+                }
+            }
+        } else {
+            proposalFileUrl = getStringValue(doc, "proposalFileUrl");
+            if (proposalFileUrl.startsWith("content://")) {
+                hasContentUri = true;
+            }
+        }
 
         String notificationTarget = getStringValue(doc, "notificationTarget");
         boolean agreementAccepted = getBooleanValue(doc, "agreementAccepted");
@@ -254,17 +270,17 @@ public class RequestorRequestDetailsFragment extends Fragment {
         chipDetailStatus.setText(!status.isEmpty() ? status : "Pending");
         styleStatusChip(status);
 
-        tvDetailScheduleSummary.setText(buildScheduleText(startDate, endDate, startTime, endTime));
-        tvDetailFacilitySummary.setText(!facility.isEmpty() ? facility : "No facility selected");
+        tvDetailScheduleSummary.setText(RequestDataHelper.getScheduleDisplay(doc));
+        tvDetailFacilitySummary.setText(RequestDataHelper.getFacilitiesDisplay(doc));
 
         tvDetailRequestorName.setText("Name: " + fallback(requestorName));
         tvDetailContactNumber.setText("Contact Number: " + fallback(contactNumber));
         tvDetailCollegeDepartment.setText("College / Department: " + fallback(collegeDepartment));
         tvDetailOfficeCourse.setText("Office / Course: " + fallback(officeCourse));
 
-        tvDetailDateRange.setText("Date: " + buildDateText(startDate, endDate));
-        tvDetailTimeRange.setText("Time: " + buildTimeText(startTime, endTime));
-        tvDetailFacility.setText("Facility: " + fallback(facility));
+        tvDetailDateRange.setText("Schedule:\n" + RequestDataHelper.getScheduleDisplay(doc));
+        tvDetailTimeRange.setVisibility(View.GONE);
+        tvDetailFacility.setText("Facilities: " + RequestDataHelper.getFacilitiesDisplay(doc));
 
         tvDetailParticipants.setText("Participants: " + fallback(participants));
         tvDetailNumberOfParticipants.setText("Number of Participants: " + fallback(numberOfParticipants));
@@ -296,11 +312,26 @@ public class RequestorRequestDetailsFragment extends Fragment {
             tvDetailConnectors.setText("Connectors / Cables: None");
         }
 
-        tvDetailProposalFileName.setText("Proposal File: " + fallback(proposalFileName));
+        if (hasContentUri) {
+            tvDetailProposalFileName.setText("Warning: This request contains files with local URIs that may not open correctly on other devices.");
+            tvDetailProposalFileName.setTextColor(Color.RED);
+        } else {
+            tvDetailProposalFileName.setText(proposalFiles.isEmpty()
+                    ? "Proposal files: none"
+                    : "Proposal files: " + proposalFiles.size());
+            tvDetailProposalFileName.setTextColor(Color.parseColor("#313131"));
+        }
+
         tvDetailNotificationTarget.setText("Sent To: " + fallback(notificationTarget));
         tvDetailAgreement.setText("Agreement Accepted: " + (agreementAccepted ? "Yes" : "No"));
 
-        btnOpenProposal.setVisibility(!proposalFileUrl.isEmpty() ? View.VISIBLE : View.GONE);
+        ProposalFilesUiHelper.bindFiles(
+                requireContext(),
+                layoutProposalFiles,
+                tvDetailProposalFileName,
+                btnOpenProposal,
+                proposalFiles
+        );
 
         cardAdminRemarks.setVisibility(View.VISIBLE);
         tvDetailRemarks.setText(!remarks.isEmpty() ? remarks : "No remarks available.");
@@ -477,6 +508,20 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
     private String fallback(String value) {
         return value != null && !value.trim().isEmpty() ? value.trim() : "—";
+    }
+
+    private void markAsSeenIfUnseen(DocumentSnapshot doc) {
+        if (RequestDataHelper.isRequestorNotificationUnseen(doc)) {
+            doc.getReference().update(
+                    "requestorSeen", true,
+                    "requestorNotificationSeen", true,
+                    "requestorApprovedSeen", true,
+                    "notificationForRequestor", false,
+                    "requestorSeenAt", FieldValue.serverTimestamp(),
+                    "requestorNotificationOpenedAt", FieldValue.serverTimestamp(),
+                    "updatedAt", FieldValue.serverTimestamp()
+            );
+        }
     }
 
     private void goBack() {
