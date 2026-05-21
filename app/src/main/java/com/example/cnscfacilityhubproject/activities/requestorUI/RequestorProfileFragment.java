@@ -73,6 +73,8 @@ public class RequestorProfileFragment extends Fragment {
     private String currentUserType = "";
     private String currentProfileImageBase64 = "";
 
+    private boolean isLoggingOut = false;
+
     public RequestorProfileFragment() {
         // Required empty public constructor
     }
@@ -173,7 +175,7 @@ public class RequestorProfileFragment extends Fragment {
                 });
 
         profileListener = userRef.addSnapshotListener((documentSnapshot, error) -> {
-            if (!isAdded()) return;
+            if (!isAdded() || isLoggingOut || auth.getCurrentUser() == null) return;
 
             if (error != null) {
                 Toast.makeText(
@@ -186,7 +188,7 @@ public class RequestorProfileFragment extends Fragment {
 
             if (documentSnapshot != null && documentSnapshot.exists()) {
                 bindUserProfile(documentSnapshot);
-            } else {
+            } else if (!isLoggingOut) {
                 Toast.makeText(getContext(), "Profile not found", Toast.LENGTH_SHORT).show();
             }
         });
@@ -240,15 +242,7 @@ public class RequestorProfileFragment extends Fragment {
 
         btnSaveProfile.setOnClickListener(v -> saveProfileChanges());
 
-        layoutLogout.setOnClickListener(v -> {
-            auth.signOut();
-            Toast.makeText(getContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
-
-            Intent intent = new Intent(requireActivity(), LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            requireActivity().finish();
-        });
+        layoutLogout.setOnClickListener(v -> logoutUser());
 
         layoutChangePassword.setOnClickListener(v -> {
             if (currentUser == null || currentUser.getEmail() == null) {
@@ -267,7 +261,25 @@ public class RequestorProfileFragment extends Fragment {
                     });
         });
     }
+    private void logoutUser() {
+        isLoggingOut = true;
+        removeProfileListener();
 
+        if (auth != null) {
+            auth.signOut();
+        }
+
+        currentUser = null;
+
+        if (!isAdded()) return;
+
+        Toast.makeText(getContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
+
+        Intent intent = new Intent(requireActivity(), LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        requireActivity().finish();
+    }
 
     private void showProfilePhotoOptions() {
         if (!isAdded()) return;
@@ -438,14 +450,15 @@ public class RequestorProfileFragment extends Fragment {
                     Toast.makeText(getContext(), "Update failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
     }
-
-    @Override
-    public void onDestroyView() {
+    private void removeProfileListener() {
         if (profileListener != null) {
             profileListener.remove();
             profileListener = null;
         }
-
+    }
+    @Override
+    public void onDestroyView() {
+        removeProfileListener();
         super.onDestroyView();
     }
 

@@ -1,13 +1,21 @@
 package com.example.cnscfacilityhubproject.activities.sacUI;
 
+import android.app.AlertDialog;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -15,24 +23,74 @@ import androidx.fragment.app.Fragment;
 import com.example.cnscfacilityhubproject.R;
 import com.example.cnscfacilityhubproject.activities.LoginActivity;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.Source;
 
-import java.util.Locale;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 public class sacProfileFragment extends Fragment {
 
-    private TextInputEditText etFullName, etEmail, etContact, etDepartment;
+    private static final int MAX_PROFILE_IMAGE_SIZE = 512;
+
+    private TextInputEditText etFullName;
+    private TextInputEditText etEmail;
+    private TextInputEditText etContact;
+    private TextInputEditText etDepartment;
+
     private MaterialButton btnSaveProfile;
-    private LinearLayout layoutChangePassword, layoutLogout;
-    private TextView tvProfileInitials, tvProfileName, tvProfileRole, tvProfileUnit;
+    private LinearLayout layoutChangePassword;
+    private LinearLayout layoutLogout;
+
+    private MaterialCardView cardProfileAvatar;
+    private ImageView ivProfilePhoto;
+    private TextView tvProfileInitials;
+    private TextView tvAvatarActionLabel;
+    private TextView tvProfileName;
+    private TextView tvProfileRole;
+    private TextView tvProfileUnit;
 
     private FirebaseAuth auth;
     private FirebaseFirestore db;
+    private FirebaseUser currentUser;
+    private ListenerRegistration profileListener;
+    private ActivityResultLauncher<String> profileImagePickerLauncher;
+
+    private String currentFullName = "";
+    private String currentUserType = "";
+    private String currentOfficeOrDepartment = "";
+    private String currentProfileImageBase64 = "";
+
+    private boolean isLoggingOut = false;
 
     public sacProfileFragment() {
         super(R.layout.fragment_sac_profile);
+    }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        profileImagePickerLauncher = registerForActivityResult(
+                new ActivityResultContracts.GetContent(),
+                uri -> {
+                    if (uri != null) {
+                        saveProfileImage(uri);
+                    }
+                }
+        );
     }
 
     @Override
@@ -41,10 +99,12 @@ public class sacProfileFragment extends Fragment {
 
         auth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
+        currentUser = auth.getCurrentUser();
 
         bindViews(view);
+        clearProfileFields();
+        setupListeners();
         loadSACProfileData();
-        setupActions();
     }
 
     private void bindViews(View view) {
@@ -57,158 +117,526 @@ public class sacProfileFragment extends Fragment {
         layoutChangePassword = view.findViewById(R.id.layoutChangePassword);
         layoutLogout = view.findViewById(R.id.layoutLogout);
 
+        cardProfileAvatar = view.findViewById(R.id.cardProfileAvatar);
+        ivProfilePhoto = view.findViewById(R.id.ivProfilePhoto);
         tvProfileInitials = view.findViewById(R.id.tvProfileInitials);
+        tvAvatarActionLabel = view.findViewById(R.id.tvAvatarActionLabel);
         tvProfileName = view.findViewById(R.id.tvProfileName);
         tvProfileRole = view.findViewById(R.id.tvProfileRole);
         tvProfileUnit = view.findViewById(R.id.tvProfileUnit);
     }
 
+    private void clearProfileFields() {
+        currentFullName = "";
+        currentUserType = "";
+        currentOfficeOrDepartment = "";
+        currentProfileImageBase64 = "";
+
+        clearProfileImage();
+        setAvatarActionLabel(false);
+
+        setProfileText(tvProfileInitials, "");
+        setProfileText(tvProfileName, "");
+        setProfileText(tvProfileRole, "");
+        setProfileText(tvProfileUnit, "");
+
+        setEditTextValue(etFullName, "");
+        setEditTextValue(etEmail, "");
+        setEditTextValue(etContact, "");
+        setEditTextValue(etDepartment, "");
+    }
+
     private void loadSACProfileData() {
-        if (auth.getCurrentUser() == null) {
-            Toast.makeText(requireContext(), "No logged in user found.", Toast.LENGTH_SHORT).show();
+        if (currentUser == null) {
+            Toast.makeText(requireContext(), "No logged in user found", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String userId = auth.getCurrentUser().getUid();
+        String userId = currentUser.getUid();
+        DocumentReference userRef = db.collection("users").document(userId);
 
-        db.collection("users")
-                .document(userId)
-                .get()
-                .addOnSuccessListener(doc -> {
+        if (currentUser.getEmail() != null) {
+            setEditTextValue(etEmail, currentUser.getEmail());
+        }
+
+        userRef.get(Source.CACHE)
+                .addOnSuccessListener(documentSnapshot -> {
                     if (!isAdded()) return;
 
-                    if (!doc.exists()) {
-                        Toast.makeText(requireContext(), "User profile not found.", Toast.LENGTH_SHORT).show();
-                        return;
+                    if (documentSnapshot.exists()) {
+                        bindSACProfile(documentSnapshot);
                     }
-
-                    String fullName = safe(doc.getString("fullName"));
-                    String email = safe(doc.getString("email"));
-                    String contactNum = safe(doc.getString("contactNum"));
-                    String department = safe(doc.getString("department"));
-                    String office = safe(doc.getString("office"));
-                    String userType = safe(doc.getString("userType"));
-
-                    etFullName.setText(fullName);
-                    etEmail.setText(email);
-                    etContact.setText(contactNum);
-                    etDepartment.setText(!office.isEmpty() ? office : department);
-
-                    tvProfileName.setText(!fullName.isEmpty() ? fullName : "SAC Officer");
-                    tvProfileRole.setText(!userType.isEmpty() ? userType : "Student Affairs Coordinator");
-                    tvProfileUnit.setText(!office.isEmpty() ? office : (!department.isEmpty() ? department : "Student Center Approval Office"));
-                    tvProfileInitials.setText(getInitials(fullName));
-                })
-                .addOnFailureListener(e -> {
-                    if (!isAdded()) return;
-                    Toast.makeText(requireContext(), "Failed to load SAC profile.", Toast.LENGTH_LONG).show();
                 });
-    }
 
-    private void setupActions() {
-        btnSaveProfile.setOnClickListener(v -> {
-            if (!validateInputs()) return;
+        profileListener = userRef.addSnapshotListener((documentSnapshot, error) -> {
+            if (!isAdded() || isLoggingOut || auth.getCurrentUser() == null) return;
 
-            if (auth.getCurrentUser() == null) {
-                Toast.makeText(requireContext(), "No logged in user found.", Toast.LENGTH_SHORT).show();
+            if (error != null) {
+                Toast.makeText(
+                        requireContext(),
+                        "Failed to load SAC profile: " + error.getMessage(),
+                        Toast.LENGTH_LONG
+                ).show();
                 return;
             }
 
-            String userId = auth.getCurrentUser().getUid();
-            String fullName = getText(etFullName);
-            String email = getText(etEmail);
-            String contact = getText(etContact);
-            String department = getText(etDepartment);
-
-            db.collection("users")
-                    .document(userId)
-                    .update(
-                            "fullName", fullName,
-                            "email", email,
-                            "contactNum", contact,
-                            "office", department
-                    )
-                    .addOnSuccessListener(unused -> {
-                        if (!isAdded()) return;
-
-                        tvProfileName.setText(fullName);
-                        tvProfileUnit.setText(department);
-                        tvProfileInitials.setText(getInitials(fullName));
-
-                        Toast.makeText(requireContext(), "SAC profile updated successfully.", Toast.LENGTH_SHORT).show();
-                    })
-                    .addOnFailureListener(e -> {
-                        if (!isAdded()) return;
-                        Toast.makeText(requireContext(), "Failed to update profile.", Toast.LENGTH_LONG).show();
-                    });
-        });
-
-        layoutChangePassword.setOnClickListener(v ->
-                Toast.makeText(requireContext(), "Open Change Password screen.", Toast.LENGTH_SHORT).show()
-        );
-
-        layoutLogout.setOnClickListener(v -> {
-            FirebaseAuth.getInstance().signOut();
-            Toast.makeText(requireContext(), "Logged out successfully.", Toast.LENGTH_SHORT).show();
-
-            Intent intent = new Intent(requireContext(), LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            requireActivity().finish();
+            if (documentSnapshot != null && documentSnapshot.exists()) {
+                bindSACProfile(documentSnapshot);
+            } else if (!isLoggingOut) {
+                Toast.makeText(requireContext(), "User profile not found", Toast.LENGTH_SHORT).show();
+            }
         });
     }
 
-    private boolean validateInputs() {
-        if (isEmpty(etFullName)) {
-            etFullName.setError("Required");
+    private void bindSACProfile(DocumentSnapshot documentSnapshot) {
+        String fullName = safeText(documentSnapshot.getString("fullName"));
+        String email = safeText(documentSnapshot.getString("email"));
+        String contactNum = safeText(documentSnapshot.getString("contactNum"));
+        String department = safeText(documentSnapshot.getString("department"));
+        String office = safeText(documentSnapshot.getString("office"));
+        String userType = safeText(documentSnapshot.getString("userType"));
+        String profileImageBase64 = firstNonEmpty(
+                documentSnapshot.getString("profileImageBase64"),
+                documentSnapshot.getString("profilePicBase64")
+        );
+
+        currentFullName = fullName;
+        currentUserType = userType;
+        currentOfficeOrDepartment = firstNonEmpty(office, department);
+
+        bindProfileHeader(
+                currentFullName,
+                currentUserType,
+                currentOfficeOrDepartment,
+                profileImageBase64
+        );
+
+        setEditTextValue(etFullName, currentFullName);
+        setEditTextValue(etEmail, firstNonEmpty(email, currentUser != null ? currentUser.getEmail() : ""));
+        setEditTextValue(etContact, contactNum);
+        setEditTextValue(etDepartment, currentOfficeOrDepartment);
+    }
+
+    private void bindProfileHeader(String fullName, String userType, String officeOrDepartment, String profileImageBase64) {
+        currentFullName = safeText(fullName);
+        currentUserType = safeText(userType);
+        currentOfficeOrDepartment = safeText(officeOrDepartment);
+
+        setProfileText(tvProfileName, currentFullName);
+        setProfileText(tvProfileRole, currentUserType);
+        setProfileText(tvProfileUnit, currentOfficeOrDepartment);
+
+        if (!showProfileImage(profileImageBase64)) {
+            setProfileText(tvProfileInitials, getInitials(currentFullName));
+        }
+    }
+
+    private void setupListeners() {
+        if (cardProfileAvatar != null) {
+            cardProfileAvatar.setOnClickListener(v -> showProfilePhotoOptions());
+        }
+
+        if (ivProfilePhoto != null) {
+            ivProfilePhoto.setOnClickListener(v -> showProfilePhotoOptions());
+        }
+
+        if (tvProfileInitials != null) {
+            tvProfileInitials.setOnClickListener(v -> showProfilePhotoOptions());
+        }
+
+        if (btnSaveProfile != null) {
+            btnSaveProfile.setOnClickListener(v -> saveProfileChanges());
+        }
+
+        if (layoutChangePassword != null) {
+            layoutChangePassword.setOnClickListener(v -> sendPasswordResetEmail());
+        }
+
+        if (layoutLogout != null) {
+            layoutLogout.setOnClickListener(v -> logoutUser());
+        }
+    }
+
+    private void showProfilePhotoOptions() {
+        if (!isAdded()) return;
+
+        boolean hasPhoto = !safeText(currentProfileImageBase64).isEmpty();
+
+        String[] options = hasPhoto
+                ? new String[]{"Change Photo", "Remove Photo"}
+                : new String[]{"Add Photo"};
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Profile Photo")
+                .setItems(options, (dialog, which) -> {
+                    if (!hasPhoto || which == 0) {
+                        openProfileImagePicker();
+                    } else {
+                        removeProfileImage();
+                    }
+                })
+                .show();
+    }
+
+    private void openProfileImagePicker() {
+        if (profileImagePickerLauncher != null) {
+            profileImagePickerLauncher.launch("image/*");
+        }
+    }
+
+    private void saveProfileImage(Uri imageUri) {
+        if (currentUser == null) {
+            Toast.makeText(requireContext(), "No logged in user found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            String imageBase64 = encodeImageToBase64(imageUri);
+
+            if (imageBase64.isEmpty()) {
+                Toast.makeText(requireContext(), "Unable to read selected image", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            showProfileImage(imageBase64);
+
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("profileImageBase64", imageBase64);
+            updates.put("profilePicBase64", imageBase64);
+            updates.put("profileImageMimeType", "image/jpeg");
+            updates.put("profileImageUpdatedAt", FieldValue.serverTimestamp());
+
+            db.collection("users")
+                    .document(currentUser.getUid())
+                    .set(updates, SetOptions.merge())
+                    .addOnSuccessListener(unused -> {
+                        if (!isAdded()) return;
+                        Toast.makeText(requireContext(), "Profile photo updated", Toast.LENGTH_SHORT).show();
+                    })
+                    .addOnFailureListener(e -> {
+                        if (!isAdded()) return;
+                        Toast.makeText(requireContext(), "Failed to update photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    });
+
+        } catch (Exception e) {
+            if (!isAdded()) return;
+            Toast.makeText(requireContext(), "Failed to load photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void removeProfileImage() {
+        if (currentUser == null) {
+            Toast.makeText(requireContext(), "No logged in user found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        clearProfileImage();
+        setProfileText(tvProfileInitials, getInitials(getText(etFullName)));
+        setAvatarActionLabel(false);
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("profileImageBase64", FieldValue.delete());
+        updates.put("profilePicBase64", FieldValue.delete());
+        updates.put("profileImageMimeType", FieldValue.delete());
+        updates.put("profileImageUpdatedAt", FieldValue.serverTimestamp());
+
+        db.collection("users")
+                .document(currentUser.getUid())
+                .set(updates, SetOptions.merge())
+                .addOnSuccessListener(unused -> {
+                    if (!isAdded()) return;
+                    Toast.makeText(requireContext(), "Profile photo removed", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    if (!isAdded()) return;
+                    Toast.makeText(requireContext(), "Failed to remove photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+    }
+
+    private void saveProfileChanges() {
+        if (currentUser == null) {
+            Toast.makeText(requireContext(), "No logged in user found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String fullName = getText(etFullName);
+        String email = getText(etEmail);
+        String contact = getText(etContact);
+        String officeOrUnit = getText(etDepartment);
+
+        if (fullName.isEmpty()) {
+            etFullName.setError("Full name is required");
             etFullName.requestFocus();
-            return false;
+            return;
         }
 
-        if (isEmpty(etEmail)) {
-            etEmail.setError("Required");
+        if (email.isEmpty()) {
+            etEmail.setError("Email is required");
             etEmail.requestFocus();
-            return false;
+            return;
         }
 
-        if (isEmpty(etContact)) {
-            etContact.setError("Required");
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            etEmail.setError("Enter a valid email address");
+            etEmail.requestFocus();
+            return;
+        }
+
+        if (contact.isEmpty()) {
+            etContact.setError("Contact number is required");
             etContact.requestFocus();
+            return;
+        }
+
+        if (!contact.matches("^[0-9]{11}$")) {
+            etContact.setError("Enter a valid 11-digit contact number");
+            etContact.requestFocus();
+            return;
+        }
+
+        if (officeOrUnit.isEmpty()) {
+            etDepartment.setError("Office / Unit is required");
+            etDepartment.requestFocus();
+            return;
+        }
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("fullName", fullName);
+        updates.put("email", email);
+        updates.put("contactNum", contact);
+        updates.put("office", officeOrUnit);
+        updates.put("department", officeOrUnit);
+
+        db.collection("users")
+                .document(currentUser.getUid())
+                .set(updates, SetOptions.merge())
+                .addOnSuccessListener(unused -> {
+                    if (!isAdded()) return;
+
+                    bindProfileHeader(
+                            fullName,
+                            currentUserType,
+                            officeOrUnit,
+                            currentProfileImageBase64
+                    );
+
+                    Toast.makeText(requireContext(), "SAC profile updated successfully", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    if (!isAdded()) return;
+                    Toast.makeText(requireContext(), "Update failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+    }
+
+    private void sendPasswordResetEmail() {
+        if (currentUser == null || currentUser.getEmail() == null) {
+            Toast.makeText(requireContext(), "Email address not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        auth.sendPasswordResetEmail(currentUser.getEmail())
+                .addOnSuccessListener(unused -> {
+                    if (!isAdded()) return;
+                    Toast.makeText(requireContext(), "Password reset email sent", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    if (!isAdded()) return;
+                    Toast.makeText(requireContext(), "Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+    }
+    private void removeProfileListener() {
+        if (profileListener != null) {
+            profileListener.remove();
+            profileListener = null;
+        }
+    }
+    private void logoutUser() {
+        isLoggingOut = true;
+        removeProfileListener();
+
+        if (auth != null) {
+            auth.signOut();
+        }
+
+        currentUser = null;
+
+        if (!isAdded()) return;
+
+        Toast.makeText(requireContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
+
+        Intent intent = new Intent(requireActivity(), LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        requireActivity().finish();
+    }
+
+    @Override
+    public void onDestroyView() {
+        removeProfileListener();
+        super.onDestroyView();
+    }
+
+    private boolean showProfileImage(String base64Value) {
+        String cleanBase64 = extractBase64(base64Value);
+
+        if (cleanBase64.isEmpty()) {
+            clearProfileImage();
             return false;
         }
 
-        if (isEmpty(etDepartment)) {
-            etDepartment.setError("Required");
-            etDepartment.requestFocus();
+        Bitmap bitmap = decodeBase64ToBitmap(cleanBase64);
+
+        if (bitmap == null) {
+            clearProfileImage();
             return false;
+        }
+
+        currentProfileImageBase64 = cleanBase64;
+        setAvatarActionLabel(true);
+
+        if (ivProfilePhoto != null) {
+            ivProfilePhoto.setImageBitmap(bitmap);
+            ivProfilePhoto.setVisibility(View.VISIBLE);
+        }
+
+        if (tvProfileInitials != null) {
+            tvProfileInitials.setVisibility(View.GONE);
         }
 
         return true;
     }
 
-    private boolean isEmpty(TextInputEditText editText) {
-        return editText.getText() == null || TextUtils.isEmpty(editText.getText().toString().trim());
+    private void clearProfileImage() {
+        currentProfileImageBase64 = "";
+        setAvatarActionLabel(false);
+
+        if (ivProfilePhoto != null) {
+            ivProfilePhoto.setImageDrawable(null);
+            ivProfilePhoto.setVisibility(View.GONE);
+        }
+    }
+
+    private String encodeImageToBase64(Uri imageUri) throws IOException {
+        Bitmap originalBitmap;
+
+        try (InputStream inputStream = requireContext().getContentResolver().openInputStream(imageUri)) {
+            originalBitmap = BitmapFactory.decodeStream(inputStream);
+        }
+
+        if (originalBitmap == null) {
+            return "";
+        }
+
+        Bitmap resizedBitmap = resizeBitmap(originalBitmap, MAX_PROFILE_IMAGE_SIZE);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 75, outputStream);
+
+        byte[] imageBytes = outputStream.toByteArray();
+
+        if (imageBytes.length > 850_000) {
+            outputStream.reset();
+            resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream);
+            imageBytes = outputStream.toByteArray();
+        }
+
+        if (imageBytes.length > 850_000) {
+            Bitmap smallerBitmap = resizeBitmap(originalBitmap, 360);
+            outputStream.reset();
+            smallerBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream);
+            imageBytes = outputStream.toByteArray();
+        }
+
+        return Base64.encodeToString(imageBytes, Base64.NO_WRAP);
+    }
+
+    private Bitmap resizeBitmap(Bitmap bitmap, int maxSize) {
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
+
+        if (width <= maxSize && height <= maxSize) {
+            return bitmap;
+        }
+
+        float ratio = Math.min((float) maxSize / width, (float) maxSize / height);
+        int newWidth = Math.round(width * ratio);
+        int newHeight = Math.round(height * ratio);
+
+        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true);
+    }
+
+    private Bitmap decodeBase64ToBitmap(String base64Value) {
+        try {
+            byte[] imageBytes = Base64.decode(extractBase64(base64Value), Base64.DEFAULT);
+            return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String extractBase64(String value) {
+        String cleanValue = safeText(value);
+
+        if (cleanValue.startsWith("data:") && cleanValue.contains(",")) {
+            return cleanValue.substring(cleanValue.indexOf(',') + 1).trim();
+        }
+
+        return cleanValue;
+    }
+
+    private void setAvatarActionLabel(boolean hasPhoto) {
+        if (tvAvatarActionLabel == null) return;
+        tvAvatarActionLabel.setText(hasPhoto ? "Edit Photo" : "Add Photo");
+    }
+
+    private void setProfileText(TextView textView, String value) {
+        if (textView == null) return;
+
+        String cleanValue = safeText(value);
+        textView.setText(cleanValue);
+        textView.setVisibility(cleanValue.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    private void setEditTextValue(TextInputEditText editText, String value) {
+        if (editText == null) return;
+        editText.setText(safeText(value));
     }
 
     private String getText(TextInputEditText editText) {
-        return editText.getText() != null ? editText.getText().toString().trim() : "";
+        if (editText == null || editText.getText() == null) return "";
+        return editText.getText().toString().trim();
     }
 
-    private String safe(String value) {
-        return value == null ? "" : value.trim();
+    private String safeText(String value) {
+        return value != null ? value.trim() : "";
+    }
+
+    private String firstNonEmpty(String first, String second) {
+        String cleanFirst = safeText(first);
+
+        if (!cleanFirst.isEmpty()) {
+            return cleanFirst;
+        }
+
+        return safeText(second);
     }
 
     private String getInitials(String fullName) {
-        if (fullName == null || fullName.trim().isEmpty()) return "SA";
+        String cleanName = safeText(fullName);
 
-        String[] parts = fullName.trim().split("\\s+");
-        if (parts.length == 1) {
-            return parts[0].substring(0, Math.min(2, parts[0].length())).toUpperCase(Locale.getDefault());
+        if (TextUtils.isEmpty(cleanName)) {
+            return "";
         }
 
-        String first = parts[0].substring(0, 1);
-        String last = parts[parts.length - 1].substring(0, 1);
-        return (first + last).toUpperCase(Locale.getDefault());
+        String[] parts = cleanName.split("\\s+");
+        StringBuilder initials = new StringBuilder();
+
+        for (int i = 0; i < parts.length && i < 2; i++) {
+            if (!parts[i].isEmpty()) {
+                initials.append(Character.toUpperCase(parts[i].charAt(0)));
+            }
+        }
+
+        return initials.toString();
     }
 }
-
