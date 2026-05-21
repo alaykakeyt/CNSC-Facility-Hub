@@ -1,6 +1,4 @@
 // Firestore Security Rules for CNSC Facility Hub
-// IMPORTANT: After editing, you must deploy these using: firebase deploy --only firestore:rules
-// OR copy and paste them into the Firebase Console -> Build -> Firestore Database -> Rules tab.
 
 rules_version = '2';
 
