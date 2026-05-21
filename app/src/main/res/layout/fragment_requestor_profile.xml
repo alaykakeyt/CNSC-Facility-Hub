@@ -34,21 +34,51 @@
                 android:padding="22dp">
 
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardProfileAvatar"
                     android:layout_width="92dp"
                     android:layout_height="92dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackgroundBorderless"
                     app:cardBackgroundColor="#F3D9D9"
                     app:cardCornerRadius="30dp"
                     app:cardElevation="0dp">
 
-                    <TextView
-                        android:id="@+id/tvProfileInitials"
+                    <FrameLayout
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:text="TR"
-                        android:textColor="#970705"
-                        android:textSize="28sp"
-                        android:textStyle="bold" />
+                        android:layout_height="match_parent">
+
+                        <ImageView
+                            android:id="@+id/ivProfilePhoto"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:contentDescription="Profile Photo"
+                            android:scaleType="centerCrop"
+                            android:visibility="gone"
+                            tools:src="@android:drawable/ic_menu_camera"
+                            tools:visibility="visible" />
+
+                        <TextView
+                            android:id="@+id/tvProfileInitials"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:textColor="#970705"
+                            android:textSize="28sp"
+                            android:textStyle="bold"
+                            tools:text="TR" />
+
+                        <TextView
+                            android:id="@+id/tvAvatarActionLabel"
+                            android:layout_width="match_parent"
+                            android:layout_height="22dp"
+                            android:layout_gravity="bottom"
+                            android:background="#80000000"
+                            android:gravity="center"
+                            android:text="Add Photo"
+                            android:textColor="#FFFFFF"
+                            android:textSize="10sp" />
+                    </FrameLayout>
                 </com.google.android.material.card.MaterialCardView>
 
                 <TextView
@@ -56,20 +86,20 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Tristan Rafael"
                     android:textColor="#313131"
                     android:textSize="22sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    tools:text="Tristan Rafael" />
 
                 <TextView
                     android:id="@+id/tvProfileRole"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="Requestor"
                     android:textColor="#970705"
                     android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    tools:text="Requestor" />
 
                 <TextView
                     android:id="@+id/tvProfileDepartment"
@@ -77,9 +107,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:alpha="0.72"
-                    android:text="College of Computer Studies"
                     android:textColor="#313131"
-                    android:textSize="13sp" />
+                    android:textSize="13sp"
+                    tools:text="College of Computer Studies" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -305,13 +335,6 @@
                         android:textColor="#313131"
                         android:textSize="15sp"
                         android:textStyle="bold" />
-
-                    <!--                    <ImageView-->
-                    <!--                        android:layout_width="18dp"-->
-                    <!--                        android:layout_height="18dp"-->
-                    <!--                        android:contentDescription="Arrow"-->
-                    <!--                        android:src="@android:drawable/arrow_forward"-->
-                    <!--                        app:tint="#313131" />-->
                 </LinearLayout>
 
                 <LinearLayout
@@ -341,13 +364,6 @@
                         android:textColor="#970705"
                         android:textSize="15sp"
                         android:textStyle="bold" />
-
-                    <!--                    <ImageView-->
-                    <!--                        android:layout_width="18dp"-->
-                    <!--                        android:layout_height="18dp"-->
-                    <!--                        android:contentDescription="Arrow"-->
-                    <!--                        android:src="@android:drawable/arrow_forward"-->
-                    <!--                        app:tint="#970705" />-->
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

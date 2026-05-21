@@ -54,6 +54,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import android.graphics.Color;
+
+import android.content.res.ColorStateList;
+
+import android.os.Environment;
+
+import androidx.core.content.FileProvider;
+
+import java.io.File;
+
 public class RequestorRequestFragment extends Fragment {
 
     // Firestore has a 1 MiB maximum document size.
@@ -140,6 +150,10 @@ public class RequestorRequestFragment extends Fragment {
     private FirebaseAuth auth;
     private FirebaseFirestore db;
 
+    private MaterialButton btnCaptureImage;
+    private ActivityResultLauncher<Uri> cameraLauncher;
+    private Uri pendingCameraImageUri;
+
     public RequestorRequestFragment() {
         super(R.layout.fragment_requestor_request);
     }
@@ -148,6 +162,7 @@ public class RequestorRequestFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setupFilePickerLauncher();
+        setupCameraLauncher();
     }
 
     @Override
@@ -169,6 +184,8 @@ public class RequestorRequestFragment extends Fragment {
         setupSubmit();
         loadRequestorInformation();
         checkActiveAppointment();
+
+
     }
 
     private void bindViews(View view) {
@@ -222,9 +239,6 @@ public class RequestorRequestFragment extends Fragment {
         layoutScheduleDays = view.findViewById(R.id.layoutScheduleDays);
         tvScheduleHint = view.findViewById(R.id.tvScheduleHint);
 
-        btnChooseFiles = view.findViewById(R.id.btnChooseFiles);
-        layoutSelectedFiles = view.findViewById(R.id.layoutSelectedFiles);
-        tvSelectedFile = view.findViewById(R.id.tvSelectedFile);
 
         btnSubmitRequest = view.findViewById(R.id.btnSubmitRequest);
         progressSubmit = view.findViewById(R.id.progressSubmit);
@@ -238,6 +252,11 @@ public class RequestorRequestFragment extends Fragment {
         tvActiveAppointmentPurpose = view.findViewById(R.id.tvActiveAppointmentPurpose);
         btnViewActiveAppointment = view.findViewById(R.id.btnViewActiveAppointment);
         cardRequestForm = view.findViewById(R.id.cardRequestForm);
+
+        btnChooseFiles = view.findViewById(R.id.btnChooseFiles);
+        btnCaptureImage = view.findViewById(R.id.btnCaptureImage);
+        layoutSelectedFiles = view.findViewById(R.id.layoutSelectedFiles);
+        tvSelectedFile = view.findViewById(R.id.tvSelectedFile);
     }
 
     private void loadRequestorInformation() {
@@ -279,6 +298,12 @@ public class RequestorRequestFragment extends Fragment {
         editText.setLongClickable(false);
         editText.setCursorVisible(false);
         editText.setKeyListener(null);
+
+        // Text color kapag may selected/typed time
+        editText.setTextColor(Color.BLACK);
+
+        // Hint color habang wala pang selected time
+        editText.setHintTextColor(Color.GRAY);
     }
 
     private void setupActivityTypeChips() {
@@ -309,14 +334,18 @@ public class RequestorRequestFragment extends Fragment {
     private void updateChipStyles(Chip... chips) {
         for (Chip chip : chips) {
             if (chip == null) continue;
+
+            chip.setCheckedIconVisible(false);
+            chip.setChipBackgroundColor(ColorStateList.valueOf(Color.WHITE));
+            chip.setChipCornerRadius(dp(18));
+            chip.setChipStrokeWidth(dp(1));
+
             if (chip.isChecked()) {
-                chip.setChipStrokeWidth(2f);
-                chip.setChipStrokeColorResource(R.color.cnsc_primary);
+                chip.setChipStrokeColor(ColorStateList.valueOf(requireContext().getColor(R.color.cnsc_primary)));
                 chip.setTextColor(requireContext().getColor(R.color.cnsc_primary));
             } else {
-                chip.setChipStrokeWidth(1f);
-                chip.setChipStrokeColorResource(R.color.cnsc_stroke);
-                chip.setTextColor(requireContext().getColor(R.color.cnsc_text_primary));
+                chip.setChipStrokeColor(ColorStateList.valueOf(Color.parseColor("#313131")));
+                chip.setTextColor(Color.parseColor("#313131"));
             }
         }
     }
@@ -591,8 +620,8 @@ public class RequestorRequestFragment extends Fragment {
                                 );
                             } catch (SecurityException ignored) {
                                 // Some providers do not support persistable URI permission.
-                                // The URI is still usable during this app session for upload.
                             }
+
                             selectedProposalFileUris.add(uri);
                         }
                     }
@@ -601,12 +630,65 @@ public class RequestorRequestFragment extends Fragment {
                 }
         );
     }
+    private void setupCameraLauncher() {
+        cameraLauncher = registerForActivityResult(
+                new ActivityResultContracts.TakePicture(),
+                success -> {
+                    if (!isAdded()) return;
+
+                    if (success && pendingCameraImageUri != null) {
+                        if (!selectedProposalFileUris.contains(pendingCameraImageUri)) {
+                            selectedProposalFileUris.add(pendingCameraImageUri);
+                        }
+
+                        refreshSelectedFilesUi();
+                    } else {
+                        Toast.makeText(requireContext(), "Image capture cancelled.", Toast.LENGTH_SHORT).show();
+                    }
+
+                    pendingCameraImageUri = null;
+                }
+        );
+    }
+
+    private void openCameraCapture() {
+        try {
+            pendingCameraImageUri = createCameraImageUri();
+
+            if (pendingCameraImageUri != null) {
+                cameraLauncher.launch(pendingCameraImageUri);
+            }
+        } catch (IOException e) {
+            Toast.makeText(requireContext(),
+                    "Unable to open camera: " + e.getMessage(),
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private Uri createCameraImageUri() throws IOException {
+        File picturesDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+
+        if (picturesDir == null) {
+            throw new IOException("Pictures directory is not available.");
+        }
+
+        String fileName = "captured_" + System.currentTimeMillis() + ".jpg";
+        File imageFile = new File(picturesDir, fileName);
+
+        return FileProvider.getUriForFile(
+                requireContext(),
+                requireContext().getPackageName() + ".fileprovider",
+                imageFile
+        );
+    }
 
     private void setupFileActions() {
         btnChooseFiles.setOnClickListener(v -> filePickerLauncher.launch(new String[]{
                 "application/pdf",
                 "image/*"
         }));
+
+        btnCaptureImage.setOnClickListener(v -> openCameraCapture());
     }
 
     private void refreshSelectedFilesUi() {
@@ -648,15 +730,18 @@ public class RequestorRequestFragment extends Fragment {
             name.setSingleLine(true);
             name.setPadding(0, 0, dp(8), 0);
 
-            MaterialButton remove = new MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+            MaterialButton remove = new MaterialButton(requireContext());
             remove.setText("Remove");
             remove.setPadding(dp(8), 0, dp(8), 0);
             remove.setMinimumWidth(0);
             remove.setMinimumHeight(0);
             remove.setAllCaps(false);
             remove.setTextSize(12f);
+            remove.setBackgroundColor(Color.TRANSPARENT);
+            remove.setStrokeWidth(dp(1));
             remove.setStrokeColorResource(R.color.cnsc_text_secondary);
             remove.setTextColor(requireContext().getColor(R.color.cnsc_text_secondary));
+
             remove.setOnClickListener(v -> {
                 selectedProposalFileUris.remove(uri);
                 refreshSelectedFilesUi();
@@ -1178,6 +1263,7 @@ public class RequestorRequestFragment extends Fragment {
     private void setSubmitting(boolean submitting, String statusText) {
         btnSubmitRequest.setEnabled(!submitting);
         btnChooseFiles.setEnabled(!submitting);
+        btnCaptureImage.setEnabled(!submitting);
         progressSubmit.setVisibility(submitting ? View.VISIBLE : View.GONE);
 
         if (statusText == null || statusText.isEmpty()) {

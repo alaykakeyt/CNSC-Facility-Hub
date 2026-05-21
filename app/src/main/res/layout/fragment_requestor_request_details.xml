@@ -33,7 +33,7 @@
                 app:backgroundTint="#FFFFFF"
                 app:cornerRadius="18dp"
                 app:elevation="0dp"
-                app:strokeColor="#313131"
+                app:strokeColor="#111111"
                 app:strokeWidth="1dp" />
 
             <LinearLayout
@@ -57,7 +57,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="3dp"
                     android:alpha="0.72"
-                    android:text="Complete booking request information"
+                    tools:text="Complete booking request information"
                     android:textColor="#313131"
                     android:textSize="13sp" />
             </LinearLayout>
@@ -94,7 +94,7 @@
                             android:id="@+id/tvDetailPurpose"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Purpose / Activity"
+                            tools:text="Purpose / Activity"
                             android:textColor="#FFFFFF"
                             android:textSize="22sp"
                             android:textStyle="bold" />
@@ -105,7 +105,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="5dp"
                             android:alpha="0.88"
-                            android:text="Institutional"
+                            tools:text="Institutional"
                             android:textColor="#FFFFFF"
                             android:textSize="13sp" />
                     </LinearLayout>
@@ -114,7 +114,7 @@
                         android:id="@+id/chipDetailStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Pending"
+                        tools:text="Pending"
                         android:textColor="#970705"
                         android:textStyle="bold"
                         app:chipBackgroundColor="#FFFFFF"
@@ -128,7 +128,7 @@
                     android:layout_marginTop="14dp"
                     android:alpha="0.94"
                     android:lineSpacingExtra="3dp"
-                    android:text="May 1, 2026 • 8:00 AM - 5:00 PM"
+                    tools:text="May 1, 2026 • 8:00 AM - 5:00 PM"
                     android:textColor="#FFFFFF"
                     android:textSize="14sp" />
 
@@ -138,7 +138,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="5dp"
                     android:alpha="0.94"
-                    android:text="Amphitheater"
+                    tools:text="Amphitheater"
                     android:textColor="#FFFFFF"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -180,7 +180,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Name: —"
+                    tools:text="Name: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -189,7 +189,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Contact Number: —"
+                    tools:text="Contact Number: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -198,7 +198,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="College / Department: —"
+                    tools:text="College / Department: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -207,7 +207,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Office / Course: —"
+                    tools:text="Office / Course: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -248,7 +248,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Date: —"
+                    tools:text="Date: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -257,7 +257,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Time: —"
+                    tools:text="Time: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -266,7 +266,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Facility: —"
+                    tools:text="Facility: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -307,7 +307,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Participants: —"
+                    tools:text="Participants: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -316,7 +316,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Number of Participants: —"
+                    tools:text="Number of Participants: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -326,7 +326,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="3dp"
-                    android:text="Purpose: —"
+                    tools:text="Purpose: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -367,7 +367,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Tables: —"
+                    tools:text="Tables: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -376,7 +376,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Chairs: —"
+                    tools:text="Chairs: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -386,7 +386,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="3dp"
-                    android:text="Other Amenities: —"
+                    tools:text="Other Amenities: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -428,7 +428,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Technical Needed: —"
+                    tools:text="Technical Needed: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -438,7 +438,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Selected Technicals: —"
+                    tools:text="Selected Technicals: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -448,7 +448,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="3dp"
-                    android:text="Connectors / Cables: —"
+                    tools:text="Connectors / Cables: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -489,7 +489,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Proposal / Supporting Files: —"
+                    tools:text="Proposal / Supporting Files: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -498,7 +498,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Sent To: —"
+                    tools:text="Sent To: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -507,7 +507,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Agreement Accepted: —"
+                    tools:text="Agreement Accepted: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -551,7 +551,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="No remarks available."
+                    tools:text="No remarks available."
                     android:textColor="#313131"
                     android:textSize="14sp" />
             </LinearLayout>

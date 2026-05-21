@@ -1,41 +1,77 @@
-
 package com.example.cnscfacilityhubproject.activities.requestorUI;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import android.app.AlertDialog;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
 import com.example.cnscfacilityhubproject.activities.LoginActivity;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.Source;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
 public class RequestorProfileFragment extends Fragment {
 
-    private TextView tvProfileInitials, tvProfileName, tvProfileRole, tvProfileDepartment;
-    private TextInputEditText etFullName, etEmail, etContact, etDepartment, etOfficeCourse;
+    private static final int MAX_PROFILE_IMAGE_SIZE = 512;
+
+    private MaterialCardView cardProfileAvatar;
+    private ImageView ivProfilePhoto;
+    private TextView tvProfileInitials;
+    private TextView tvAvatarActionLabel;
+    private TextView tvProfileName;
+    private TextView tvProfileRole;
+    private TextView tvProfileDepartment;
+
+    private TextInputEditText etFullName;
+    private TextInputEditText etEmail;
+    private TextInputEditText etContact;
+    private TextInputEditText etDepartment;
+    private TextInputEditText etOfficeCourse;
+
     private MaterialButton btnSaveProfile;
-    private LinearLayout layoutChangePassword, layoutLogout;
+    private LinearLayout layoutChangePassword;
+    private LinearLayout layoutLogout;
 
     private FirebaseAuth auth;
     private FirebaseFirestore db;
     private FirebaseUser currentUser;
+    private ListenerRegistration profileListener;
+    private ActivityResultLauncher<String> profileImagePickerLauncher;
+
+    private String currentUserType = "";
+    private String currentProfileImageBase64 = "";
 
     public RequestorProfileFragment() {
         // Required empty public constructor
@@ -43,6 +79,20 @@ public class RequestorProfileFragment extends Fragment {
 
     public static RequestorProfileFragment newInstance() {
         return new RequestorProfileFragment();
+    }
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        profileImagePickerLauncher = registerForActivityResult(
+                new ActivityResultContracts.GetContent(),
+                uri -> {
+                    if (uri != null) {
+                        saveProfileImage(uri);
+                    }
+                }
+        );
     }
 
     @Override
@@ -55,14 +105,18 @@ public class RequestorProfileFragment extends Fragment {
         currentUser = auth.getCurrentUser();
 
         initViews(view);
-        loadUserProfile();
+        clearProfileFields();
         setupListeners();
+        loadUserProfile();
 
         return view;
     }
 
     private void initViews(View view) {
+        cardProfileAvatar = view.findViewById(R.id.cardProfileAvatar);
+        ivProfilePhoto = view.findViewById(R.id.ivProfilePhoto);
         tvProfileInitials = view.findViewById(R.id.tvProfileInitials);
+        tvAvatarActionLabel = view.findViewById(R.id.tvAvatarActionLabel);
         tvProfileName = view.findViewById(R.id.tvProfileName);
         tvProfileRole = view.findViewById(R.id.tvProfileRole);
         tvProfileDepartment = view.findViewById(R.id.tvProfileDepartment);
@@ -78,6 +132,24 @@ public class RequestorProfileFragment extends Fragment {
         layoutLogout = view.findViewById(R.id.layoutLogout);
     }
 
+    private void clearProfileFields() {
+        currentUserType = "";
+        currentProfileImageBase64 = "";
+
+        clearProfileImage();
+        setAvatarActionLabel(false);
+        setProfileText(tvProfileInitials, "");
+        setProfileText(tvProfileName, "");
+        setProfileText(tvProfileRole, "");
+        setProfileText(tvProfileDepartment, "");
+
+        setEditTextValue(etFullName, "");
+        setEditTextValue(etEmail, "");
+        setEditTextValue(etContact, "");
+        setEditTextValue(etDepartment, "");
+        setEditTextValue(etOfficeCourse, "");
+    }
+
     private void loadUserProfile() {
         if (currentUser == null) {
             Toast.makeText(getContext(), "No user is logged in", Toast.LENGTH_SHORT).show();
@@ -85,42 +157,87 @@ public class RequestorProfileFragment extends Fragment {
         }
 
         String userId = currentUser.getUid();
+        DocumentReference userRef = db.collection("users").document(userId);
 
-        db.collection("users")
-                .document(userId)
-                .get()
+        if (currentUser.getEmail() != null) {
+            setEditTextValue(etEmail, currentUser.getEmail());
+        }
+
+        userRef.get(Source.CACHE)
                 .addOnSuccessListener(documentSnapshot -> {
                     if (!isAdded()) return;
 
                     if (documentSnapshot.exists()) {
-                        String fullName = documentSnapshot.getString("fullName");
-                        String contactNum = documentSnapshot.getString("contactNum");
-                        String department = documentSnapshot.getString("department");
-                        String course = documentSnapshot.getString("course");
-                        String email = documentSnapshot.getString("email");
-                        String userType = documentSnapshot.getString("userType");
-
-                        tvProfileName.setText(notNull(fullName));
-                        tvProfileRole.setText(notNull(userType));
-                        tvProfileDepartment.setText(notNull(department));
-                        tvProfileInitials.setText(getInitials(fullName));
-
-                        etFullName.setText(notNull(fullName));
-                        etEmail.setText(notNull(email));
-                        etContact.setText(notNull(contactNum));
-                        etDepartment.setText(notNull(department));
-                        etOfficeCourse.setText(notNull(course));
-                    } else {
-                        Toast.makeText(getContext(), "Profile not found", Toast.LENGTH_SHORT).show();
+                        bindUserProfile(documentSnapshot);
                     }
-                })
-                .addOnFailureListener(e -> {
-                    if (!isAdded()) return;
-                    Toast.makeText(getContext(), "Failed to load profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
+
+        profileListener = userRef.addSnapshotListener((documentSnapshot, error) -> {
+            if (!isAdded()) return;
+
+            if (error != null) {
+                Toast.makeText(
+                        getContext(),
+                        "Failed to load profile: " + error.getMessage(),
+                        Toast.LENGTH_LONG
+                ).show();
+                return;
+            }
+
+            if (documentSnapshot != null && documentSnapshot.exists()) {
+                bindUserProfile(documentSnapshot);
+            } else {
+                Toast.makeText(getContext(), "Profile not found", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void bindUserProfile(DocumentSnapshot documentSnapshot) {
+        String fullName = safeText(documentSnapshot.getString("fullName"));
+        String contactNum = safeText(documentSnapshot.getString("contactNum"));
+        String department = safeText(documentSnapshot.getString("department"));
+        String course = safeText(documentSnapshot.getString("course"));
+        String email = safeText(documentSnapshot.getString("email"));
+        String userType = safeText(documentSnapshot.getString("userType"));
+        String profileImageBase64 = firstNonEmpty(
+                documentSnapshot.getString("profileImageBase64"),
+                documentSnapshot.getString("profilePicBase64")
+        );
+
+        currentUserType = userType;
+
+        bindProfileHeader(fullName, userType, department, profileImageBase64);
+
+        setEditTextValue(etFullName, fullName);
+        setEditTextValue(etEmail, firstNonEmpty(email, currentUser != null ? currentUser.getEmail() : ""));
+        setEditTextValue(etContact, contactNum);
+        setEditTextValue(etDepartment, department);
+        setEditTextValue(etOfficeCourse, course);
+    }
+
+    private void bindProfileHeader(String fullName, String userType, String department, String profileImageBase64) {
+        setProfileText(tvProfileName, fullName);
+        setProfileText(tvProfileRole, userType);
+        setProfileText(tvProfileDepartment, department);
+
+        if (!showProfileImage(profileImageBase64)) {
+            setProfileText(tvProfileInitials, getInitials(fullName));
+        }
     }
 
     private void setupListeners() {
+        if (cardProfileAvatar != null) {
+            cardProfileAvatar.setOnClickListener(v -> showProfilePhotoOptions());
+        }
+
+        if (ivProfilePhoto != null) {
+            ivProfilePhoto.setOnClickListener(v -> showProfilePhotoOptions());
+        }
+
+        if (tvProfileInitials != null) {
+            tvProfileInitials.setOnClickListener(v -> showProfilePhotoOptions());
+        }
+
         btnSaveProfile.setOnClickListener(v -> saveProfileChanges());
 
         layoutLogout.setOnClickListener(v -> {
@@ -134,18 +251,116 @@ public class RequestorProfileFragment extends Fragment {
         });
 
         layoutChangePassword.setOnClickListener(v -> {
-            if (currentUser != null && currentUser.getEmail() != null) {
-                auth.sendPasswordResetEmail(currentUser.getEmail())
-                        .addOnSuccessListener(unused -> {
-                            if (!isAdded()) return;
-                            Toast.makeText(getContext(), "Password reset email sent", Toast.LENGTH_SHORT).show();
-                        })
-                        .addOnFailureListener(e -> {
-                            if (!isAdded()) return;
-                            Toast.makeText(getContext(), "Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                        });
+            if (currentUser == null || currentUser.getEmail() == null) {
+                Toast.makeText(getContext(), "Email address not found", Toast.LENGTH_SHORT).show();
+                return;
             }
+
+            auth.sendPasswordResetEmail(currentUser.getEmail())
+                    .addOnSuccessListener(unused -> {
+                        if (!isAdded()) return;
+                        Toast.makeText(getContext(), "Password reset email sent", Toast.LENGTH_SHORT).show();
+                    })
+                    .addOnFailureListener(e -> {
+                        if (!isAdded()) return;
+                        Toast.makeText(getContext(), "Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    });
         });
+    }
+
+
+    private void showProfilePhotoOptions() {
+        if (!isAdded()) return;
+
+        boolean hasPhoto = !safeText(currentProfileImageBase64).isEmpty();
+        String[] options = hasPhoto
+                ? new String[]{"Change Photo", "Remove Photo"}
+                : new String[]{"Add Photo"};
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Profile Photo")
+                .setItems(options, (dialog, which) -> {
+                    if (!hasPhoto || which == 0) {
+                        openProfileImagePicker();
+                    } else {
+                        removeProfileImage();
+                    }
+                })
+                .show();
+    }
+
+    private void openProfileImagePicker() {
+        if (profileImagePickerLauncher != null) {
+            profileImagePickerLauncher.launch("image/*");
+        }
+    }
+
+    private void saveProfileImage(Uri imageUri) {
+        if (currentUser == null) {
+            Toast.makeText(getContext(), "No user is logged in", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            String imageBase64 = encodeImageToBase64(imageUri);
+
+            if (imageBase64.isEmpty()) {
+                Toast.makeText(getContext(), "Unable to read selected image", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            showProfileImage(imageBase64);
+
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("profileImageBase64", imageBase64);
+            updates.put("profileImageMimeType", "image/jpeg");
+            updates.put("profileImageUpdatedAt", FieldValue.serverTimestamp());
+
+            db.collection("users")
+                    .document(currentUser.getUid())
+                    .set(updates, SetOptions.merge())
+                    .addOnSuccessListener(unused -> {
+                        if (!isAdded()) return;
+                        Toast.makeText(getContext(), "Profile photo updated", Toast.LENGTH_SHORT).show();
+                    })
+                    .addOnFailureListener(e -> {
+                        if (!isAdded()) return;
+                        Toast.makeText(getContext(), "Failed to update photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    });
+        } catch (Exception e) {
+            if (!isAdded()) return;
+            Toast.makeText(getContext(), "Failed to load photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+
+    private void removeProfileImage() {
+        if (currentUser == null) {
+            Toast.makeText(getContext(), "No user is logged in", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        clearProfileImage();
+        setProfileText(tvProfileInitials, getInitials(getText(etFullName)));
+        setAvatarActionLabel(false);
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("profileImageBase64", FieldValue.delete());
+        updates.put("profilePicBase64", FieldValue.delete());
+        updates.put("profileImageMimeType", FieldValue.delete());
+        updates.put("profileImageUpdatedAt", FieldValue.serverTimestamp());
+
+        db.collection("users")
+                .document(currentUser.getUid())
+                .set(updates, SetOptions.merge())
+                .addOnSuccessListener(unused -> {
+                    if (!isAdded()) return;
+                    Toast.makeText(getContext(), "Profile photo removed", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    if (!isAdded()) return;
+                    Toast.makeText(getContext(), "Failed to remove photo: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
     }
 
     private void saveProfileChanges() {
@@ -211,14 +426,11 @@ public class RequestorProfileFragment extends Fragment {
 
         db.collection("users")
                 .document(currentUser.getUid())
-                .update(updates)
+                .set(updates, SetOptions.merge())
                 .addOnSuccessListener(unused -> {
                     if (!isAdded()) return;
 
-                    tvProfileName.setText(fullName);
-                    tvProfileDepartment.setText(department);
-                    tvProfileInitials.setText(getInitials(fullName));
-
+                    bindProfileHeader(fullName, currentUserType, department, currentProfileImageBase64);
                     Toast.makeText(getContext(), "Profile updated successfully", Toast.LENGTH_SHORT).show();
                 })
                 .addOnFailureListener(e -> {
@@ -227,18 +439,163 @@ public class RequestorProfileFragment extends Fragment {
                 });
     }
 
-    private String getText(TextInputEditText editText) {
-        return editText.getText() != null ? editText.getText().toString().trim() : "";
+    @Override
+    public void onDestroyView() {
+        if (profileListener != null) {
+            profileListener.remove();
+            profileListener = null;
+        }
+
+        super.onDestroyView();
     }
 
-    private String notNull(String value) {
-        return value != null ? value : "";
+    private boolean showProfileImage(String base64Value) {
+        String cleanBase64 = extractBase64(base64Value);
+
+        if (cleanBase64.isEmpty()) {
+            clearProfileImage();
+            return false;
+        }
+
+        Bitmap bitmap = decodeBase64ToBitmap(cleanBase64);
+
+        if (bitmap == null) {
+            clearProfileImage();
+            return false;
+        }
+
+        currentProfileImageBase64 = cleanBase64;
+        setAvatarActionLabel(true);
+
+        if (ivProfilePhoto != null) {
+            ivProfilePhoto.setImageBitmap(bitmap);
+            ivProfilePhoto.setVisibility(View.VISIBLE);
+        }
+
+        if (tvProfileInitials != null) {
+            tvProfileInitials.setVisibility(View.GONE);
+        }
+
+        return true;
+    }
+
+    private void clearProfileImage() {
+        currentProfileImageBase64 = "";
+        setAvatarActionLabel(false);
+
+        if (ivProfilePhoto != null) {
+            ivProfilePhoto.setImageDrawable(null);
+            ivProfilePhoto.setVisibility(View.GONE);
+        }
+    }
+
+    private String encodeImageToBase64(Uri imageUri) throws IOException {
+        Bitmap originalBitmap;
+
+        try (InputStream inputStream = requireContext().getContentResolver().openInputStream(imageUri)) {
+            originalBitmap = BitmapFactory.decodeStream(inputStream);
+        }
+
+        if (originalBitmap == null) {
+            return "";
+        }
+
+        Bitmap resizedBitmap = resizeBitmap(originalBitmap, MAX_PROFILE_IMAGE_SIZE);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 75, outputStream);
+
+        byte[] imageBytes = outputStream.toByteArray();
+
+        if (imageBytes.length > 850_000) {
+            outputStream.reset();
+            resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream);
+            imageBytes = outputStream.toByteArray();
+        }
+
+        if (imageBytes.length > 850_000) {
+            Bitmap smallerBitmap = resizeBitmap(originalBitmap, 360);
+            outputStream.reset();
+            smallerBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream);
+            imageBytes = outputStream.toByteArray();
+        }
+
+        return Base64.encodeToString(imageBytes, Base64.NO_WRAP);
+    }
+
+    private Bitmap resizeBitmap(Bitmap bitmap, int maxSize) {
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
+
+        if (width <= maxSize && height <= maxSize) {
+            return bitmap;
+        }
+
+        float ratio = Math.min((float) maxSize / width, (float) maxSize / height);
+        int newWidth = Math.round(width * ratio);
+        int newHeight = Math.round(height * ratio);
+
+        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true);
+    }
+
+    private Bitmap decodeBase64ToBitmap(String base64Value) {
+        try {
+            byte[] imageBytes = Base64.decode(extractBase64(base64Value), Base64.DEFAULT);
+            return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String extractBase64(String value) {
+        String cleanValue = safeText(value);
+
+        if (cleanValue.startsWith("data:") && cleanValue.contains(",")) {
+            return cleanValue.substring(cleanValue.indexOf(',') + 1).trim();
+        }
+
+        return cleanValue;
+    }
+
+
+    private void setAvatarActionLabel(boolean hasPhoto) {
+        if (tvAvatarActionLabel == null) return;
+        tvAvatarActionLabel.setText(hasPhoto ? "Edit Photo" : "Add Photo");
+    }
+
+    private void setProfileText(TextView textView, String value) {
+        if (textView == null) return;
+
+        String cleanValue = safeText(value);
+        textView.setText(cleanValue);
+        textView.setVisibility(cleanValue.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    private void setEditTextValue(TextInputEditText editText, String value) {
+        if (editText == null) return;
+        editText.setText(safeText(value));
+    }
+
+    private String getText(TextInputEditText editText) {
+        if (editText == null || editText.getText() == null) return "";
+        return editText.getText().toString().trim();
+    }
+
+    private String safeText(String value) {
+        return value != null ? value.trim() : "";
+    }
+
+    private String firstNonEmpty(String first, String second) {
+        String cleanFirst = safeText(first);
+        if (!cleanFirst.isEmpty()) return cleanFirst;
+
+        return safeText(second);
     }
 
     private String getInitials(String fullName) {
-        if (TextUtils.isEmpty(fullName)) return "NA";
+        String cleanName = safeText(fullName);
+        if (TextUtils.isEmpty(cleanName)) return "";
 
-        String[] parts = fullName.trim().split("\\s+");
+        String[] parts = cleanName.split("\\s+");
         StringBuilder initials = new StringBuilder();
 
         for (int i = 0; i < parts.length && i < 2; i++) {
@@ -247,6 +604,6 @@ public class RequestorProfileFragment extends Fragment {
             }
         }
 
-        return initials.length() > 0 ? initials.toString() : "NA";
+        return initials.toString();
     }
 }

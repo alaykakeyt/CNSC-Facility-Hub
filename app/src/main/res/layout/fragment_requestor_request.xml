@@ -884,14 +884,33 @@
                         android:orientation="vertical"
                         android:padding="16dp">
 
+
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnChooseFiles"
                             android:layout_width="match_parent"
                             android:layout_height="48dp"
                             android:text="Choose Images / PDF"
                             android:textAllCaps="false"
+                            android:textColor="#FFFFFF"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
                             app:backgroundTint="#970705"
                             app:cornerRadius="14dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnCaptureImage"
+                            android:layout_width="match_parent"
+                            android:layout_height="48dp"
+                            android:layout_marginTop="10dp"
+                            android:text="Capture Image"
+                            android:textAllCaps="false"
+                            android:textColor="#970705"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            app:backgroundTint="#FFFFFF"
+                            app:cornerRadius="14dp"
+                            app:strokeColor="#970705"
+                            app:strokeWidth="1dp" />
 
                         <TextView
                             android:id="@+id/tvSelectedFile"

@@ -211,3 +211,4 @@ public class sacProfileFragment extends Fragment {
         return (first + last).toUpperCase(Locale.getDefault());
     }
 }
+

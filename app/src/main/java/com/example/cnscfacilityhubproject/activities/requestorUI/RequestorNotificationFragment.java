@@ -69,11 +69,7 @@ public class RequestorNotificationFragment extends Fragment {
         listenForRequestorNotifications();
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        listenForRequestorNotifications();
-    }
+
 
     @Override
     public void onDestroyView() {
@@ -87,8 +83,7 @@ public class RequestorNotificationFragment extends Fragment {
 
     private void listenForRequestorNotifications() {
         if (notificationListener != null) {
-            notificationListener.remove();
-            notificationListener = null;
+            return;
         }
 
         if (auth.getCurrentUser() == null) {
@@ -150,11 +145,6 @@ public class RequestorNotificationFragment extends Fragment {
                         }
                     }
 
-                    /*
-                     * Kapag napindot/nabuksan na ang Notification nav bar,
-                     * mawawala agad ang badge count at NEW badge,
-                     * pero hindi mawawala ang notification card/list.
-                     */
                     if (!docsToMarkSeen.isEmpty()) {
                         for (DocumentSnapshot doc : docsToMarkSeen) {
                             locallySeenNotificationIds.add(doc.getId());

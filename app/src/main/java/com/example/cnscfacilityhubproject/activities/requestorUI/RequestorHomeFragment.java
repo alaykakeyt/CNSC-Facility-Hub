@@ -38,6 +38,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import android.widget.ImageView;
+
 import android.content.Context;
 import android.content.SharedPreferences;
 public class RequestorHomeFragment extends Fragment {
@@ -67,6 +69,17 @@ public class RequestorHomeFragment extends Fragment {
 
     private static final int FULLY_BOOKED_LIMIT = 3;
 
+    private TextView textNewRequest;
+    private ImageView iconNewRequest;
+
+    private TextView textHome;
+    private ImageView iconHome;
+
+    private static final int COLOR_PRIMARY = Color.parseColor("#970705");
+    private static final int COLOR_DEFAULT = Color.parseColor("#313131");
+
+
+
     public RequestorHomeFragment() {
         super(R.layout.fragment_requestor_home);
     }
@@ -90,6 +103,79 @@ public class RequestorHomeFragment extends Fragment {
         updateSelectedDateLabel();
         listenForScheduledBookings();
         updateSchedsSection();
+
+        textNewRequest = requireActivity().findViewById(R.id.textRequest);
+        iconNewRequest = requireActivity().findViewById(R.id.iconRequest);
+
+        textHome = requireActivity().findViewById(R.id.textHome);
+        iconHome = requireActivity().findViewById(R.id.iconHome);
+
+    }
+
+    private Map<String, Object> getScheduleDayForDate(DocumentSnapshot doc, String targetDateKey) {
+        Object rawScheduleDays = doc.get("scheduleDays");
+
+        if (!(rawScheduleDays instanceof List<?>)) {
+            return null;
+        }
+
+        List<?> scheduleDays = (List<?>) rawScheduleDays;
+
+        for (Object item : scheduleDays) {
+            if (!(item instanceof Map<?, ?>)) {
+                continue;
+            }
+
+            Map<?, ?> rawMap = (Map<?, ?>) item;
+            Map<String, Object> dayMap = new HashMap<>();
+
+            for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+                if (entry.getKey() != null) {
+                    dayMap.put(String.valueOf(entry.getKey()), entry.getValue());
+                }
+            }
+
+            String dateText = getMapString(dayMap, "dateText");
+            String dateKey = convertDateTextToKey(dateText);
+
+            if (targetDateKey.equals(dateKey)) {
+                return dayMap;
+            }
+        }
+
+        return null;
+    }
+
+    private String convertDateTextToKey(String dateText) {
+        Calendar calendar = parseDateTextToCalendar(dateText);
+
+        if (calendar == null) {
+            return "";
+        }
+
+        SimpleDateFormat keyFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        return keyFormat.format(calendar.getTime());
+    }
+
+    private String getMapString(Map<String, Object> map, String key) {
+        if (map == null || key == null) {
+            return "";
+        }
+
+        Object value = map.get(key);
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private String firstNonEmpty(String first, String second) {
+        if (first != null && !first.trim().isEmpty()) {
+            return first.trim();
+        }
+
+        if (second != null && !second.trim().isEmpty()) {
+            return second.trim();
+        }
+
+        return "";
     }
 
     private void bindViews(View view) {
@@ -102,6 +188,9 @@ public class RequestorHomeFragment extends Fragment {
         tvSelectedDate = view.findViewById(R.id.tvSelectedDate);
         btnNewRequest = view.findViewById(R.id.btnNewRequest);
         schedsContainer = view.findViewById(R.id.Scheds);
+
+        textNewRequest = requireActivity().findViewById(R.id.textRequest);
+        iconNewRequest = requireActivity().findViewById(R.id.iconRequest);
 
         if (tvRequestorName.getText() != null) {
             requestorNameLabel = tvRequestorName.getText().toString().trim();
@@ -179,7 +268,42 @@ public class RequestorHomeFragment extends Fragment {
     }
 
     private void setupActions() {
-        btnNewRequest.setOnClickListener(v -> openRequestorRequestFragment());
+        if (btnNewRequest != null) {
+            btnNewRequest.setOnClickListener(v -> {
+                selectNewRequestTab();
+                openRequestorRequestFragment();
+            });
+        }
+    }
+
+    private void selectNewRequestTab() {
+        resetNavigationTabs();
+
+        if (textNewRequest != null) {
+            textNewRequest.setTextColor(COLOR_PRIMARY);
+        }
+
+        if (iconNewRequest != null) {
+            iconNewRequest.setImageTintList(ColorStateList.valueOf(COLOR_PRIMARY));
+        }
+    }
+
+    private void resetNavigationTabs() {
+        if (textHome != null) {
+            textHome.setTextColor(COLOR_DEFAULT);
+        }
+
+        if (iconHome != null) {
+            iconHome.setImageTintList(ColorStateList.valueOf(COLOR_DEFAULT));
+        }
+
+        if (textNewRequest != null) {
+            textNewRequest.setTextColor(COLOR_DEFAULT);
+        }
+
+        if (iconNewRequest != null) {
+            iconNewRequest.setImageTintList(ColorStateList.valueOf(COLOR_DEFAULT));
+        }
     }
 
     private void openRequestorRequestFragment() {
@@ -279,6 +403,40 @@ public class RequestorHomeFragment extends Fragment {
         String endDateText = getSafeString(doc.getString("endDateText"), "");
         String timeStartText = getSafeString(doc.getString("timeStartText"), "");
         String timeEndText = getSafeString(doc.getString("timeEndText"), "");
+
+        Map<String, Object> scheduleDay = getScheduleDayForDate(doc, dateKey);
+
+        if (scheduleDay != null) {
+            String dayDateText = getMapString(scheduleDay, "dateText");
+            String dayStartTime = firstNonEmpty(
+                    getMapString(scheduleDay, "startTimeText"),
+                    firstNonEmpty(
+                            getMapString(scheduleDay, "timeStartText"),
+                            getMapString(scheduleDay, "startTime")
+                    )
+            );
+            String dayEndTime = firstNonEmpty(
+                    getMapString(scheduleDay, "endTimeText"),
+                    firstNonEmpty(
+                            getMapString(scheduleDay, "timeEndText"),
+                            getMapString(scheduleDay, "endTime")
+                    )
+            );
+
+            if (!dayDateText.isEmpty()) {
+                startDateText = dayDateText;
+                endDateText = dayDateText;
+            }
+
+            if (!dayStartTime.isEmpty()) {
+                timeStartText = dayStartTime;
+            }
+
+            if (!dayEndTime.isEmpty()) {
+                timeEndText = dayEndTime;
+            }
+        }
+
         String status = getSafeString(doc.getString("status"), "Pending");
 
         return new BookingItem(
