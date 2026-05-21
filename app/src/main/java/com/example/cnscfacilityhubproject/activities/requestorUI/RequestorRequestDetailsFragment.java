@@ -1,23 +1,25 @@
 package com.example.cnscfacilityhubproject.activities.requestorUI;
 
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
-import com.example.cnscfacilityhubproject.models.ProposalFileItem;
-import com.example.cnscfacilityhubproject.utils.ProposalFilesUiHelper;
 import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -26,8 +28,13 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 public class RequestorRequestDetailsFragment extends Fragment {
 
@@ -35,12 +42,11 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
     private FirebaseFirestore db;
     private String requestId = "";
-    private String proposalFileUrl = "";
+
+    private final List<FirestoreProposalFile> proposalFilesToOpen = new ArrayList<>();
 
     private MaterialButton btnBack;
     private MaterialButton btnBackBottom;
-    private MaterialButton btnOpenProposal;
-
     private TextView tvDetailsSubtitle;
     private TextView tvDetailPurpose;
     private TextView tvDetailActivityType;
@@ -115,7 +121,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
     private void bindViews(View view) {
         btnBack = view.findViewById(R.id.btnBack);
         btnBackBottom = view.findViewById(R.id.btnBackBottom);
-        btnOpenProposal = view.findViewById(R.id.btnOpenProposal);
 
         tvDetailsSubtitle = view.findViewById(R.id.tvDetailsSubtitle);
         tvDetailPurpose = view.findViewById(R.id.tvDetailPurpose);
@@ -158,22 +163,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
     private void setupButtons() {
         btnBack.setOnClickListener(v -> goBack());
         btnBackBottom.setOnClickListener(v -> goBack());
-
-        btnOpenProposal.setOnClickListener(v -> {
-            if (TextUtils.isEmpty(proposalFileUrl)) {
-                Toast.makeText(requireContext(), "No proposal file available.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            try {
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setData(Uri.parse(proposalFileUrl));
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivity(intent);
-            } catch (Exception e) {
-                Toast.makeText(requireContext(), "Unable to open proposal file.", Toast.LENGTH_SHORT).show();
-            }
-        });
     }
 
     private void loadRequestDetails() {
@@ -240,22 +229,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         boolean technicalNeeded = getBooleanValue(doc, "technicalNeeded") || getBooleanValue(doc, "needsITSO");
         String connectors = getStringValue(doc, "connectors");
 
-        List<ProposalFileItem> proposalFiles = RequestDataHelper.getProposalFiles(doc);
-        boolean hasContentUri = false;
-        if (!proposalFiles.isEmpty()) {
-            proposalFileUrl = proposalFiles.get(0).getFileUrl();
-            for (ProposalFileItem f : proposalFiles) {
-                if (f.getFileUrl().startsWith("content://")) {
-                    hasContentUri = true;
-                    break;
-                }
-            }
-        } else {
-            proposalFileUrl = getStringValue(doc, "proposalFileUrl");
-            if (proposalFileUrl.startsWith("content://")) {
-                hasContentUri = true;
-            }
-        }
+        List<FirestoreProposalFile> proposalFiles = getFirestoreProposalFiles(doc);
 
         String notificationTarget = getStringValue(doc, "notificationTarget");
         boolean agreementAccepted = getBooleanValue(doc, "agreementAccepted");
@@ -312,29 +286,310 @@ public class RequestorRequestDetailsFragment extends Fragment {
             tvDetailConnectors.setText("Connectors / Cables: None");
         }
 
-        if (hasContentUri) {
-            tvDetailProposalFileName.setText("Warning: This request contains files with local URIs that may not open correctly on other devices.");
-            tvDetailProposalFileName.setTextColor(Color.RED);
-        } else {
-            tvDetailProposalFileName.setText(proposalFiles.isEmpty()
-                    ? "Proposal files: none"
-                    : "Proposal files: " + proposalFiles.size());
-            tvDetailProposalFileName.setTextColor(Color.parseColor("#313131"));
-        }
-
         tvDetailNotificationTarget.setText("Sent To: " + fallback(notificationTarget));
         tvDetailAgreement.setText("Agreement Accepted: " + (agreementAccepted ? "Yes" : "No"));
 
-        ProposalFilesUiHelper.bindFiles(
-                requireContext(),
-                layoutProposalFiles,
-                tvDetailProposalFileName,
-                btnOpenProposal,
-                proposalFiles
-        );
+        bindProposalFiles(proposalFiles);
 
         cardAdminRemarks.setVisibility(View.VISIBLE);
         tvDetailRemarks.setText(!remarks.isEmpty() ? remarks : "No remarks available.");
+    }
+
+    private List<FirestoreProposalFile> getFirestoreProposalFiles(DocumentSnapshot doc) {
+        List<FirestoreProposalFile> files = new ArrayList<>();
+        Object rawFiles = doc.get("proposalFiles");
+
+        if (rawFiles instanceof List<?>) {
+            List<?> rawList = (List<?>) rawFiles;
+
+            for (Object item : rawList) {
+                if (!(item instanceof Map<?, ?>)) continue;
+
+                Map<?, ?> map = (Map<?, ?>) item;
+
+                FirestoreProposalFile file = new FirestoreProposalFile();
+                file.fileName = firstNonEmpty(getMapString(map, "fileName"), getMapString(map, "name"));
+                file.fileType = getMapString(map, "fileType");
+                file.mimeType = getMapString(map, "mimeType");
+                file.storageType = getMapString(map, "storageType");
+                file.fileDataBase64 = firstNonEmpty(
+                        getMapString(map, "fileDataBase64"),
+                        getMapString(map, "base64")
+                );
+                file.fileUrl = firstNonEmpty(
+                        getMapString(map, "fileUrl"),
+                        getMapString(map, "url")
+                );
+                file.sizeBytes = getMapLong(map, "sizeBytes");
+
+                if (file.fileName.isEmpty()) {
+                    file.fileName = "proposal_file_" + (files.size() + 1);
+                }
+
+                if (file.mimeType.isEmpty()) {
+                    file.mimeType = guessMimeType(file);
+                }
+
+                files.add(file);
+            }
+        }
+
+        if (files.isEmpty()) {
+            String legacyName = firstNonEmpty(
+                    getStringValue(doc, "proposalFileName"),
+                    getStringValue(doc, "fileName")
+            );
+            String legacyUrl = getStringValue(doc, "proposalFileUrl");
+            String legacyBase64 = getStringValue(doc, "fileDataBase64");
+            String legacyMimeType = getStringValue(doc, "mimeType");
+
+            if (!legacyUrl.isEmpty() || !legacyBase64.isEmpty()) {
+                FirestoreProposalFile legacyFile = new FirestoreProposalFile();
+                legacyFile.fileName = !legacyName.isEmpty() ? legacyName : "proposal_file";
+                legacyFile.fileUrl = legacyUrl;
+                legacyFile.fileDataBase64 = legacyBase64;
+                legacyFile.mimeType = !legacyMimeType.isEmpty() ? legacyMimeType : guessMimeType(legacyFile);
+                legacyFile.storageType = legacyBase64.isEmpty() ? "legacy_url" : "firestore_base64";
+                files.add(legacyFile);
+            }
+        }
+
+        return files;
+    }
+
+    private void bindProposalFiles(List<FirestoreProposalFile> files) {
+        proposalFilesToOpen.clear();
+        proposalFilesToOpen.addAll(files);
+        layoutProposalFiles.removeAllViews();
+
+        if (files.isEmpty()) {
+            tvDetailProposalFileName.setText("Proposal / Supporting Files: none");
+            tvDetailProposalFileName.setTextColor(Color.parseColor("#313131"));
+            return;
+        }
+
+        tvDetailProposalFileName.setText("Proposal / Supporting Files: " + files.size() + " file(s) • Tap a file to open");
+        tvDetailProposalFileName.setTextColor(Color.parseColor("#313131"));
+
+        for (int i = 0; i < files.size(); i++) {
+            FirestoreProposalFile file = files.get(i);
+            layoutProposalFiles.addView(createProposalFileRow(file, i + 1));
+        }
+    }
+
+    private View createProposalFileRow(FirestoreProposalFile file, int position) {
+        MaterialCardView card = new MaterialCardView(requireContext());
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        cardParams.setMargins(0, dp(8), 0, 0);
+        card.setLayoutParams(cardParams);
+        card.setCardBackgroundColor(Color.parseColor("#FAFAFA"));
+        card.setRadius(dp(16));
+        card.setStrokeWidth(dp(1));
+        card.setStrokeColor(Color.parseColor("#E0E0E0"));
+        card.setCardElevation(0f);
+
+        LinearLayout container = new LinearLayout(requireContext());
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dp(12), dp(10), dp(12), dp(10));
+
+        TextView name = new TextView(requireContext());
+        name.setText(position + ". " + file.fileName);
+        name.setTextColor(Color.parseColor("#313131"));
+        name.setTextSize(14f);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+        container.addView(name);
+
+        TextView meta = new TextView(requireContext());
+        meta.setText(buildFileMeta(file));
+        meta.setTextColor(Color.parseColor("#666666"));
+        meta.setTextSize(12f);
+        meta.setPadding(0, dp(4), 0, 0);
+        container.addView(meta);
+
+        TextView tapHint = new TextView(requireContext());
+        tapHint.setText("Tap to open");
+        tapHint.setTextColor(Color.parseColor("#970705"));
+        tapHint.setTextSize(12f);
+        tapHint.setPadding(0, dp(6), 0, 0);
+        container.addView(tapHint);
+
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setOnClickListener(v -> openProposalFile(file));
+        container.setOnClickListener(v -> openProposalFile(file));
+
+        card.addView(container);
+        return card;
+    }
+
+    private String buildFileMeta(FirestoreProposalFile file) {
+        String mime = !file.mimeType.isEmpty() ? file.mimeType : "unknown type";
+        String size = file.sizeBytes > 0 ? " • " + formatBytes(file.sizeBytes) : "";
+        String source = file.hasBase64Data() || file.hasDataUri() ? "Firestore Base64" : "External URI";
+        return mime + size + " • " + source;
+    }
+
+    private void openProposalFile(FirestoreProposalFile file) {
+        if (!isAdded()) return;
+
+        try {
+            if (file.hasBase64Data() || file.hasDataUri()) {
+                Uri cachedFileUri = createCachedFileUri(file);
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setDataAndType(cachedFileUri, guessMimeType(file));
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(intent);
+                return;
+            }
+
+            if (!file.fileUrl.isEmpty()) {
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setData(Uri.parse(file.fileUrl));
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(intent);
+                return;
+            }
+
+            Toast.makeText(requireContext(), "This file has no data to open.", Toast.LENGTH_SHORT).show();
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(requireContext(), "No app found to open this file.", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Unable to open file: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private Uri createCachedFileUri(FirestoreProposalFile file) throws IOException {
+        String base64 = file.fileDataBase64;
+
+        if (base64 == null || base64.trim().isEmpty()) {
+            base64 = extractBase64FromDataUri(file.fileUrl);
+        }
+
+        if (base64 == null || base64.trim().isEmpty()) {
+            throw new IOException("Missing file data.");
+        }
+
+        byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
+
+        File folder = new File(requireContext().getCacheDir(), "proposal_files");
+        if (!folder.exists() && !folder.mkdirs()) {
+            throw new IOException("Unable to prepare cache folder.");
+        }
+
+        String safeFileName = makeSafeFileName(file.fileName, guessMimeType(file));
+        File outputFile = new File(folder, safeFileName);
+
+        FileOutputStream outputStream = new FileOutputStream(outputFile);
+        try {
+            outputStream.write(bytes);
+            outputStream.flush();
+        } finally {
+            outputStream.close();
+        }
+
+        return FileProvider.getUriForFile(
+                requireContext(),
+                requireContext().getPackageName() + ".fileprovider",
+                outputFile
+        );
+    }
+
+    private String extractBase64FromDataUri(String dataUri) {
+        if (dataUri == null) return "";
+        int commaIndex = dataUri.indexOf(',');
+        if (commaIndex < 0 || commaIndex >= dataUri.length() - 1) return "";
+        return dataUri.substring(commaIndex + 1);
+    }
+
+    private String makeSafeFileName(String originalName, String mimeType) {
+        String name = originalName == null || originalName.trim().isEmpty()
+                ? "proposal_file"
+                : originalName.trim();
+
+        name = name.replaceAll("[^a-zA-Z0-9._-]", "_");
+
+        if (!name.contains(".")) {
+            if ("application/pdf".equalsIgnoreCase(mimeType)) {
+                name += ".pdf";
+            } else if ("image/png".equalsIgnoreCase(mimeType)) {
+                name += ".png";
+            } else if ("image/webp".equalsIgnoreCase(mimeType)) {
+                name += ".webp";
+            } else if (mimeType != null && mimeType.startsWith("image/")) {
+                name += ".jpg";
+            }
+        }
+
+        return name;
+    }
+
+    private String guessMimeType(FirestoreProposalFile file) {
+        if (file == null) return "application/octet-stream";
+
+        if (file.mimeType != null && !file.mimeType.trim().isEmpty()) {
+            return file.mimeType.trim();
+        }
+
+        if (file.fileUrl != null && file.fileUrl.startsWith("data:")) {
+            int colon = file.fileUrl.indexOf(':');
+            int semicolon = file.fileUrl.indexOf(';');
+            if (colon >= 0 && semicolon > colon) {
+                return file.fileUrl.substring(colon + 1, semicolon);
+            }
+        }
+
+        String name = file.fileName != null ? file.fileName.toLowerCase(Locale.US) : "";
+        if (name.endsWith(".pdf")) return "application/pdf";
+        if (name.endsWith(".png")) return "image/png";
+        if (name.endsWith(".webp")) return "image/webp";
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+
+        String type = file.fileType != null ? file.fileType.toLowerCase(Locale.US) : "";
+        if (type.contains("pdf")) return "application/pdf";
+        if (type.contains("image")) return "image/jpeg";
+
+        return "application/octet-stream";
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        double kb = bytes / 1024.0;
+        if (kb < 1024) return String.format(Locale.US, "%.1f KB", kb);
+        double mb = kb / 1024.0;
+        return String.format(Locale.US, "%.2f MB", mb);
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private String getMapString(Map<?, ?> map, String key) {
+        if (map == null || key == null) return "";
+        Object value = map.get(key);
+        return value != null ? String.valueOf(value).trim() : "";
+    }
+
+    private long getMapLong(Map<?, ?> map, String key) {
+        if (map == null || key == null) return 0L;
+        Object value = map.get(key);
+
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+
+        if (value instanceof String) {
+            try {
+                return Long.parseLong(((String) value).trim());
+            } catch (NumberFormatException ignored) {
+                return 0L;
+            }
+        }
+
+        return 0L;
     }
 
     private void loadRequestorInfoIfNeeded(DocumentSnapshot requestDoc) {
@@ -412,23 +667,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
         return builder.toString();
     }
 
-    private String getFinalFacility(DocumentSnapshot doc) {
-        String finalFacilityName = getStringValue(doc, "finalFacilityName");
-
-        if (!finalFacilityName.isEmpty()) {
-            return finalFacilityName;
-        }
-
-        String facility = getStringValue(doc, "facility");
-        String otherFacility = getStringValue(doc, "otherFacility");
-
-        if ("Others".equalsIgnoreCase(facility) && !otherFacility.isEmpty()) {
-            return otherFacility;
-        }
-
-        return facility;
-    }
-
     private String getRemarks(DocumentSnapshot doc) {
         String remarks = getStringValue(doc, "remarks");
         if (!remarks.isEmpty()) return remarks;
@@ -444,34 +682,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
         remarks = getStringValue(doc, "itsoRemarks");
         return remarks;
-    }
-
-    private String buildScheduleText(String startDate, String endDate, String startTime, String endTime) {
-        return buildDateText(startDate, endDate) + " • " + buildTimeText(startTime, endTime);
-    }
-
-    private String buildDateText(String startDate, String endDate) {
-        if (startDate.isEmpty() && endDate.isEmpty()) {
-            return "No date";
-        }
-
-        if (!startDate.isEmpty() && !endDate.isEmpty() && !startDate.equalsIgnoreCase(endDate)) {
-            return startDate + " - " + endDate;
-        }
-
-        return !startDate.isEmpty() ? startDate : endDate;
-    }
-
-    private String buildTimeText(String startTime, String endTime) {
-        if (startTime.isEmpty() && endTime.isEmpty()) {
-            return "No time";
-        }
-
-        if (!startTime.isEmpty() && !endTime.isEmpty()) {
-            return startTime + " - " + endTime;
-        }
-
-        return !startTime.isEmpty() ? startTime : endTime;
     }
 
     private String getStringValue(DocumentSnapshot doc, String field) {
@@ -532,4 +742,21 @@ public class RequestorRequestDetailsFragment extends Fragment {
                 .popBackStack();
     }
 
+    private static class FirestoreProposalFile {
+        String fileName = "";
+        String fileType = "";
+        String mimeType = "";
+        String storageType = "";
+        String fileDataBase64 = "";
+        String fileUrl = "";
+        long sizeBytes = 0L;
+
+        boolean hasBase64Data() {
+            return fileDataBase64 != null && !fileDataBase64.trim().isEmpty();
+        }
+
+        boolean hasDataUri() {
+            return fileUrl != null && fileUrl.startsWith("data:") && fileUrl.contains("base64,");
+        }
+    }
 }

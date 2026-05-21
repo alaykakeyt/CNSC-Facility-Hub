@@ -45,7 +45,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="0 booking notifications"
+                    android:text="0 incoming notifications"
                     android:textColor="#970705"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -116,4 +116,3 @@
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
-

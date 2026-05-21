@@ -1,32 +1,41 @@
 package com.example.cnscfacilityhubproject.activities.sacUI;
 
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Base64;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
-import com.example.cnscfacilityhubproject.models.ProposalFileItem;
-import com.example.cnscfacilityhubproject.utils.ProposalFilesUiHelper;
 import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
-
-import java.util.List;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 public class sacRequestsViewDetailsFragment extends Fragment {
 
@@ -34,17 +43,30 @@ public class sacRequestsViewDetailsFragment extends Fragment {
 
     private FirebaseFirestore db;
     private String requestId = "";
-    private String proposalFileUrl = "";
 
-    private MaterialButton btnBack, btnOpenProposal, btnApprove, btnReject;
+    private MaterialButton btnBack;
+    private MaterialButton btnApprove;
+    private MaterialButton btnReject;
+
     private LinearLayout layoutApprovalActions;
     private Chip chipStatus;
     private TextInputEditText etSacRemarks;
 
-    private TextView tvPurpose, tvActivityType, tvSchedule, tvFacility;
-    private TextView tvRequestorInfo, tvParticipants, tvPurposeFull, tvAmenities;
-    private TextView tvProposalFile, tvRoute;
+    private TextView tvPurpose;
+    private TextView tvActivityType;
+    private TextView tvSchedule;
+    private TextView tvFacility;
+    private TextView tvRequestorInfo;
+    private TextView tvParticipants;
+    private TextView tvPurposeFull;
+    private TextView tvAmenities;
+    private TextView tvTechnicalList;
+    private TextView tvConnectors;
+    private TextView tvProposalFile;
+    private TextView tvRoute;
     private LinearLayout layoutProposalFiles;
+
+    private final List<DisplayProposalFile> currentProposalFiles = new ArrayList<>();
 
     public sacRequestsViewDetailsFragment() {
         super(R.layout.fragment_sac_requests_view_details);
@@ -82,7 +104,6 @@ public class sacRequestsViewDetailsFragment extends Fragment {
 
     private void bindViews(View view) {
         btnBack = view.findViewById(R.id.btnBack);
-        btnOpenProposal = view.findViewById(R.id.btnOpenProposal);
         btnApprove = view.findViewById(R.id.btnApprove);
         btnReject = view.findViewById(R.id.btnReject);
 
@@ -98,6 +119,8 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         tvParticipants = view.findViewById(R.id.tvParticipants);
         tvPurposeFull = view.findViewById(R.id.tvPurposeFull);
         tvAmenities = view.findViewById(R.id.tvAmenities);
+        tvTechnicalList = view.findViewById(R.id.tvTechnicalList);
+        tvConnectors = view.findViewById(R.id.tvConnectors);
         tvProposalFile = view.findViewById(R.id.tvProposalFile);
         tvRoute = view.findViewById(R.id.tvRoute);
         layoutProposalFiles = view.findViewById(R.id.layoutProposalFiles);
@@ -107,22 +130,6 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         btnBack.setOnClickListener(v -> goBack());
         btnApprove.setOnClickListener(v -> approveAndForwardRequest());
         btnReject.setOnClickListener(v -> rejectRequest());
-
-        btnOpenProposal.setOnClickListener(v -> {
-            if (proposalFileUrl.isEmpty()) {
-                Toast.makeText(requireContext(), "No proposal file available.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            try {
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setData(Uri.parse(proposalFileUrl));
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivity(intent);
-            } catch (Exception e) {
-                Toast.makeText(requireContext(), "Unable to open proposal file.", Toast.LENGTH_SHORT).show();
-            }
-        });
     }
 
     private void loadRequestDetails() {
@@ -152,44 +159,14 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         String activityType = getStringValue(doc, "activityType");
         String displayStatus = getDisplayStatus(doc);
 
-        String requestorName = firstNonEmpty(
-                getStringValue(doc, "requestorName"),
-                getStringValue(doc, "fullName")
-        );
-
-        String contactNumber = firstNonEmpty(
-                getStringValue(doc, "contactNumber"),
-                getStringValue(doc, "contactNum")
-        );
-
-        String department = firstNonEmpty(
-                getStringValue(doc, "collegeDepartment"),
-                getStringValue(doc, "department")
-        );
-
-        String course = firstNonEmpty(
-                getStringValue(doc, "officeCourse"),
-                getStringValue(doc, "course")
-        );
+        String requestorName = firstNonEmpty(getStringValue(doc, "requestorName"), getStringValue(doc, "fullName"));
+        String contactNumber = firstNonEmpty(getStringValue(doc, "contactNumber"), getStringValue(doc, "contactNum"));
+        String department = firstNonEmpty(getStringValue(doc, "collegeDepartment"), getStringValue(doc, "department"));
+        String course = firstNonEmpty(getStringValue(doc, "officeCourse"), getStringValue(doc, "course"));
 
         String participants = getStringValue(doc, "participants");
         String numberOfParticipants = getLongString(doc, "numberOfParticipants");
-        List<ProposalFileItem> proposalFiles = RequestDataHelper.getProposalFiles(doc);
-        boolean hasContentUri = false;
-        if (!proposalFiles.isEmpty()) {
-            proposalFileUrl = proposalFiles.get(0).getFileUrl();
-            for (ProposalFileItem f : proposalFiles) {
-                if (f.getFileUrl().startsWith("content://")) {
-                    hasContentUri = true;
-                    break;
-                }
-            }
-        } else {
-            proposalFileUrl = getStringValue(doc, "proposalFileUrl");
-            if (proposalFileUrl.startsWith("content://")) {
-                hasContentUri = true;
-            }
-        }
+        List<DisplayProposalFile> proposalFiles = getProposalFilesFromFirestore(doc);
 
         chipStatus.setText(displayStatus);
         styleStatusChip(displayStatus);
@@ -213,32 +190,245 @@ public class sacRequestsViewDetailsFragment extends Fragment {
 
         tvPurposeFull.setText("Purpose: " + fallback(purpose));
         tvAmenities.setText(buildAmenities(doc));
-        
-        if (hasContentUri) {
-            tvProposalFile.setText("Warning: This request contains files with local URIs that may not open correctly.");
-            tvProposalFile.setTextColor(Color.RED);
-        } else {
-            tvProposalFile.setText(proposalFiles.isEmpty()
-                    ? "Proposal files: none"
-                    : "Proposal files: " + proposalFiles.size());
-            tvProposalFile.setTextColor(Color.parseColor("#313131"));
-        }
-
+        tvTechnicalList.setText("Technical Requirements:\n" + buildTechnicalList(doc));
+        tvConnectors.setText("Connectors / Cables: " + fallback(getStringValue(doc, "connectors")));
         tvRoute.setText(buildRouteText(doc));
 
-        etSacRemarks.setText(getStringValue(doc, "sacRemarks"));
+        if (etSacRemarks != null) {
+            etSacRemarks.setText(getStringValue(doc, "sacRemarks"));
+        }
 
-        ProposalFilesUiHelper.bindFiles(
-                requireContext(),
-                layoutProposalFiles,
-                tvProposalFile,
-                btnOpenProposal,
-                proposalFiles
-        );
+        bindProposalFiles(proposalFiles);
 
         layoutApprovalActions.setVisibility(
                 "Pending".equalsIgnoreCase(displayStatus) ? View.VISIBLE : View.GONE
         );
+    }
+
+    private List<DisplayProposalFile> getProposalFilesFromFirestore(DocumentSnapshot doc) {
+        List<DisplayProposalFile> files = new ArrayList<>();
+
+        Object rawFiles = doc.get("proposalFiles");
+        if (rawFiles instanceof List<?>) {
+            List<?> list = (List<?>) rawFiles;
+            for (Object item : list) {
+                if (!(item instanceof Map<?, ?>)) continue;
+
+                Map<?, ?> map = (Map<?, ?>) item;
+
+                DisplayProposalFile file = new DisplayProposalFile();
+                file.fileName = firstNonEmpty(getMapString(map, "fileName"), getMapString(map, "name"));
+                file.fileUrl = firstNonEmpty(getMapString(map, "fileUrl"), getMapString(map, "url"));
+                file.fileType = getMapString(map, "fileType");
+                file.mimeType = getMapString(map, "mimeType");
+                file.fileDataBase64 = firstNonEmpty(
+                        getMapString(map, "fileDataBase64"),
+                        getMapString(map, "base64")
+                );
+                file.storageType = getMapString(map, "storageType");
+                file.sizeBytes = getMapLong(map, "sizeBytes");
+
+                if (file.fileName.isEmpty()) {
+                    file.fileName = "Proposal File " + (files.size() + 1);
+                }
+                if (file.mimeType.isEmpty()) {
+                    file.mimeType = guessMimeType(file);
+                }
+                if (file.fileType.isEmpty()) {
+                    file.fileType = guessFileType(file.mimeType, file.fileName);
+                }
+                if (file.sizeBytes <= 0 && !file.fileDataBase64.isEmpty()) {
+                    file.sizeBytes = estimateBytesFromBase64(file.fileDataBase64);
+                }
+
+                files.add(file);
+            }
+        }
+
+        // Legacy support: old single proposalFileUrl field.
+        if (files.isEmpty()) {
+            String legacyUrl = getStringValue(doc, "proposalFileUrl");
+            if (!legacyUrl.isEmpty()) {
+                DisplayProposalFile legacy = new DisplayProposalFile();
+                legacy.fileName = firstNonEmpty(getStringValue(doc, "proposalFileName"), "Proposal File");
+                legacy.fileUrl = legacyUrl;
+                legacy.mimeType = guessMimeType(legacy);
+                legacy.fileType = guessFileType(legacy.mimeType, legacy.fileName);
+                files.add(legacy);
+            }
+        }
+
+        return files;
+    }
+
+    private void bindProposalFiles(List<DisplayProposalFile> proposalFiles) {
+        currentProposalFiles.clear();
+        currentProposalFiles.addAll(proposalFiles);
+        layoutProposalFiles.removeAllViews();
+
+        if (proposalFiles.isEmpty()) {
+            tvProposalFile.setText("Proposal / Supporting Files: none");
+            tvProposalFile.setTextColor(Color.parseColor("#313131"));
+            return;
+        }
+
+        boolean hasLocalContentUri = false;
+        for (DisplayProposalFile file : proposalFiles) {
+            if (file.fileUrl != null && file.fileUrl.startsWith("content://")) {
+                hasLocalContentUri = true;
+                break;
+            }
+        }
+
+        if (hasLocalContentUri) {
+            tvProposalFile.setText("Warning: This request contains local device URIs. Ask the requestor to resubmit using the updated Firestore-only upload.");
+            tvProposalFile.setTextColor(Color.RED);
+        } else {
+            tvProposalFile.setText("Proposal / Supporting Files: " + proposalFiles.size() + " file(s). Tap a file below to open it.");
+            tvProposalFile.setTextColor(Color.parseColor("#313131"));
+        }
+
+        for (int i = 0; i < proposalFiles.size(); i++) {
+            DisplayProposalFile file = proposalFiles.get(i);
+            layoutProposalFiles.addView(createProposalFileRow(file, i + 1));
+        }
+    }
+
+    private View createProposalFileRow(DisplayProposalFile file, int index) {
+        MaterialCardView row = new MaterialCardView(requireContext());
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        rowParams.bottomMargin = dp(8);
+        row.setLayoutParams(rowParams);
+        row.setCardBackgroundColor(Color.parseColor("#FFFFFF"));
+        row.setRadius(dp(14));
+        row.setStrokeWidth(dp(1));
+        row.setStrokeColor(Color.parseColor("#DDDDDD"));
+        row.setCardElevation(0f);
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setOnClickListener(v -> openProposalFile(file));
+
+        LinearLayout container = new LinearLayout(requireContext());
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setGravity(Gravity.CENTER_VERTICAL);
+        container.setPadding(dp(12), dp(10), dp(12), dp(10));
+        container.setClickable(true);
+        container.setFocusable(true);
+        container.setOnClickListener(v -> openProposalFile(file));
+
+        TextView details = new TextView(requireContext());
+        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        details.setLayoutParams(detailParams);
+        details.setTextColor(Color.parseColor("#313131"));
+        details.setTextSize(13f);
+        details.setSingleLine(false);
+        details.setText(
+                index + ". " + file.fileName +
+                        "\n" + buildFileSubtitle(file) +
+                        "\nTap to open"
+        );
+        details.setOnClickListener(v -> openProposalFile(file));
+
+        container.addView(details);
+        row.addView(container);
+        return row;
+    }
+
+    private String buildFileSubtitle(DisplayProposalFile file) {
+        List<String> parts = new ArrayList<>();
+
+        if (!file.mimeType.isEmpty()) parts.add(file.mimeType);
+        if (file.sizeBytes > 0) parts.add(formatBytes(file.sizeBytes));
+        if (!file.storageType.isEmpty()) parts.add(file.storageType);
+        else if (file.hasBase64Data()) parts.add("firestore_base64");
+        else if (!file.fileUrl.isEmpty()) parts.add("link/url");
+
+        if (parts.isEmpty()) return "File attached";
+        return TextUtils.join(" • ", parts);
+    }
+
+    private void openProposalFile(DisplayProposalFile file) {
+        if (file == null) {
+            Toast.makeText(requireContext(), "No file selected.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            if (file.hasBase64Data()) {
+                File cachedFile = writeBase64FileToCache(file);
+                Uri fileUri = FileProvider.getUriForFile(
+                        requireContext(),
+                        requireContext().getPackageName() + ".fileprovider",
+                        cachedFile
+                );
+
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setDataAndType(fileUri, file.mimeType.isEmpty() ? "application/octet-stream" : file.mimeType);
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(intent, "Open file"));
+                return;
+            }
+
+            if (!file.fileUrl.isEmpty()) {
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setData(Uri.parse(file.fileUrl));
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(intent);
+                return;
+            }
+
+            Toast.makeText(requireContext(), "This file has no readable data.", Toast.LENGTH_SHORT).show();
+        } catch (IllegalArgumentException e) {
+            Toast.makeText(requireContext(), "FileProvider is missing. Add the manifest provider and file_paths.xml.", Toast.LENGTH_LONG).show();
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(requireContext(), "No app found to open this file.", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Unable to open file: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private File writeBase64FileToCache(DisplayProposalFile file) throws Exception {
+        String base64Data = file.fileDataBase64;
+
+        if (base64Data.isEmpty() && file.fileUrl.startsWith("data:")) {
+            int commaIndex = file.fileUrl.indexOf(',');
+            if (commaIndex >= 0 && commaIndex < file.fileUrl.length() - 1) {
+                base64Data = file.fileUrl.substring(commaIndex + 1);
+            }
+        }
+
+        if (base64Data.isEmpty()) {
+            throw new IllegalArgumentException("Missing file data.");
+        }
+
+        byte[] bytes = Base64.decode(base64Data, Base64.DEFAULT);
+
+        File dir = new File(requireContext().getCacheDir(), "proposal_files");
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new IllegalStateException("Unable to create cache folder.");
+        }
+
+        String safeName = sanitizeFileName(file.fileName);
+        if (!hasFileExtension(safeName)) {
+            safeName = safeName + extensionForMime(file.mimeType);
+        }
+
+        File outFile = new File(dir, safeName);
+        FileOutputStream outputStream = new FileOutputStream(outFile);
+        try {
+            outputStream.write(bytes);
+            outputStream.flush();
+        } finally {
+            outputStream.close();
+        }
+
+        return outFile;
     }
 
     private void approveAndForwardRequest() {
@@ -434,6 +624,8 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     }
 
     private void goBack() {
+        if (!isAdded()) return;
+
         if (getParentFragmentManager().getBackStackEntryCount() > 0) {
             getParentFragmentManager().popBackStack();
         } else {
@@ -522,56 +714,141 @@ public class sacRequestsViewDetailsFragment extends Fragment {
                 "\nOther Amenities: " + fallback(otherAmenities);
     }
 
-    private String buildSchedule(
-            String startDate,
-            String endDate,
-            String startTime,
-            String endTime
-    ) {
+    private String buildTechnicalList(DocumentSnapshot doc) {
+        List<String> selected = new ArrayList<>();
+        if (getBooleanValue(doc, "soundSystemSetup")) selected.add("Sound System Setup");
+        if (getBooleanValue(doc, "microphones")) selected.add("Microphones");
+        if (getBooleanValue(doc, "portableSpeaker")) selected.add("Portable Speaker");
+        if (getBooleanValue(doc, "lights")) selected.add("Lights");
+        if (getBooleanValue(doc, "livestreamingServices")) selected.add("Livestreaming Services");
+        if (getBooleanValue(doc, "zoomHosting")) selected.add("Zoom Hosting");
+        if (getBooleanValue(doc, "gmeetHosting")) selected.add("GMeet Hosting");
+        if (getBooleanValue(doc, "webCamera")) selected.add("Web Camera");
+        if (getBooleanValue(doc, "tripod")) selected.add("Tripod");
+        if (getBooleanValue(doc, "multimediaProjector")) selected.add("Multimedia Projector");
+
+        if (selected.isEmpty()) return "None";
+
+        StringBuilder builder = new StringBuilder();
+        for (String item : selected) builder.append("• ").append(item).append("\n");
+        return builder.toString().trim();
+    }
+
+    private String buildSchedule(String startDate, String endDate, String startTime, String endTime) {
         return buildDate(startDate, endDate) + " • " + buildTime(startTime, endTime);
     }
 
     private String buildDate(String startDate, String endDate) {
-        if (startDate.isEmpty() && endDate.isEmpty()) {
-            return "No date";
-        }
-
-        if (!startDate.isEmpty()
-                && !endDate.isEmpty()
-                && !startDate.equalsIgnoreCase(endDate)) {
+        if (startDate.isEmpty() && endDate.isEmpty()) return "No date";
+        if (!startDate.isEmpty() && !endDate.isEmpty() && !startDate.equalsIgnoreCase(endDate)) {
             return startDate + " - " + endDate;
         }
-
         return !startDate.isEmpty() ? startDate : endDate;
     }
 
     private String buildTime(String startTime, String endTime) {
-        if (startTime.isEmpty() && endTime.isEmpty()) {
-            return "No time";
-        }
-
-        if (!startTime.isEmpty() && !endTime.isEmpty()) {
-            return startTime + " - " + endTime;
-        }
-
+        if (startTime.isEmpty() && endTime.isEmpty()) return "No time";
+        if (!startTime.isEmpty() && !endTime.isEmpty()) return startTime + " - " + endTime;
         return !startTime.isEmpty() ? startTime : endTime;
     }
 
     private String getFinalFacility(DocumentSnapshot doc) {
         String finalFacilityName = getStringValue(doc, "finalFacilityName");
-
-        if (!finalFacilityName.isEmpty()) {
-            return finalFacilityName;
-        }
+        if (!finalFacilityName.isEmpty()) return finalFacilityName;
 
         String facility = getStringValue(doc, "facility");
         String otherFacility = getStringValue(doc, "otherFacility");
 
-        if ("Others".equalsIgnoreCase(facility) && !otherFacility.isEmpty()) {
-            return otherFacility;
+        if ("Others".equalsIgnoreCase(facility) && !otherFacility.isEmpty()) return otherFacility;
+        return facility;
+    }
+
+    private String getMapString(Map<?, ?> map, String key) {
+        Object value = map.get(key);
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private long getMapLong(Map<?, ?> map, String key) {
+        Object value = map.get(key);
+        if (value instanceof Number) return ((Number) value).longValue();
+        if (value != null) {
+            try {
+                return Long.parseLong(String.valueOf(value));
+            } catch (NumberFormatException ignored) {
+                return 0;
+            }
+        }
+        return 0;
+    }
+
+    private String guessMimeType(DisplayProposalFile file) {
+        String name = file.fileName == null ? "" : file.fileName.toLowerCase(Locale.US);
+        String url = file.fileUrl == null ? "" : file.fileUrl.toLowerCase(Locale.US);
+
+        if (url.startsWith("data:")) {
+            int semicolonIndex = url.indexOf(';');
+            if (semicolonIndex > 5) return url.substring(5, semicolonIndex);
         }
 
-        return facility;
+        if (name.endsWith(".pdf") || url.contains("application/pdf")) return "application/pdf";
+        if (name.endsWith(".png")) return "image/png";
+        if (name.endsWith(".webp")) return "image/webp";
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+        if (url.contains("image/png")) return "image/png";
+        if (url.contains("image/webp")) return "image/webp";
+        if (url.contains("image/jpeg") || url.contains("image/jpg")) return "image/jpeg";
+
+        return "application/octet-stream";
+    }
+
+    private String guessFileType(String mimeType, String fileName) {
+        String lowerMime = mimeType == null ? "" : mimeType.toLowerCase(Locale.US);
+        String lowerName = fileName == null ? "" : fileName.toLowerCase(Locale.US);
+
+        if (lowerMime.startsWith("image/") || lowerName.endsWith(".jpg")
+                || lowerName.endsWith(".jpeg") || lowerName.endsWith(".png")
+                || lowerName.endsWith(".webp")) return "image";
+        if ("application/pdf".equals(lowerMime) || lowerName.endsWith(".pdf")) return "pdf";
+        return "file";
+    }
+
+    private int estimateBytesFromBase64(String base64) {
+        if (base64 == null || base64.isEmpty()) return 0;
+        String clean = base64.replace("\n", "").replace("\r", "").trim();
+        int padding = 0;
+        if (clean.endsWith("==")) padding = 2;
+        else if (clean.endsWith("=")) padding = 1;
+        return Math.max(0, (clean.length() * 3 / 4) - padding);
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        double kb = bytes / 1024.0;
+        if (kb < 1024) return String.format(Locale.US, "%.1f KB", kb);
+        return String.format(Locale.US, "%.1f MB", kb / 1024.0);
+    }
+
+    private String sanitizeFileName(String name) {
+        if (name == null || name.trim().isEmpty()) return "proposal_file";
+        return name.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    private boolean hasFileExtension(String name) {
+        return name != null && name.matches("(?i).+\\.(pdf|jpg|jpeg|png|webp)$");
+    }
+
+    private String extensionForMime(String mimeType) {
+        if (mimeType == null) return ".bin";
+        String lower = mimeType.toLowerCase(Locale.US);
+        if ("application/pdf".equals(lower)) return ".pdf";
+        if ("image/png".equals(lower)) return ".png";
+        if ("image/webp".equals(lower)) return ".webp";
+        if ("image/jpeg".equals(lower) || "image/jpg".equals(lower)) return ".jpg";
+        return ".bin";
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private boolean getBooleanValue(DocumentSnapshot doc, String field) {
@@ -590,18 +867,33 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     }
 
     private String getText(TextInputEditText editText) {
-        return editText.getText() != null
+        return editText != null && editText.getText() != null
                 ? editText.getText().toString().trim()
                 : "";
     }
 
     private String fallback(String value) {
-        return value == null || value.trim().isEmpty()
-                ? "—"
-                : value.trim();
+        return value == null || value.trim().isEmpty() ? "—" : value.trim();
     }
 
     private String firstNonEmpty(String first, String second) {
-        return !first.isEmpty() ? first : second;
+        if (first != null && !first.trim().isEmpty()) return first.trim();
+        if (second != null && !second.trim().isEmpty()) return second.trim();
+        return "";
+    }
+
+    private static class DisplayProposalFile {
+        String fileName = "";
+        String fileUrl = "";
+        String fileType = "";
+        String mimeType = "";
+        String fileDataBase64 = "";
+        String storageType = "";
+        long sizeBytes = 0;
+
+        boolean hasBase64Data() {
+            return fileDataBase64 != null && !fileDataBase64.trim().isEmpty()
+                    || fileUrl != null && fileUrl.startsWith("data:");
+        }
     }
 }

@@ -25,11 +25,16 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.WriteBatch;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public class RequestorNotificationFragment extends Fragment {
 
@@ -42,6 +47,9 @@ public class RequestorNotificationFragment extends Fragment {
     private ListenerRegistration notificationListener;
 
     private final List<DocumentSnapshot> requestList = new ArrayList<>();
+    private final Set<String> locallySeenNotificationIds = new HashSet<>();
+
+    private int unseenNotificationCount = 0;
 
     public RequestorNotificationFragment() {
         super(R.layout.fragment_requestor_notification);
@@ -111,11 +119,8 @@ public class RequestorNotificationFragment extends Fragment {
                     Collections.sort(docs, new Comparator<DocumentSnapshot>() {
                         @Override
                         public int compare(DocumentSnapshot a, DocumentSnapshot b) {
-                            Timestamp timeA = a.getTimestamp("notificationUpdatedAt");
-                            Timestamp timeB = b.getTimestamp("notificationUpdatedAt");
-
-                            if (timeA == null) timeA = a.getTimestamp("updatedAt");
-                            if (timeB == null) timeB = b.getTimestamp("updatedAt");
+                            Timestamp timeA = getBestNotificationTimestamp(a);
+                            Timestamp timeB = getBestNotificationTimestamp(b);
 
                             if (timeA == null && timeB == null) return 0;
                             if (timeA == null) return 1;
@@ -126,12 +131,37 @@ public class RequestorNotificationFragment extends Fragment {
                     });
 
                     requestList.clear();
+                    unseenNotificationCount = 0;
+
+                    List<DocumentSnapshot> docsToMarkSeen = new ArrayList<>();
 
                     for (DocumentSnapshot doc : docs) {
-                        if (RequestDataHelper.shouldShowInRequestList(doc)
-                                && RequestDataHelper.isRequestorNotificationUnseen(doc)) {
+                        if (!RequestDataHelper.shouldShowInRequestList(doc)) {
+                            continue;
+                        }
+
+                        if (shouldShowNotificationCard(doc)) {
                             requestList.add(doc);
                         }
+
+                        if (shouldCountForBadge(doc)) {
+                            unseenNotificationCount++;
+                            docsToMarkSeen.add(doc);
+                        }
+                    }
+
+                    /*
+                     * Kapag napindot/nabuksan na ang Notification nav bar,
+                     * mawawala agad ang badge count at NEW badge,
+                     * pero hindi mawawala ang notification card/list.
+                     */
+                    if (!docsToMarkSeen.isEmpty()) {
+                        for (DocumentSnapshot doc : docsToMarkSeen) {
+                            locallySeenNotificationIds.add(doc.getId());
+                        }
+
+                        unseenNotificationCount = 0;
+                        markNotificationsAsSeen(docsToMarkSeen);
                     }
 
                     renderNotifications();
@@ -143,15 +173,16 @@ public class RequestorNotificationFragment extends Fragment {
 
         layoutNotificationList.removeAllViews();
 
-        int count = requestList.size();
+        int totalNotifications = requestList.size();
 
         if (tvIncomingCount != null) {
             tvIncomingCount.setText(
-                    count + " booking notification" + (count == 1 ? "" : "s")
+                    unseenNotificationCount + " incoming notification" +
+                            (unseenNotificationCount == 1 ? "" : "s")
             );
         }
 
-        if (count == 0) {
+        if (totalNotifications == 0) {
             showEmptyState();
             return;
         }
@@ -176,14 +207,38 @@ public class RequestorNotificationFragment extends Fragment {
         String startTime = getStringValue(doc, "timeStartText");
         String endTime = getStringValue(doc, "timeEndText");
 
+        String notifiedDateText = buildNotifiedDateText(doc);
+        boolean isUnseen = shouldCountForBadge(doc);
+
+        LinearLayout outerLayout = new LinearLayout(requireContext());
+        outerLayout.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout.LayoutParams outerParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        outerParams.setMargins(0, 0, 0, dp(12));
+        outerLayout.setLayoutParams(outerParams);
+
+        TextView tvNotifiedDate = new TextView(requireContext());
+        tvNotifiedDate.setText(notifiedDateText);
+        tvNotifiedDate.setTextColor(Color.parseColor("#970705"));
+        tvNotifiedDate.setTextSize(12f);
+        tvNotifiedDate.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        LinearLayout.LayoutParams notifiedDateParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        notifiedDateParams.setMargins(dp(4), 0, 0, dp(6));
+        tvNotifiedDate.setLayoutParams(notifiedDateParams);
+
         MaterialCardView card = new MaterialCardView(requireContext());
 
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         );
-
-        cardParams.setMargins(0, 0, 0, dp(12));
 
         card.setLayoutParams(cardParams);
         card.setCardBackgroundColor(Color.WHITE);
@@ -233,7 +288,6 @@ public class RequestorNotificationFragment extends Fragment {
         );
 
         titleParams.setMargins(dp(12), 0, dp(8), 0);
-
         titleLayout.setLayoutParams(titleParams);
 
         TextView tvTitle = new TextView(requireContext());
@@ -260,6 +314,29 @@ public class RequestorNotificationFragment extends Fragment {
         titleLayout.addView(tvTitle);
         titleLayout.addView(tvMeta);
 
+        Chip chipIncoming = new Chip(requireContext());
+
+        chipIncoming.setText("NEW");
+        chipIncoming.setTextColor(Color.WHITE);
+        chipIncoming.setTextSize(11f);
+        chipIncoming.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        chipIncoming.setChipBackgroundColor(
+                ColorStateList.valueOf(Color.parseColor("#970705"))
+        );
+
+        chipIncoming.setChipStrokeWidth(0);
+        chipIncoming.setCheckable(false);
+        chipIncoming.setClickable(false);
+
+        LinearLayout.LayoutParams incomingParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+
+        incomingParams.setMargins(0, 0, dp(6), 0);
+        chipIncoming.setLayoutParams(incomingParams);
+
         Chip chipStatus = new Chip(requireContext());
 
         chipStatus.setText(status);
@@ -275,6 +352,11 @@ public class RequestorNotificationFragment extends Fragment {
 
         headerRow.addView(iconCard);
         headerRow.addView(titleLayout);
+
+        if (isUnseen) {
+            headerRow.addView(chipIncoming);
+        }
+
         headerRow.addView(chipStatus);
 
         TextView tvDescription = new TextView(requireContext());
@@ -322,7 +404,10 @@ public class RequestorNotificationFragment extends Fragment {
 
         card.addView(container);
 
-        return card;
+        outerLayout.addView(tvNotifiedDate);
+        outerLayout.addView(card);
+
+        return outerLayout;
     }
 
     private void openRequestDetails(String requestId) {
@@ -331,14 +416,7 @@ public class RequestorNotificationFragment extends Fragment {
             return;
         }
 
-        for (int i = 0; i < requestList.size(); i++) {
-            if (requestList.get(i).getId().equals(requestId)) {
-                requestList.remove(i);
-                break;
-            }
-        }
-
-        renderNotifications();
+        locallySeenNotificationIds.add(requestId);
 
         db.collection("requests")
                 .document(requestId)
@@ -346,10 +424,8 @@ public class RequestorNotificationFragment extends Fragment {
                         "requestorSeen", true,
                         "requestorNotificationSeen", true,
                         "requestorApprovedSeen", true,
-                        "notificationForRequestor", false,
                         "requestorSeenAt", FieldValue.serverTimestamp(),
-                        "requestorNotificationOpenedAt", FieldValue.serverTimestamp(),
-                        "updatedAt", FieldValue.serverTimestamp()
+                        "requestorNotificationOpenedAt", FieldValue.serverTimestamp()
                 );
 
         RequestorRequestDetailsFragment fragment =
@@ -361,6 +437,64 @@ public class RequestorNotificationFragment extends Fragment {
                 .replace(R.id.fragment_container, fragment)
                 .addToBackStack(null)
                 .commit();
+    }
+
+    private void markNotificationsAsSeen(List<DocumentSnapshot> docsToMarkSeen) {
+        if (docsToMarkSeen == null || docsToMarkSeen.isEmpty()) {
+            return;
+        }
+
+        WriteBatch batch = db.batch();
+
+        for (DocumentSnapshot doc : docsToMarkSeen) {
+            batch.update(
+                    doc.getReference(),
+                    "requestorSeen", true,
+                    "requestorNotificationSeen", true,
+                    "requestorApprovedSeen", true,
+                    "requestorSeenAt", FieldValue.serverTimestamp(),
+                    "requestorNotificationOpenedAt", FieldValue.serverTimestamp()
+            );
+        }
+
+        batch.commit();
+    }
+
+    private boolean shouldShowNotificationCard(DocumentSnapshot doc) {
+        Boolean notificationForRequestor = doc.getBoolean("notificationForRequestor");
+
+        String title = getStringValue(doc, "requestorNotificationTitle");
+        String message = getStringValue(doc, "requestorNotificationMessage");
+
+        Timestamp notificationUpdatedAt = doc.getTimestamp("notificationUpdatedAt");
+        Timestamp requestorNotifiedAt = doc.getTimestamp("requestorNotifiedAt");
+        Timestamp requestorNotificationOpenedAt = doc.getTimestamp("requestorNotificationOpenedAt");
+
+        boolean hasNotificationText = !title.isEmpty() || !message.isEmpty();
+
+        boolean hasNotificationDate =
+                notificationUpdatedAt != null
+                        || requestorNotifiedAt != null
+                        || requestorNotificationOpenedAt != null;
+
+        return Boolean.TRUE.equals(notificationForRequestor)
+                || RequestDataHelper.isRequestorNotificationUnseen(doc)
+                || hasNotificationText
+                || hasNotificationDate;
+    }
+
+    private boolean shouldCountForBadge(DocumentSnapshot doc) {
+        if (locallySeenNotificationIds.contains(doc.getId())) {
+            return false;
+        }
+
+        Boolean requestorNotificationSeen = doc.getBoolean("requestorNotificationSeen");
+
+        if (Boolean.TRUE.equals(requestorNotificationSeen)) {
+            return false;
+        }
+
+        return shouldShowNotificationCard(doc);
     }
 
     private String getDisplayStatus(DocumentSnapshot doc) {
@@ -443,6 +577,41 @@ public class RequestorNotificationFragment extends Fragment {
         }
 
         return "There is an update on your booking request.";
+    }
+
+    private String buildNotifiedDateText(DocumentSnapshot doc) {
+        Timestamp timestamp = getBestNotificationTimestamp(doc);
+
+        if (timestamp == null) {
+            return "Notified date not available";
+        }
+
+        SimpleDateFormat formatter =
+                new SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault());
+
+        return formatter.format(timestamp.toDate());
+    }
+
+    private Timestamp getBestNotificationTimestamp(DocumentSnapshot doc) {
+        Timestamp timestamp = doc.getTimestamp("notificationUpdatedAt");
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("requestorNotifiedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("requestorNotificationOpenedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("updatedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("createdAt");
+        }
+
+        return timestamp;
     }
 
     private String buildMetaText(
@@ -544,7 +713,7 @@ public class RequestorNotificationFragment extends Fragment {
         }
 
         if (tvIncomingCount != null) {
-            tvIncomingCount.setText("0 booking notifications");
+            tvIncomingCount.setText("0 incoming notifications");
         }
     }
 

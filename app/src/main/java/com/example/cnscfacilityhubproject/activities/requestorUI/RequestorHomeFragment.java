@@ -38,6 +38,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 public class RequestorHomeFragment extends Fragment {
 
     private TextView tvGreeting;
@@ -100,6 +102,10 @@ public class RequestorHomeFragment extends Fragment {
         tvSelectedDate = view.findViewById(R.id.tvSelectedDate);
         btnNewRequest = view.findViewById(R.id.btnNewRequest);
         schedsContainer = view.findViewById(R.id.Scheds);
+
+        if (tvRequestorName.getText() != null) {
+            requestorNameLabel = tvRequestorName.getText().toString().trim();
+        }
     }
 
     private void setGreetingByTime() {
@@ -117,11 +123,25 @@ public class RequestorHomeFragment extends Fragment {
 
     private void loadHeaderRequestorInfo() {
         if (auth.getCurrentUser() == null) {
-            tvRequestorName.setText("Hello, Requestor");
             return;
         }
 
         String userId = auth.getCurrentUser().getUid();
+        String label = tvRequestorName.getText().toString().trim();
+
+        if (!label.endsWith(",")) {
+            label = "Hello,";
+        }
+
+        final String prefix = label + " ";
+
+        SharedPreferences prefs = requireContext().getSharedPreferences("user_cache", Context.MODE_PRIVATE);
+
+        String cachedFullName = prefs.getString("fullName_" + userId, "");
+
+        if (cachedFullName != null && !cachedFullName.trim().isEmpty()) {
+            tvRequestorName.setText(prefix + cachedFullName.trim());
+        }
 
         db.collection("users")
                 .document(userId)
@@ -132,14 +152,17 @@ public class RequestorHomeFragment extends Fragment {
                     String fullName = documentSnapshot.getString("fullName");
 
                     if (fullName != null && !fullName.trim().isEmpty()) {
-                        tvRequestorName.setText("Hello, " + fullName);
-                    } else {
-                        tvRequestorName.setText("Hello, Requestor");
+                        String cleanName = fullName.trim();
+
+                        prefs.edit()
+                                .putString("fullName_" + userId, cleanName)
+                                .apply();
+
+                        tvRequestorName.setText(prefix + cleanName);
                     }
                 })
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
-                    tvRequestorName.setText("Hello, Requestor");
                 });
     }
 
@@ -612,6 +635,8 @@ public class RequestorHomeFragment extends Fragment {
 
         return row;
     }
+
+    private String requestorNameLabel = "";
 
     private String getTimeBadgeText(String timeStartText) {
         try {

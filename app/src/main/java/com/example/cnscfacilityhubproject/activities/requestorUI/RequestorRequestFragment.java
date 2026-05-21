@@ -2,12 +2,16 @@ package com.example.cnscfacilityhubproject.activities.requestorUI;
 
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
-import android.content.ActivityNotFoundException;
+import android.database.Cursor;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -18,6 +22,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
@@ -36,8 +42,10 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QuerySnapshot;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -47,6 +55,13 @@ import java.util.Locale;
 import java.util.Map;
 
 public class RequestorRequestFragment extends Fragment {
+
+    // Firestore has a 1 MiB maximum document size.
+    // Base64 text is larger than the original file bytes, so keep files small.
+    private static final int MAX_SINGLE_FILE_BYTES_FOR_FIRESTORE = 350 * 1024;
+    private static final int MAX_TOTAL_BASE64_CHARS_FOR_FIRESTORE = 700 * 1024;
+    private static final int MAX_IMAGE_DIMENSION_FOR_FIRESTORE = 1280;
+    private static final int IMAGE_JPEG_QUALITY_FOR_FIRESTORE = 70;
 
     private TextInputEditText etStartDate;
     private TextInputEditText etEndDate;
@@ -97,12 +112,11 @@ public class RequestorRequestFragment extends Fragment {
     private LinearLayout layoutSingleDayTimes;
     private LinearLayout layoutScheduleDays;
     private TextView tvScheduleHint;
-    
-    private TextInputEditText etLinkLabel;
-    private TextInputEditText etLinkUrl;
-    private MaterialButton btnAddLink;
+
+    private MaterialButton btnChooseFiles;
     private LinearLayout layoutSelectedFiles;
     private TextView tvSelectedFile;
+    private ActivityResultLauncher<String[]> filePickerLauncher;
 
     private MaterialButton btnSubmitRequest;
     private ProgressBar progressSubmit;
@@ -119,7 +133,7 @@ public class RequestorRequestFragment extends Fragment {
 
     private String selectedActivityType = "Institutional";
 
-    private final List<ProposalFileItem> proposalLinks = new ArrayList<>();
+    private final List<Uri> selectedProposalFileUris = new ArrayList<>();
     private final Map<String, TextInputEditText> perDayStartFields = new HashMap<>();
     private final Map<String, TextInputEditText> perDayEndFields = new HashMap<>();
 
@@ -128,6 +142,12 @@ public class RequestorRequestFragment extends Fragment {
 
     public RequestorRequestFragment() {
         super(R.layout.fragment_requestor_request);
+    }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setupFilePickerLauncher();
     }
 
     @Override
@@ -145,7 +165,7 @@ public class RequestorRequestFragment extends Fragment {
         setupTimePickers();
         setupAmenitiesInputs();
         setupTechnicalOptions();
-        setupLinkActions();
+        setupFileActions();
         setupSubmit();
         loadRequestorInformation();
         checkActiveAppointment();
@@ -201,10 +221,8 @@ public class RequestorRequestFragment extends Fragment {
         layoutSingleDayTimes = view.findViewById(R.id.layoutSingleDayTimes);
         layoutScheduleDays = view.findViewById(R.id.layoutScheduleDays);
         tvScheduleHint = view.findViewById(R.id.tvScheduleHint);
-        
-        etLinkLabel = view.findViewById(R.id.etLinkLabel);
-        etLinkUrl = view.findViewById(R.id.etLinkUrl);
-        btnAddLink = view.findViewById(R.id.btnAddLink);
+
+        btnChooseFiles = view.findViewById(R.id.btnChooseFiles);
         layoutSelectedFiles = view.findViewById(R.id.layoutSelectedFiles);
         tvSelectedFile = view.findViewById(R.id.tvSelectedFile);
 
@@ -547,57 +565,63 @@ public class RequestorRequestFragment extends Fragment {
         return card;
     }
 
-    private void setupLinkActions() {
-        btnAddLink.setOnClickListener(v -> {
-            String label = getText(etLinkLabel);
-            String url = getText(etLinkUrl);
+    private void setupFilePickerLauncher() {
+        filePickerLauncher = registerForActivityResult(
+                new ActivityResultContracts.OpenMultipleDocuments(),
+                uris -> {
+                    if (uris == null || uris.isEmpty() || !isAdded()) return;
 
-            if (label.isEmpty()) {
-                etLinkLabel.setError("Enter a label (e.g. Proposal)");
-                return;
-            }
+                    for (Uri uri : uris) {
+                        String mimeType = requireContext().getContentResolver().getType(uri);
+                        boolean isPdf = "application/pdf".equalsIgnoreCase(mimeType);
+                        boolean isImage = mimeType != null && mimeType.toLowerCase(Locale.ROOT).startsWith("image/");
 
-            if (url.isEmpty()) {
-                etLinkUrl.setError("Paste a link");
-                return;
-            }
+                        if (!isPdf && !isImage) {
+                            Toast.makeText(requireContext(),
+                                    "Only PDF and image files are allowed.",
+                                    Toast.LENGTH_SHORT).show();
+                            continue;
+                        }
 
-            if (!url.startsWith("http://") && !url.startsWith("https://")) {
-                etLinkUrl.setError("Link must start with http:// or https://");
-                return;
-            }
+                        if (!selectedProposalFileUris.contains(uri)) {
+                            try {
+                                requireContext().getContentResolver().takePersistableUriPermission(
+                                        uri,
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                );
+                            } catch (SecurityException ignored) {
+                                // Some providers do not support persistable URI permission.
+                                // The URI is still usable during this app session for upload.
+                            }
+                            selectedProposalFileUris.add(uri);
+                        }
+                    }
 
-            if (url.startsWith("content://")) {
-                etLinkUrl.setError("Local device links are not allowed.");
-                return;
-            }
+                    refreshSelectedFilesUi();
+                }
+        );
+    }
 
-            proposalLinks.add(new ProposalFileItem(label, url, "link", "external_link"));
-            etLinkLabel.setText("");
-            etLinkUrl.setText("");
-            etLinkLabel.setError(null);
-            etLinkUrl.setError(null);
-            refreshSelectedFilesUi();
-
-            if (url.contains("drive.google.com")) {
-                Toast.makeText(requireContext(), "Reminder: Ensure your Google Drive link is set to 'Anyone with the link can view'.", Toast.LENGTH_LONG).show();
-            }
-        });
+    private void setupFileActions() {
+        btnChooseFiles.setOnClickListener(v -> filePickerLauncher.launch(new String[]{
+                "application/pdf",
+                "image/*"
+        }));
     }
 
     private void refreshSelectedFilesUi() {
         layoutSelectedFiles.removeAllViews();
 
-        if (proposalLinks.isEmpty()) {
-            tvSelectedFile.setText("No links added. At least one is required.");
+        if (selectedProposalFileUris.isEmpty()) {
+            tvSelectedFile.setText("No files selected. At least one is required.");
             tvSelectedFile.setTextColor(requireContext().getColor(R.color.cnsc_text_primary));
             return;
         }
 
-        tvSelectedFile.setText(proposalLinks.size() + " link(s) added");
+        tvSelectedFile.setText(selectedProposalFileUris.size() + " file(s) selected");
         tvSelectedFile.setTextColor(requireContext().getColor(R.color.cnsc_primary));
 
-        for (ProposalFileItem link : new ArrayList<>(proposalLinks)) {
+        for (Uri uri : new ArrayList<>(selectedProposalFileUris)) {
             MaterialCardView row = new MaterialCardView(requireContext());
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -618,7 +642,7 @@ public class RequestorRequestFragment extends Fragment {
             TextView name = new TextView(requireContext());
             LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
             name.setLayoutParams(nameParams);
-            name.setText(link.getFileName());
+            name.setText(getFileName(uri));
             name.setTextColor(requireContext().getColor(R.color.cnsc_text_primary));
             name.setEllipsize(TextUtils.TruncateAt.MIDDLE);
             name.setSingleLine(true);
@@ -634,7 +658,7 @@ public class RequestorRequestFragment extends Fragment {
             remove.setStrokeColorResource(R.color.cnsc_text_secondary);
             remove.setTextColor(requireContext().getColor(R.color.cnsc_text_secondary));
             remove.setOnClickListener(v -> {
-                proposalLinks.remove(link);
+                selectedProposalFileUris.remove(uri);
                 refreshSelectedFilesUi();
             });
 
@@ -643,6 +667,178 @@ public class RequestorRequestFragment extends Fragment {
             row.addView(inner);
             layoutSelectedFiles.addView(row);
         }
+    }
+
+    private String getFileName(Uri uri) {
+        String result = "Selected File";
+
+        Cursor cursor = requireContext().getContentResolver()
+                .query(uri, null, null, null, null);
+
+        if (cursor != null) {
+            try {
+                int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (nameIndex >= 0 && cursor.moveToFirst()) {
+                    String displayName = cursor.getString(nameIndex);
+                    if (!TextUtils.isEmpty(displayName)) {
+                        result = displayName;
+                    }
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+
+        return result;
+    }
+
+    private List<Map<String, Object>> buildFirestoreProposalFiles() throws IOException {
+        List<Map<String, Object>> files = new ArrayList<>();
+        int totalBase64Chars = 0;
+
+        for (Uri uri : selectedProposalFileUris) {
+            String fileName = getFileName(uri);
+            String mimeType = requireContext().getContentResolver().getType(uri);
+            boolean isImage = mimeType != null && mimeType.toLowerCase(Locale.ROOT).startsWith("image/");
+            boolean isPdf = "application/pdf".equalsIgnoreCase(mimeType);
+
+            if (!isImage && !isPdf) {
+                throw new IOException(fileName + " is not a PDF or image file.");
+            }
+
+            byte[] fileBytes = isImage
+                    ? compressImageForFirestore(uri)
+                    : readBytesFromUri(uri, MAX_SINGLE_FILE_BYTES_FOR_FIRESTORE);
+
+            String base64Data = Base64.encodeToString(fileBytes, Base64.NO_WRAP);
+            totalBase64Chars += base64Data.length();
+
+            if (totalBase64Chars > MAX_TOTAL_BASE64_CHARS_FOR_FIRESTORE) {
+                throw new IOException("Selected files are too large for Firestore. Please choose smaller or fewer files.");
+            }
+
+            String finalMimeType;
+            String fileType;
+            if (isImage) {
+                finalMimeType = "image/jpeg";
+                fileType = "image";
+            } else {
+                finalMimeType = "application/pdf";
+                fileType = "pdf";
+            }
+
+            Map<String, Object> fileMap = new HashMap<>();
+            fileMap.put("fileName", fileName);
+            fileMap.put("fileType", fileType);
+            fileMap.put("mimeType", finalMimeType);
+            fileMap.put("storageType", "firestore_base64");
+            fileMap.put("sizeBytes", fileBytes.length);
+            fileMap.put("fileDataBase64", base64Data);
+
+            // Compatibility field: older screens may already read fileUrl.
+            // This is not an external URL. It is a data URI saved inside Firestore.
+            fileMap.put("fileUrl", "data:" + finalMimeType + ";base64," + base64Data);
+
+            files.add(fileMap);
+        }
+
+        return files;
+    }
+
+    private byte[] readBytesFromUri(Uri uri, int maxBytes) throws IOException {
+        try (InputStream inputStream = requireContext().getContentResolver().openInputStream(uri);
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+
+            if (inputStream == null) {
+                throw new IOException("Unable to read selected file.");
+            }
+
+            byte[] buffer = new byte[8192];
+            int read;
+            int total = 0;
+
+            while ((read = inputStream.read(buffer)) != -1) {
+                total += read;
+                if (total > maxBytes) {
+                    throw new IOException(getFileName(uri) + " is too large for Firestore. Please choose a smaller file.");
+                }
+                outputStream.write(buffer, 0, read);
+            }
+
+            return outputStream.toByteArray();
+        }
+    }
+
+    private byte[] compressImageForFirestore(Uri uri) throws IOException {
+        BitmapFactory.Options boundsOptions = new BitmapFactory.Options();
+        boundsOptions.inJustDecodeBounds = true;
+
+        try (InputStream boundsStream = requireContext().getContentResolver().openInputStream(uri)) {
+            if (boundsStream == null) {
+                throw new IOException("Unable to read selected image.");
+            }
+            BitmapFactory.decodeStream(boundsStream, null, boundsOptions);
+        }
+
+        int sampleSize = 1;
+        while ((boundsOptions.outWidth / sampleSize) > (MAX_IMAGE_DIMENSION_FOR_FIRESTORE * 2)
+                || (boundsOptions.outHeight / sampleSize) > (MAX_IMAGE_DIMENSION_FOR_FIRESTORE * 2)) {
+            sampleSize *= 2;
+        }
+
+        BitmapFactory.Options decodeOptions = new BitmapFactory.Options();
+        decodeOptions.inSampleSize = sampleSize;
+
+        Bitmap decodedBitmap;
+        try (InputStream imageStream = requireContext().getContentResolver().openInputStream(uri)) {
+            if (imageStream == null) {
+                throw new IOException("Unable to read selected image.");
+            }
+            decodedBitmap = BitmapFactory.decodeStream(imageStream, null, decodeOptions);
+        }
+
+        if (decodedBitmap == null) {
+            throw new IOException(getFileName(uri) + " could not be decoded as an image.");
+        }
+
+        Bitmap bitmapToSave = scaleBitmapIfNeeded(decodedBitmap, MAX_IMAGE_DIMENSION_FOR_FIRESTORE);
+        if (bitmapToSave != decodedBitmap) {
+            decodedBitmap.recycle();
+        }
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        int quality = IMAGE_JPEG_QUALITY_FOR_FIRESTORE;
+        bitmapToSave.compress(Bitmap.CompressFormat.JPEG, quality, outputStream);
+
+        while (outputStream.size() > MAX_SINGLE_FILE_BYTES_FOR_FIRESTORE && quality > 35) {
+            outputStream.reset();
+            quality -= 10;
+            bitmapToSave.compress(Bitmap.CompressFormat.JPEG, quality, outputStream);
+        }
+
+        byte[] compressedBytes = outputStream.toByteArray();
+        bitmapToSave.recycle();
+
+        if (compressedBytes.length > MAX_SINGLE_FILE_BYTES_FOR_FIRESTORE) {
+            throw new IOException(getFileName(uri) + " is too large for Firestore even after compression.");
+        }
+
+        return compressedBytes;
+    }
+
+    private Bitmap scaleBitmapIfNeeded(Bitmap source, int maxDimension) {
+        int width = source.getWidth();
+        int height = source.getHeight();
+
+        if (width <= maxDimension && height <= maxDimension) {
+            return source;
+        }
+
+        float ratio = Math.min((float) maxDimension / width, (float) maxDimension / height);
+        int newWidth = Math.max(1, Math.round(width * ratio));
+        int newHeight = Math.max(1, Math.round(height * ratio));
+
+        return Bitmap.createScaledBitmap(source, newWidth, newHeight, true);
     }
 
     private void setupSubmit() {
@@ -798,11 +994,11 @@ public class RequestorRequestFragment extends Fragment {
 
                     String conflict = (snapshot != null)
                             ? ScheduleConflictChecker.findConflictMessage(
-                                facilityNames,
-                                facilityKeys,
-                                scheduleDays,
-                                snapshot
-                            ) : "";
+                            facilityNames,
+                            facilityKeys,
+                            scheduleDays,
+                            snapshot
+                    ) : "";
 
                     if (!conflict.isEmpty()) {
                         setSubmitting(false, "");
@@ -810,7 +1006,7 @@ public class RequestorRequestFragment extends Fragment {
                         return;
                     }
 
-                    createRequestWithLinks(facilityNames, facilityKeys, scheduleDays);
+                    createRequestWithFiles(facilityNames, facilityKeys, scheduleDays);
                 })
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
@@ -821,15 +1017,16 @@ public class RequestorRequestFragment extends Fragment {
                 });
     }
 
-    private void createRequestWithLinks(
+    private void createRequestWithFiles(
             List<String> facilityNames,
             List<String> facilityKeys,
             List<ScheduleDayItem> scheduleDays
     ) {
         String TAG = "CNSC_RequestSubmit";
         Log.d(TAG, "Preparing request map for submission...");
-        setSubmitting(true, "Submitting request...");
+        setSubmitting(true, "Preparing files for Firestore...");
 
+        String requestId = db.collection("requests").document().getId();
         String userId = auth.getCurrentUser().getUid();
         String finalFacilityName = RequestDataHelper.buildFinalFacilityName(facilityNames);
         String facilityKeyLegacy = facilityKeys.isEmpty() ? "" : facilityKeys.get(0);
@@ -892,6 +1089,16 @@ public class RequestorRequestFragment extends Fragment {
             chairsCount = Long.parseLong(getText(etChairsCount));
         }
 
+        List<Map<String, Object>> firestoreProposalFiles;
+        try {
+            firestoreProposalFiles = buildFirestoreProposalFiles();
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to prepare files for Firestore: " + e.getMessage());
+            setSubmitting(false, "");
+            Toast.makeText(requireContext(), e.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
+
         Map<String, Object> requestMap = RequestSubmissionHelper.buildRequestMap(
                 userId,
                 selectedActivityType,
@@ -934,15 +1141,20 @@ public class RequestorRequestFragment extends Fragment {
                 sendToGSO,
                 notificationTarget,
                 workflowStage,
-                proposalLinks
+                new ArrayList<ProposalFileItem>()
         );
 
-        Log.d(TAG, "Adding request document to Firestore...");
+        requestMap.put("proposalFiles", firestoreProposalFiles);
+        requestMap.put("proposalFileStorage", "firestore_base64");
+
+        Log.d(TAG, "Saving request document with ID: " + requestId);
+        setSubmitting(true, "Submitting request...");
         db.collection("requests")
-                .add(requestMap)
-                .addOnSuccessListener(documentReference -> {
+                .document(requestId)
+                .set(requestMap)
+                .addOnSuccessListener(unused -> {
                     if (!isAdded()) return;
-                    Log.d(TAG, "Firestore document created with ID: " + documentReference.getId());
+                    Log.d(TAG, "Firestore document created with ID: " + requestId);
                     setSubmitting(false, "");
                     showSuccessToast(needsSAC, needsITSO);
                     clearForm();
@@ -965,7 +1177,7 @@ public class RequestorRequestFragment extends Fragment {
 
     private void setSubmitting(boolean submitting, String statusText) {
         btnSubmitRequest.setEnabled(!submitting);
-        btnAddLink.setEnabled(!submitting);
+        btnChooseFiles.setEnabled(!submitting);
         progressSubmit.setVisibility(submitting ? View.VISIBLE : View.GONE);
 
         if (statusText == null || statusText.isEmpty()) {
@@ -1054,8 +1266,8 @@ public class RequestorRequestFragment extends Fragment {
             return false;
         }
 
-        if (proposalLinks.isEmpty()) {
-            Toast.makeText(requireContext(), "Please add at least one proposal link.", Toast.LENGTH_SHORT).show();
+        if (selectedProposalFileUris.isEmpty()) {
+            Toast.makeText(requireContext(), "Please upload at least one PDF or image file.", Toast.LENGTH_SHORT).show();
             return false;
         }
 
@@ -1098,7 +1310,7 @@ public class RequestorRequestFragment extends Fragment {
         selectedActivityType = "Institutional";
         chipGroupFacility.clearCheck();
 
-        proposalLinks.clear();
+        selectedProposalFileUris.clear();
         refreshSelectedFilesUi();
         rebuildScheduleDayCards();
 

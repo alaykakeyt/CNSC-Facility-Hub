@@ -16,7 +16,6 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- TOP BAR -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -64,7 +63,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- STATUS SUMMARY CARD -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardStatusSummary"
             android:layout_width="match_parent"
@@ -147,7 +145,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- REQUESTOR INFORMATION -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -216,7 +213,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- SCHEDULE AND FACILITY -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -276,7 +272,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- PARTICIPANTS AND PURPOSE -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -337,7 +332,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- AMENITIES -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -398,7 +392,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- TECHNICAL REQUIREMENTS -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardTechnicalDetails"
             android:layout_width="match_parent"
@@ -461,7 +454,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- FILE AND ROUTING -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -481,7 +473,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="File and Approval Route"
+                    android:text="Proposal / Supporting Files and Approval Route"
                     android:textColor="#313131"
                     android:textSize="18sp"
                     android:textStyle="bold" />
@@ -497,7 +489,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Proposal File: —"
+                    android:text="Proposal / Supporting Files: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -519,19 +511,6 @@
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnOpenProposal"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:layout_marginTop="16dp"
-                    android:text="Open Proposal File"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold"
-                    app:backgroundTint="#313131"
-                    app:cornerRadius="18dp"
-                    app:elevation="0dp" />
-
                 <LinearLayout
                     android:id="@+id/layoutProposalFiles"
                     android:layout_width="match_parent"
@@ -541,7 +520,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ADMIN REMARKS -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardAdminRemarks"
             android:layout_width="match_parent"

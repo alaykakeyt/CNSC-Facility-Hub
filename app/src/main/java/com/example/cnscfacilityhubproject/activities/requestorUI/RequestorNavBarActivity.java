@@ -1,5 +1,6 @@
 package com.example.cnscfacilityhubproject.activities.requestorUI;
 
+import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -9,12 +10,15 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.activities.LoginActivity;
 import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.example.cnscfacilityhubproject.utils.RoleGuardHelper;
 import com.google.firebase.auth.FirebaseAuth;
@@ -23,20 +27,14 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
-import android.content.Intent;
-import android.widget.ProgressBar;
-import android.widget.Toast;
-
-import com.example.cnscfacilityhubproject.activities.LoginActivity;
-
 public class RequestorNavBarActivity extends AppCompatActivity {
 
-    private LinearLayout navHome, navRequest, navRequests, navNotification, navProfile;
+    private LinearLayout navHome, navRequest, navNotification, navProfile;
 
-    private TextView textHome, textRequest, textRequests, textNotification, textProfile;
+    private TextView textHome, textRequest, textNotification, textProfile;
     private TextView badgeNotification;
 
-    private ImageView iconHome, iconRequest, iconRequests, iconNotification, iconProfile;
+    private ImageView iconHome, iconRequest, iconNotification, iconProfile;
 
     private FirebaseAuth auth;
     private FirebaseFirestore db;
@@ -63,14 +61,12 @@ public class RequestorNavBarActivity extends AppCompatActivity {
         setupNavigationClicks();
         listenForIncomingNotificationBadge();
 
-        // Use RoleGuardHelper to verify role before loading fragments
         ProgressBar progressBar = findViewById(R.id.roleVerificationProgress);
         RoleGuardHelper roleGuard = new RoleGuardHelper(this, progressBar);
-        
+
         roleGuard.verifyAndProceed("Requestor", new RoleGuardHelper.OnRoleVerified() {
             @Override
             public void onSuccess() {
-                // Role verified! Now safe to load fragments
                 if (savedInstanceState == null) {
                     loadFragment(new RequestorHomeFragment());
                     setSelectedTab(Tab.HOME);
@@ -79,7 +75,7 @@ public class RequestorNavBarActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(String message) {
-                // Already handled by RoleGuardHelper (redirected to login)
+                // Already handled by RoleGuardHelper.
             }
         });
     }
@@ -97,19 +93,16 @@ public class RequestorNavBarActivity extends AppCompatActivity {
     private void bindViews() {
         navHome = findViewById(R.id.navHome);
         navRequest = findViewById(R.id.navRequest);
-        navRequests = findViewById(R.id.navRequests);
         navNotification = findViewById(R.id.navNotification);
         navProfile = findViewById(R.id.navProfile);
 
         textHome = findViewById(R.id.textHome);
         textRequest = findViewById(R.id.textRequest);
-        textRequests = findViewById(R.id.textRequests);
         textNotification = findViewById(R.id.textNotification);
         textProfile = findViewById(R.id.textProfile);
 
         iconHome = findViewById(R.id.iconHome);
         iconRequest = findViewById(R.id.iconRequest);
-        iconRequests = findViewById(R.id.iconRequests);
         iconNotification = findViewById(R.id.iconNotification);
         iconProfile = findViewById(R.id.iconProfile);
 
@@ -141,11 +134,6 @@ public class RequestorNavBarActivity extends AppCompatActivity {
         navRequest.setOnClickListener(v -> {
             loadFragment(new RequestorRequestFragment());
             setSelectedTab(Tab.REQUEST);
-        });
-
-        navRequests.setOnClickListener(v -> {
-            loadFragment(new RequestorRequestsFragment());
-            setSelectedTab(Tab.REQUESTS);
         });
 
         navNotification.setOnClickListener(v -> {
@@ -183,6 +171,7 @@ public class RequestorNavBarActivity extends AppCompatActivity {
                             );
                         }
                     }
+
                     updateIncomingBadge(0);
                 });
     }
@@ -216,7 +205,8 @@ public class RequestorNavBarActivity extends AppCompatActivity {
                     int unseenCount = 0;
 
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (RequestDataHelper.shouldShowInRequestList(doc) && RequestDataHelper.isRequestorNotificationUnseen(doc)) {
+                        if (RequestDataHelper.shouldShowInRequestList(doc)
+                                && RequestDataHelper.isRequestorNotificationUnseen(doc)) {
                             unseenCount++;
                         }
                     }
@@ -250,10 +240,6 @@ public class RequestorNavBarActivity extends AppCompatActivity {
                 selectTab(textRequest, iconRequest);
                 break;
 
-            case REQUESTS:
-                selectTab(textRequests, iconRequests);
-                break;
-
             case NOTIFICATION:
                 selectTab(textNotification, iconNotification);
                 break;
@@ -267,7 +253,6 @@ public class RequestorNavBarActivity extends AppCompatActivity {
     private void resetTabs() {
         resetTab(textHome, iconHome);
         resetTab(textRequest, iconRequest);
-        resetTab(textRequests, iconRequests);
         resetTab(textNotification, iconNotification);
         resetTab(textProfile, iconProfile);
     }
@@ -292,7 +277,6 @@ public class RequestorNavBarActivity extends AppCompatActivity {
         }
     }
 
-
     private boolean ensureUserLoggedIn() {
         if (auth.getCurrentUser() != null) {
             return true;
@@ -315,7 +299,6 @@ public class RequestorNavBarActivity extends AppCompatActivity {
     private enum Tab {
         HOME,
         REQUEST,
-        REQUESTS,
         NOTIFICATION,
         PROFILE
     }
