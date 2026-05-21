@@ -34,7 +34,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:alpha="0.85"
-                    android:text="Good Morning"
+                    tools:text="Good Morning"
                     android:textColor="@color/black"
                     android:textSize="14sp" />
 
@@ -43,7 +43,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="Hello, ITSO Staff"
+                    tools:text="Hello, ITSO Staff"
                     android:textColor="#273F4F"
                     android:textSize="26sp"
                     android:textStyle="bold" />
@@ -82,7 +82,7 @@
                     android:layout_marginTop="8dp"
                     android:alpha="0.78"
                     android:lineSpacingExtra="3dp"
-                    android:text="Monitor technical support requests, availability status, and today's recent requests."
+                    android:text="Monitor technical support requests and and today's recent requests."
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -127,7 +127,7 @@
                         android:id="@+id/tvPendingCount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="00"
+                        tools:text="00"
                         android:textColor="#FFFFFF"
                         android:textSize="26sp"
                         android:textStyle="bold" />
@@ -166,7 +166,7 @@
                         android:id="@+id/tvApprovedCount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="00"
+                        tools:text="00"
                         android:textColor="#2E7D32"
                         android:textSize="26sp"
                         android:textStyle="bold" />

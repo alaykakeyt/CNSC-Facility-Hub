@@ -20,7 +20,6 @@ import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
-import com.example.cnscfacilityhubproject.activities.gsoUI.gsoRequestsFragment;
 import com.example.cnscfacilityhubproject.utils.ItsoReminderHelper;
 import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
@@ -30,6 +29,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -44,6 +44,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
     private FirebaseFirestore db;
     private String requestId = "";
+    private ListenerRegistration requestListener;
 
     private MaterialButton btnBack;
     private MaterialButton btnAvailable;
@@ -66,6 +67,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     private TextView tvProposalFile;
     private TextView tvRoute;
     private TextView tvRemarks;
+    private MaterialCardView cardRemarks;
     private LinearLayout layoutProposalFiles;
 
     private final List<DisplayProposalFile> currentProposalFiles = new ArrayList<>();
@@ -94,6 +96,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
         bindViews(view);
         setupButtons();
+        setInitialLabels();
 
         if (TextUtils.isEmpty(requestId)) {
             Toast.makeText(requireContext(), "Request ID not found.", Toast.LENGTH_SHORT).show();
@@ -102,6 +105,16 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         }
 
         loadRequestDetails();
+    }
+
+    @Override
+    public void onDestroyView() {
+        if (requestListener != null) {
+            requestListener.remove();
+            requestListener = null;
+        }
+
+        super.onDestroyView();
     }
 
     private void bindViews(View view) {
@@ -126,6 +139,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         tvProposalFile = view.findViewById(R.id.tvProposalFile);
         tvRoute = view.findViewById(R.id.tvRoute);
         tvRemarks = view.findViewById(R.id.tvRemarks);
+        cardRemarks = view.findViewById(R.id.cardRemarks);
         layoutProposalFiles = view.findViewById(R.id.layoutProposalFiles);
     }
 
@@ -141,25 +155,55 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         );
     }
 
+    private void setInitialLabels() {
+        setPlainText(tvPurpose, "");
+        setPlainText(tvActivityType, "");
+        setChipText(chipStatus, "");
+
+        setLabeledText(tvSchedule, "Schedule:\n", "");
+        setLabeledText(tvFacility, "Facilities: ", "");
+        tvRequestorInfo.setText(
+                labelValue("Name: ", "") +
+                        "\n" + labelValue("Contact: ", "") +
+                        "\n" + labelValue("College / Department: ", "") +
+                        "\n" + labelValue("Office / Course: ", "")
+        );
+        tvParticipants.setText(
+                labelValue("Participants: ", "") +
+                        "\n" + labelValue("Number of Participants: ", "")
+        );
+        setLabeledText(tvPurposeFull, "Purpose: ", "");
+        tvAmenities.setText(buildEmptyAmenitiesText());
+        setLabeledText(tvTechnicalList, "Technical Requirements:\n", "");
+        setLabeledText(tvConnectors, "Connectors / Cables: ", "");
+        setLabeledText(tvProposalFile, "Proposal / Supporting Files: ", "");
+        setLabeledText(tvRoute, "Route: ", "");
+        setLabeledText(tvRemarks, "Remarks: ", "");
+    }
+
     private void loadRequestDetails() {
-        db.collection("requests")
+        if (requestListener != null) {
+            requestListener.remove();
+            requestListener = null;
+        }
+
+        requestListener = db.collection("requests")
                 .document(requestId)
-                .get()
-                .addOnSuccessListener(doc -> {
+                .addSnapshotListener((doc, error) -> {
                     if (!isAdded()) return;
 
-                    if (!doc.exists()) {
+                    if (error != null) {
+                        Toast.makeText(requireContext(), "Failed to load request details.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    if (doc == null || !doc.exists()) {
                         Toast.makeText(requireContext(), "Request not found.", Toast.LENGTH_SHORT).show();
                         goBack();
                         return;
                     }
 
                     displayRequest(doc);
-                })
-                .addOnFailureListener(e -> {
-                    if (!isAdded()) return;
-                    Toast.makeText(requireContext(), "Failed to load request details.", Toast.LENGTH_SHORT).show();
-                    goBack();
                 });
     }
 
@@ -191,37 +235,42 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         String participants = getStringValue(doc, "participants");
         String numberOfParticipants = getLongString(doc, "numberOfParticipants");
         String notificationTarget = getStringValue(doc, "notificationTarget");
+        String scheduleDisplay = cleanDisplayValue(RequestDataHelper.getScheduleDisplay(doc));
+        String facilitiesDisplay = cleanDisplayValue(RequestDataHelper.getFacilitiesDisplay(doc));
         List<DisplayProposalFile> proposalFiles = getProposalFilesFromFirestore(doc);
 
-        chipStatus.setText(displayStatus);
+        setPlainText(tvPurpose, purpose);
+        setPlainText(tvActivityType, activityType);
+        setChipText(chipStatus, displayStatus);
         styleStatusChip(displayStatus);
 
-        tvPurpose.setText(!purpose.isEmpty() ? purpose : "Request Details");
-        tvActivityType.setText(!activityType.isEmpty() ? activityType : "Technical support request");
-        tvSchedule.setText("Schedule:\n" + RequestDataHelper.getScheduleDisplay(doc));
-        tvFacility.setText("Facilities: " + RequestDataHelper.getFacilitiesDisplay(doc));
+        setLabeledText(tvSchedule, "Schedule:\n", scheduleDisplay);
+        setLabeledText(tvFacility, "Facilities: ", facilitiesDisplay);
 
         tvRequestorInfo.setText(
-                "Name: " + fallback(requestorName) +
-                        "\nContact: " + fallback(contactNumber) +
-                        "\nCollege / Department: " + fallback(department) +
-                        "\nOffice / Course: " + fallback(course)
+                labelValue("Name: ", requestorName) +
+                        "\n" + labelValue("Contact: ", contactNumber) +
+                        "\n" + labelValue("College / Department: ", department) +
+                        "\n" + labelValue("Office / Course: ", course)
         );
 
         tvParticipants.setText(
-                "Participants: " + fallback(participants) +
-                        "\nNumber of Participants: " + fallback(numberOfParticipants)
+                labelValue("Participants: ", participants) +
+                        "\n" + labelValue("Number of Participants: ", numberOfParticipants)
         );
 
-        tvPurposeFull.setText("Purpose: " + fallback(purpose));
+        setLabeledText(tvPurposeFull, "Purpose: ", purpose);
         tvAmenities.setText(buildAmenities(doc));
-
-        tvTechnicalList.setText("Technical Requirements:\n" + buildTechnicalList(doc));
-        tvConnectors.setText("Connectors / Cables: " + fallback(getStringValue(doc, "connectors")));
-        tvRoute.setText("Route: " + fallback(notificationTarget));
+        setLabeledText(tvTechnicalList, "Technical Requirements:\n", buildTechnicalList(doc));
+        setLabeledText(tvConnectors, "Connectors / Cables: ", getStringValue(doc, "connectors"));
+        setLabeledText(tvRoute, "Route: ", notificationTarget);
 
         if (tvRemarks != null) {
-            tvRemarks.setText("Remarks: " + fallback(getRemarks(doc)));
+            setLabeledText(tvRemarks, "Remarks: ", getRemarks(doc));
+        }
+
+        if (cardRemarks != null) {
+            cardRemarks.setVisibility(View.VISIBLE);
         }
 
         if (etItsoRemarks != null) {
@@ -260,31 +309,41 @@ public class itsoHomeViewDetailsFragment extends Fragment {
                 file.storageType = getMapString(map, "storageType");
                 file.sizeBytes = getMapLong(map, "sizeBytes");
 
-                if (file.fileName.isEmpty()) {
-                    file.fileName = "Proposal File " + (files.size() + 1);
-                }
                 if (file.mimeType.isEmpty()) {
                     file.mimeType = guessMimeType(file);
                 }
+
                 if (file.fileType.isEmpty()) {
                     file.fileType = guessFileType(file.mimeType, file.fileName);
                 }
+
                 if (file.sizeBytes <= 0 && !file.fileDataBase64.isEmpty()) {
                     file.sizeBytes = estimateBytesFromBase64(file.fileDataBase64);
                 }
 
-                files.add(file);
+                if (hasDisplayValue(file.fileName)
+                        || hasDisplayValue(file.fileUrl)
+                        || hasDisplayValue(file.fileDataBase64)) {
+                    files.add(file);
+                }
             }
         }
 
-        // Legacy support: old single proposalFileUrl field.
         if (files.isEmpty()) {
             String legacyUrl = getStringValue(doc, "proposalFileUrl");
-            if (!legacyUrl.isEmpty()) {
+            String legacyBase64 = getStringValue(doc, "fileDataBase64");
+
+            if (!legacyUrl.isEmpty() || !legacyBase64.isEmpty()) {
                 DisplayProposalFile legacy = new DisplayProposalFile();
-                legacy.fileName = firstNonEmpty(getStringValue(doc, "proposalFileName"), "Proposal File");
+                legacy.fileName = getStringValue(doc, "proposalFileName");
                 legacy.fileUrl = legacyUrl;
-                legacy.mimeType = guessMimeType(legacy);
+                legacy.fileDataBase64 = legacyBase64;
+                legacy.mimeType = getStringValue(doc, "mimeType");
+
+                if (legacy.mimeType.isEmpty()) {
+                    legacy.mimeType = guessMimeType(legacy);
+                }
+
                 legacy.fileType = guessFileType(legacy.mimeType, legacy.fileName);
                 files.add(legacy);
             }
@@ -299,7 +358,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         layoutProposalFiles.removeAllViews();
 
         if (proposalFiles.isEmpty()) {
-            tvProposalFile.setText("Proposal / Supporting Files: none");
+            tvProposalFile.setText("Proposal / Supporting Files: ");
             tvProposalFile.setTextColor(Color.parseColor("#313131"));
             return;
         }
@@ -313,7 +372,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         }
 
         if (hasLocalContentUri) {
-            tvProposalFile.setText("Warning: This request contains local device URIs. Ask the requestor to resubmit using the updated Firestore-only upload.");
+            tvProposalFile.setText("Proposal / Supporting Files: Local device URI detected");
             tvProposalFile.setTextColor(Color.RED);
         } else {
             tvProposalFile.setText("Proposal / Supporting Files: " + proposalFiles.size() + " file(s)");
@@ -349,6 +408,11 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         container.setClickable(true);
         container.setOnClickListener(v -> openProposalFile(file));
 
+        String fileTitle = hasDisplayValue(file.fileName)
+                ? index + ". " + file.fileName
+                : String.valueOf(index) + ".";
+        String fileSubtitle = buildFileSubtitle(file);
+
         TextView details = new TextView(requireContext());
         LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -358,10 +422,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         details.setTextColor(Color.parseColor("#313131"));
         details.setTextSize(13f);
         details.setSingleLine(false);
-        details.setText(
-                index + ". " + file.fileName +
-                        "\n" + buildFileSubtitle(file)
-        );
+        details.setText(hasDisplayValue(fileSubtitle) ? fileTitle + "\n" + fileSubtitle : fileTitle);
         details.setOnClickListener(v -> openProposalFile(file));
 
         TextView tapHint = new TextView(requireContext());
@@ -380,13 +441,19 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     private String buildFileSubtitle(DisplayProposalFile file) {
         List<String> parts = new ArrayList<>();
 
-        if (!file.mimeType.isEmpty()) parts.add(file.mimeType);
-        if (file.sizeBytes > 0) parts.add(formatBytes(file.sizeBytes));
-        if (!file.storageType.isEmpty()) parts.add(file.storageType);
-        else if (file.hasBase64Data()) parts.add("firestore_base64");
-        else if (!file.fileUrl.isEmpty()) parts.add("link/url");
+        if (hasDisplayValue(file.mimeType)
+                && !"application/octet-stream".equalsIgnoreCase(file.mimeType)) {
+            parts.add(file.mimeType);
+        }
 
-        if (parts.isEmpty()) return "File attached";
+        if (file.sizeBytes > 0) {
+            parts.add(formatBytes(file.sizeBytes));
+        }
+
+        if (hasDisplayValue(file.storageType)) {
+            parts.add(file.storageType);
+        }
+
         return TextUtils.join(" • ", parts);
     }
 
@@ -587,21 +654,6 @@ public class itsoHomeViewDetailsFragment extends Fragment {
                 });
     }
 
-    private void openGsoRequestsFragment(String filter) {
-        Bundle bundle = new Bundle();
-        bundle.putString("filter", filter);
-
-        gsoRequestsFragment fragment = new gsoRequestsFragment();
-        fragment.setArguments(bundle);
-
-        requireActivity()
-                .getSupportFragmentManager()
-                .beginTransaction()
-                .replace(R.id.itso_fragment_container, fragment)
-                .addToBackStack(null)
-                .commit();
-    }
-
     private void setActionButtonsEnabled(boolean enabled) {
         btnAvailable.setEnabled(enabled);
         btnNotAvailable.setEnabled(enabled);
@@ -630,20 +682,48 @@ public class itsoHomeViewDetailsFragment extends Fragment {
             return "Approved - Available";
         }
 
-        return "Pending";
+        if (hasDisplayValue(itsoStatus)) {
+            return itsoStatus;
+        }
+
+        if (hasDisplayValue(status)) {
+            return status;
+        }
+
+        return "";
+    }
+
+    private String buildEmptyAmenitiesText() {
+        return labelValue("Tables: ", "") +
+                "\n" + labelValue("Chairs: ", "") +
+                "\n" + labelValue("Other Amenities: ", "");
     }
 
     private String buildAmenities(DocumentSnapshot doc) {
-        boolean tablesRequested = getBooleanValue(doc, "tablesRequested");
-        boolean chairsRequested = getBooleanValue(doc, "chairsRequested");
+        Boolean tablesRequested = getNullableBooleanValue(doc, "tablesRequested");
+        Boolean chairsRequested = getNullableBooleanValue(doc, "chairsRequested");
 
         String tablesCount = getLongString(doc, "tablesCount");
         String chairsCount = getLongString(doc, "chairsCount");
         String otherAmenities = getStringValue(doc, "otherAmenities");
 
-        return "Tables: " + (tablesRequested ? "Requested (" + fallback(tablesCount) + ")" : "Not requested") +
-                "\nChairs: " + (chairsRequested ? "Requested (" + fallback(chairsCount) + ")" : "Not requested") +
-                "\nOther Amenities: " + fallback(otherAmenities);
+        String tablesValue = "";
+        if (tablesRequested != null) {
+            tablesValue = tablesRequested
+                    ? "Requested" + (hasDisplayValue(tablesCount) ? " (" + tablesCount + ")" : "")
+                    : "Not requested";
+        }
+
+        String chairsValue = "";
+        if (chairsRequested != null) {
+            chairsValue = chairsRequested
+                    ? "Requested" + (hasDisplayValue(chairsCount) ? " (" + chairsCount + ")" : "")
+                    : "Not requested";
+        }
+
+        return labelValue("Tables: ", tablesValue) +
+                "\n" + labelValue("Chairs: ", chairsValue) +
+                "\n" + labelValue("Other Amenities: ", otherAmenities);
     }
 
     private String buildTechnicalList(DocumentSnapshot doc) {
@@ -660,15 +740,27 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         if (getBooleanValue(doc, "tripod")) selected.add("Tripod");
         if (getBooleanValue(doc, "multimediaProjector")) selected.add("Multimedia Projector");
 
-        if (selected.isEmpty()) return "None";
+        String directTechnicals = firstNonEmpty(
+                getStringValue(doc, "selectedTechnicals"),
+                getStringValue(doc, "technicalRequirements")
+        );
 
-        StringBuilder builder = new StringBuilder();
-
-        for (String item : selected) {
-            builder.append("• ").append(item).append("\n");
+        if (hasDisplayValue(directTechnicals)) {
+            selected.add(directTechnicals);
         }
 
-        return builder.toString().trim();
+        StringBuilder builder = new StringBuilder();
+        for (String item : selected) {
+            if (!hasDisplayValue(item)) continue;
+
+            if (builder.length() > 0) {
+                builder.append("\n");
+            }
+
+            builder.append("• ").append(item.trim());
+        }
+
+        return builder.toString();
     }
 
     private String getRemarks(DocumentSnapshot doc) {
@@ -685,6 +777,8 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     }
 
     private void styleStatusChip(String status) {
+        if (chipStatus == null) return;
+
         if ("Approved - Available".equalsIgnoreCase(status)
                 || "Available".equalsIgnoreCase(status)) {
             chipStatus.setTextColor(Color.parseColor("#2E7D32"));
@@ -699,6 +793,28 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         }
     }
 
+    private void setPlainText(TextView textView, String value) {
+        if (textView == null) return;
+        textView.setText(cleanDisplayValue(value));
+    }
+
+    private void setLabeledText(TextView textView, String label, String value) {
+        if (textView == null) return;
+        textView.setText(labelValue(label, value));
+    }
+
+    private String labelValue(String label, String value) {
+        return label + cleanDisplayValue(value);
+    }
+
+    private void setChipText(Chip chip, String value) {
+        if (chip == null) return;
+
+        String cleaned = cleanDisplayValue(value);
+        chip.setText(cleaned);
+        chip.setVisibility(cleaned.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
     private String getText(TextInputEditText editText) {
         return editText != null && editText.getText() != null
                 ? editText.getText().toString().trim()
@@ -706,6 +822,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     }
 
     private String getStringValue(DocumentSnapshot doc, String field) {
+        if (doc == null || field == null) return "";
         Object value = doc.get(field);
         return value == null ? "" : String.valueOf(value).trim();
     }
@@ -715,9 +832,30 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         return Boolean.TRUE.equals(value);
     }
 
+    private Boolean getNullableBooleanValue(DocumentSnapshot doc, String field) {
+        if (doc == null || field == null || !doc.contains(field)) {
+            return null;
+        }
+
+        Object value = doc.get(field);
+
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+
+        if (value instanceof String) {
+            String text = ((String) value).trim();
+
+            if ("true".equalsIgnoreCase(text)) return true;
+            if ("false".equalsIgnoreCase(text)) return false;
+        }
+
+        return null;
+    }
+
     private String getLongString(DocumentSnapshot doc, String field) {
         Object value = doc.get(field);
-        return value == null ? "" : String.valueOf(value);
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private String getMapString(Map<?, ?> map, String key) {
@@ -744,8 +882,31 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         return "";
     }
 
-    private String fallback(String value) {
-        return value != null && !value.trim().isEmpty() ? value.trim() : "—";
+    private String cleanDisplayValue(String value) {
+        if (value == null) return "";
+
+        String cleaned = value.trim();
+        if (cleaned.isEmpty()) return "";
+
+        String lower = cleaned.toLowerCase(Locale.US);
+        if (cleaned.equals("—")
+                || cleaned.equals("-")
+                || lower.equals("null")
+                || lower.equals("none")
+                || lower.equals("n/a")
+                || lower.equals("not available")
+                || lower.equals("not set")
+                || lower.equals("no schedule")
+                || lower.equals("no facility")
+                || lower.equals("no facilities")) {
+            return "";
+        }
+
+        return cleaned;
+    }
+
+    private boolean hasDisplayValue(String value) {
+        return !cleanDisplayValue(value).isEmpty();
     }
 
     private String guessMimeType(DisplayProposalFile file) {
@@ -794,8 +955,15 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     }
 
     private String sanitizeFileName(String name) {
-        if (name == null || name.trim().isEmpty()) return "proposal_file";
-        return name.replaceAll("[^a-zA-Z0-9._-]", "_");
+        String safeName = name == null || name.trim().isEmpty()
+                ? requestId
+                : name.trim();
+
+        if (safeName.isEmpty()) {
+            safeName = String.valueOf(System.currentTimeMillis());
+        }
+
+        return safeName.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
     private boolean hasFileExtension(String name) {

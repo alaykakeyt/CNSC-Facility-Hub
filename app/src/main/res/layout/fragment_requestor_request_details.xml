@@ -473,7 +473,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Proposal / Supporting Files and Approval Route"
+                    android:text="Proposal"
                     android:textColor="#313131"
                     android:textSize="18sp"
                     android:textStyle="bold" />
@@ -484,32 +484,7 @@
                     android:layout_marginTop="12dp"
                     android:background="#E6E1D2" />
 
-                <TextView
-                    android:id="@+id/tvDetailProposalFileName"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    tools:text="Proposal / Supporting Files: —"
-                    android:textColor="#313131"
-                    android:textSize="14sp" />
 
-                <TextView
-                    android:id="@+id/tvDetailNotificationTarget"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    tools:text="Sent To: —"
-                    android:textColor="#313131"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/tvDetailAgreement"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    tools:text="Agreement Accepted: —"
-                    android:textColor="#313131"
-                    android:textSize="14sp" />
 
                 <LinearLayout
                     android:id="@+id/layoutProposalFiles"
@@ -557,18 +532,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnBackBottom"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="20dp"
-            android:text="Back to Notifications"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            app:backgroundTint="#970705"
-            app:cornerRadius="18dp"
-            app:elevation="0dp" />
+
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

@@ -26,6 +26,7 @@
                 android:id="@+id/btnBack"
                 android:layout_width="46dp"
                 android:layout_height="46dp"
+                android:contentDescription="Back"
                 android:text="‹"
                 android:textColor="#313131"
                 android:textSize="28sp"
@@ -91,10 +92,10 @@
                             android:id="@+id/tvPurpose"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Request Details"
                             android:textColor="#FFFFFF"
                             android:textSize="22sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            tools:text="Purpose from Firestore" />
 
                         <TextView
                             android:id="@+id/tvActivityType"
@@ -102,19 +103,19 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="5dp"
                             android:alpha="0.88"
-                            android:text="Student Center booking request"
                             android:textColor="#FFFFFF"
-                            android:textSize="13sp" />
+                            android:textSize="13sp"
+                            tools:text="Activity type from Firestore" />
                     </LinearLayout>
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chipStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Pending"
                         android:textStyle="bold"
                         app:chipBackgroundColor="#FFFFFF"
-                        app:chipCornerRadius="18dp" />
+                        app:chipCornerRadius="18dp"
+                        tools:text="Status" />
                 </LinearLayout>
 
                 <TextView
@@ -122,19 +123,19 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Schedule: —"
                     android:textColor="#FFFFFF"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Schedule:\nMay 1, 2026 • 8:00 AM - 5:00 PM" />
 
                 <TextView
                     android:id="@+id/tvFacility"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="5dp"
-                    android:text="Facility: —"
                     android:textColor="#FFFFFF"
                     android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    tools:text="Facilities: Student Center" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -162,15 +163,21 @@
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:background="#E6E1D2" />
+
                 <TextView
                     android:id="@+id/tvRequestorInfo"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Name: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Name: Juan Dela Cruz\nContact: 09123456789\nCollege / Department: CCS\nOffice / Course: BSIT" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -197,6 +204,11 @@
                     android:textColor="#313131"
                     android:textSize="18sp"
                     android:textStyle="bold" />
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:background="#E6E1D2" />
 
                 <TextView
                     android:id="@+id/tvParticipants"
@@ -204,9 +216,10 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Participants: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Participants: Students\nNumber of Participants: 50" />
+
 
                 <TextView
                     android:id="@+id/tvPurposeFull"
@@ -214,9 +227,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Purpose: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Purpose: Seminar" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -244,15 +257,21 @@
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:background="#E6E1D2" />
+
                 <TextView
                     android:id="@+id/tvAmenities"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Amenities: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Tables: Requested (10)\nChairs: Requested (50)\nOther Amenities: Podium" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -279,6 +298,11 @@
                     android:textColor="#313131"
                     android:textSize="18sp"
                     android:textStyle="bold" />
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:background="#E6E1D2" />
 
                 <TextView
                     android:id="@+id/tvTechnicalList"
@@ -286,18 +310,18 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Technical Requirements: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Technical Requirements:\n• Microphones\n• Multimedia Projector" />
 
                 <TextView
                     android:id="@+id/tvConnectors"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Connectors / Cables: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Connectors / Cables: HDMI" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -320,28 +344,17 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Proposal / Supporting Files and Route"
+                    android:text="Proposal"
                     android:textColor="#313131"
                     android:textSize="18sp"
                     android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvProposalFile"
+                <View
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="1dp"
                     android:layout_marginTop="12dp"
-                    android:text="Proposal / Supporting Files: — Tap a file below to open it."
-                    android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:background="#E6E1D2" />
 
-                <TextView
-                    android:id="@+id/tvRoute"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Route: —"
-                    android:textColor="#313131"
-                    android:textSize="14sp" />
+
 
                 <LinearLayout
                     android:id="@+id/layoutProposalFiles"

@@ -16,54 +16,37 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <com.google.android.material.card.MaterialCardView
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilNotificationFilter"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
-            app:cardBackgroundColor="#FFFFFF"
-            app:cardCornerRadius="26dp"
-            app:cardElevation="8dp"
-            app:strokeColor="#313131"
-            app:strokeWidth="1dp">
+            android:hint="Select status"
+            app:boxBackgroundColor="#FFFFFF"
+            app:boxCornerRadiusBottomEnd="18dp"
+            app:boxCornerRadiusBottomStart="18dp"
+            app:boxCornerRadiusTopEnd="18dp"
+            app:boxCornerRadiusTopStart="18dp"
+            app:boxStrokeColor="#313131"
+            app:endIconTint="#970705"
+            app:hintTextColor="#313131"
+            app:startIconDrawable="@android:drawable/ic_menu_sort_by_size"
+            app:startIconTint="#970705">
 
-            <LinearLayout
+            <AutoCompleteTextView
+                android:id="@+id/actvNotificationFilter"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="18dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Incoming Bookings"
-                    android:textColor="#313131"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvIncomingCount"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="0 incoming booking requests"
-                    android:textColor="#970705"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <FrameLayout
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:layout_marginTop="6dp">
-
-                    <TextView
-                        android:id="@+id/badgeNotification"
-                        android:layout_width="8dp"
-                        android:layout_height="8dp"
-                        android:text="0"
-                        android:visibility="gone" />
-                </FrameLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+                android:background="@null"
+                android:clickable="true"
+                android:focusable="false"
+                android:inputType="none"
+                android:paddingTop="16dp"
+                android:paddingBottom="16dp"
+                android:textColor="#313131"
+                android:textSize="15sp" />
+        </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
             android:id="@+id/layoutEmptyState"
@@ -101,7 +84,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="No incoming bookings"
+                        android:text="No incoming ITSO requests"
                         android:textColor="#313131"
                         android:textSize="17sp"
                         android:textStyle="bold" />
@@ -124,15 +107,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:orientation="vertical">
+            android:animateLayoutChanges="true"
+            android:orientation="vertical" />
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recyclerViewNotifications"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false"
-                tools:itemCount="3"
-                tools:listitem="@layout/item_itso_notification" />
-        </LinearLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

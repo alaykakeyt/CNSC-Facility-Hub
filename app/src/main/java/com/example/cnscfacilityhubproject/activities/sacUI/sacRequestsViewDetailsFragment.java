@@ -26,9 +26,12 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Source;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -42,6 +45,7 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     private static final String ARG_REQUEST_ID = "requestId";
 
     private FirebaseFirestore db;
+    private ListenerRegistration requestListener;
     private String requestId = "";
 
     private MaterialButton btnBack;
@@ -62,8 +66,6 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     private TextView tvAmenities;
     private TextView tvTechnicalList;
     private TextView tvConnectors;
-    private TextView tvProposalFile;
-    private TextView tvRoute;
     private LinearLayout layoutProposalFiles;
 
     private final List<DisplayProposalFile> currentProposalFiles = new ArrayList<>();
@@ -91,6 +93,7 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         }
 
         bindViews(view);
+        clearRequestDataViews();
         setupButtons();
 
         if (TextUtils.isEmpty(requestId)) {
@@ -121,9 +124,34 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         tvAmenities = view.findViewById(R.id.tvAmenities);
         tvTechnicalList = view.findViewById(R.id.tvTechnicalList);
         tvConnectors = view.findViewById(R.id.tvConnectors);
-        tvProposalFile = view.findViewById(R.id.tvProposalFile);
-        tvRoute = view.findViewById(R.id.tvRoute);
+
+        // ADD THESE TWO
+
         layoutProposalFiles = view.findViewById(R.id.layoutProposalFiles);
+    }
+
+    private void clearRequestDataViews() {
+        setHeaderValue(tvPurpose, "");
+        setHeaderValue(tvActivityType, "");
+        setStatusChip("");
+
+        setLabelValue(tvSchedule, "Schedule", "", true);
+        setLabelValue(tvFacility, "Facilities", "", false);
+        tvRequestorInfo.setText(buildRequestorInfoText("", "", "", ""));
+        tvParticipants.setText(buildParticipantsText("", ""));
+        setLabelValue(tvPurposeFull, "Purpose", "", false);
+        tvAmenities.setText(buildAmenitiesText("", "", ""));
+        setLabelValue(tvTechnicalList, "Technical Requirements", "", true);
+        setLabelValue(tvConnectors, "Connectors / Cables", "", false);
+
+
+        if (layoutProposalFiles != null) {
+            layoutProposalFiles.removeAllViews();
+        }
+
+        if (layoutApprovalActions != null) {
+            layoutApprovalActions.setVisibility(View.GONE);
+        }
     }
 
     private void setupButtons() {
@@ -132,26 +160,47 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         btnReject.setOnClickListener(v -> rejectRequest());
     }
 
+    @Override
+    public void onDestroyView() {
+        if (requestListener != null) {
+            requestListener.remove();
+            requestListener = null;
+        }
+
+        super.onDestroyView();
+    }
+
     private void loadRequestDetails() {
-        db.collection("requests")
-                .document(requestId)
-                .get()
+        DocumentReference requestRef = db.collection("requests").document(requestId);
+
+        requestRef.get(Source.CACHE)
                 .addOnSuccessListener(doc -> {
                     if (!isAdded()) return;
 
-                    if (!doc.exists()) {
-                        Toast.makeText(requireContext(), "Request not found.", Toast.LENGTH_SHORT).show();
-                        goBack();
-                        return;
+                    if (doc.exists()) {
+                        displayRequest(doc);
                     }
-
-                    displayRequest(doc);
-                })
-                .addOnFailureListener(e -> {
-                    if (!isAdded()) return;
-                    Toast.makeText(requireContext(), "Failed to load request details.", Toast.LENGTH_SHORT).show();
-                    goBack();
                 });
+
+        if (requestListener != null) {
+            requestListener.remove();
+        }
+
+        requestListener = requestRef.addSnapshotListener((doc, error) -> {
+            if (!isAdded()) return;
+
+            if (error != null) {
+                Toast.makeText(requireContext(), "Failed to load request details.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (doc != null && doc.exists()) {
+                displayRequest(doc);
+            } else {
+                Toast.makeText(requireContext(), "Request not found.", Toast.LENGTH_SHORT).show();
+                goBack();
+            }
+        });
     }
 
     private void displayRequest(DocumentSnapshot doc) {
@@ -166,33 +215,24 @@ public class sacRequestsViewDetailsFragment extends Fragment {
 
         String participants = getStringValue(doc, "participants");
         String numberOfParticipants = getLongString(doc, "numberOfParticipants");
+        String schedule = cleanGeneratedValue(RequestDataHelper.getScheduleDisplay(doc));
+        String facilities = cleanGeneratedValue(RequestDataHelper.getFacilitiesDisplay(doc));
+        String connectors = getStringValue(doc, "connectors");
         List<DisplayProposalFile> proposalFiles = getProposalFilesFromFirestore(doc);
 
-        chipStatus.setText(displayStatus);
-        styleStatusChip(displayStatus);
+        setHeaderValue(tvPurpose, purpose);
+        setHeaderValue(tvActivityType, activityType);
+        setStatusChip(displayStatus);
 
-        tvPurpose.setText(!purpose.isEmpty() ? purpose : "Request Details");
-        tvActivityType.setText(!activityType.isEmpty() ? activityType : "Student Center booking request");
-        tvSchedule.setText("Schedule:\n" + RequestDataHelper.getScheduleDisplay(doc));
-        tvFacility.setText("Facilities: " + RequestDataHelper.getFacilitiesDisplay(doc));
-
-        tvRequestorInfo.setText(
-                "Name: " + fallback(requestorName) +
-                        "\nContact: " + fallback(contactNumber) +
-                        "\nCollege / Department: " + fallback(department) +
-                        "\nOffice / Course: " + fallback(course)
-        );
-
-        tvParticipants.setText(
-                "Participants: " + fallback(participants) +
-                        "\nNumber of Participants: " + fallback(numberOfParticipants)
-        );
-
-        tvPurposeFull.setText("Purpose: " + fallback(purpose));
+        setLabelValue(tvSchedule, "Schedule", schedule, true);
+        setLabelValue(tvFacility, "Facilities", facilities, false);
+        tvRequestorInfo.setText(buildRequestorInfoText(requestorName, contactNumber, department, course));
+        tvParticipants.setText(buildParticipantsText(participants, numberOfParticipants));
+        setLabelValue(tvPurposeFull, "Purpose", purpose, false);
         tvAmenities.setText(buildAmenities(doc));
-        tvTechnicalList.setText("Technical Requirements:\n" + buildTechnicalList(doc));
-        tvConnectors.setText("Connectors / Cables: " + fallback(getStringValue(doc, "connectors")));
-        tvRoute.setText(buildRouteText(doc));
+        setLabelValue(tvTechnicalList, "Technical Requirements", buildTechnicalList(doc), true);
+        setLabelValue(tvConnectors, "Connectors / Cables", connectors, false);
+
 
         if (etSacRemarks != null) {
             etSacRemarks.setText(getStringValue(doc, "sacRemarks"));
@@ -228,9 +268,6 @@ public class sacRequestsViewDetailsFragment extends Fragment {
                 file.storageType = getMapString(map, "storageType");
                 file.sizeBytes = getMapLong(map, "sizeBytes");
 
-                if (file.fileName.isEmpty()) {
-                    file.fileName = "Proposal File " + (files.size() + 1);
-                }
                 if (file.mimeType.isEmpty()) {
                     file.mimeType = guessMimeType(file);
                 }
@@ -245,12 +282,11 @@ public class sacRequestsViewDetailsFragment extends Fragment {
             }
         }
 
-        // Legacy support: old single proposalFileUrl field.
         if (files.isEmpty()) {
             String legacyUrl = getStringValue(doc, "proposalFileUrl");
             if (!legacyUrl.isEmpty()) {
                 DisplayProposalFile legacy = new DisplayProposalFile();
-                legacy.fileName = firstNonEmpty(getStringValue(doc, "proposalFileName"), "Proposal File");
+                legacy.fileName = getStringValue(doc, "proposalFileName");
                 legacy.fileUrl = legacyUrl;
                 legacy.mimeType = guessMimeType(legacy);
                 legacy.fileType = guessFileType(legacy.mimeType, legacy.fileName);
@@ -264,11 +300,12 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     private void bindProposalFiles(List<DisplayProposalFile> proposalFiles) {
         currentProposalFiles.clear();
         currentProposalFiles.addAll(proposalFiles);
+
+        if (layoutProposalFiles == null) return;
+
         layoutProposalFiles.removeAllViews();
 
         if (proposalFiles.isEmpty()) {
-            tvProposalFile.setText("Proposal / Supporting Files: none");
-            tvProposalFile.setTextColor(Color.parseColor("#313131"));
             return;
         }
 
@@ -281,11 +318,12 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         }
 
         if (hasLocalContentUri) {
-            tvProposalFile.setText("Warning: This request contains local device URIs. Ask the requestor to resubmit using the updated Firestore-only upload.");
-            tvProposalFile.setTextColor(Color.RED);
-        } else {
-            tvProposalFile.setText("Proposal / Supporting Files: " + proposalFiles.size() + " file(s). Tap a file below to open it.");
-            tvProposalFile.setTextColor(Color.parseColor("#313131"));
+            TextView warning = new TextView(requireContext());
+            warning.setText("This request contains local device URIs. Ask the requestor to resubmit using the updated Firestore-only upload.");
+            warning.setTextColor(Color.RED);
+            warning.setTextSize(14f);
+            warning.setPadding(0, 0, 0, dp(8));
+            layoutProposalFiles.addView(warning);
         }
 
         for (int i = 0; i < proposalFiles.size(); i++) {
@@ -320,19 +358,14 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         container.setOnClickListener(v -> openProposalFile(file));
 
         TextView details = new TextView(requireContext());
-        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(
+        details.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        details.setLayoutParams(detailParams);
+        ));
         details.setTextColor(Color.parseColor("#313131"));
         details.setTextSize(13f);
         details.setSingleLine(false);
-        details.setText(
-                index + ". " + file.fileName +
-                        "\n" + buildFileSubtitle(file) +
-                        "\nTap to open"
-        );
+        details.setText(buildProposalFileRowText(file, index));
         details.setOnClickListener(v -> openProposalFile(file));
 
         container.addView(details);
@@ -340,16 +373,32 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         return row;
     }
 
+    private String buildProposalFileRowText(DisplayProposalFile file, int index) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(index).append(".");
+
+        if (file != null && !safeText(file.fileName).isEmpty()) {
+            builder.append(" ").append(safeText(file.fileName));
+        }
+
+        String subtitle = buildFileSubtitle(file);
+        if (!subtitle.isEmpty()) {
+            builder.append("\n").append(subtitle);
+        }
+
+        builder.append("\nTap to open");
+        return builder.toString();
+    }
+
     private String buildFileSubtitle(DisplayProposalFile file) {
+        if (file == null) return "";
+
         List<String> parts = new ArrayList<>();
 
-        if (!file.mimeType.isEmpty()) parts.add(file.mimeType);
+        if (!safeText(file.mimeType).isEmpty()) parts.add(safeText(file.mimeType));
         if (file.sizeBytes > 0) parts.add(formatBytes(file.sizeBytes));
-        if (!file.storageType.isEmpty()) parts.add(file.storageType);
-        else if (file.hasBase64Data()) parts.add("firestore_base64");
-        else if (!file.fileUrl.isEmpty()) parts.add("link/url");
+        if (!safeText(file.storageType).isEmpty()) parts.add(safeText(file.storageType));
 
-        if (parts.isEmpty()) return "File attached";
         return TextUtils.join(" • ", parts);
     }
 
@@ -641,22 +690,29 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         String sacStatus = getStringValue(doc, "sacStatus");
         String status = getStringValue(doc, "status");
 
-        if ("Rejected".equalsIgnoreCase(sacStatus)
-                || "Rejected".equalsIgnoreCase(status)) {
+        if ("Rejected".equalsIgnoreCase(sacStatus) || "Rejected".equalsIgnoreCase(status)) {
             return "Rejected";
         }
 
-        if ("Approved".equalsIgnoreCase(sacStatus)) {
-            return "Approved";
-        }
-
-        if ("Pending".equalsIgnoreCase(sacStatus)
-                || "Pending".equalsIgnoreCase(status)
-                || status.isEmpty()) {
-            return "Pending";
+        if (!sacStatus.isEmpty()) {
+            return sacStatus;
         }
 
         return status;
+    }
+
+    private void setStatusChip(String status) {
+        String cleanStatus = safeText(status);
+
+        if (cleanStatus.isEmpty()) {
+            chipStatus.setText("");
+            chipStatus.setVisibility(View.GONE);
+            return;
+        }
+
+        chipStatus.setVisibility(View.VISIBLE);
+        chipStatus.setText(cleanStatus);
+        styleStatusChip(cleanStatus);
     }
 
     private void styleStatusChip(String status) {
@@ -679,39 +735,55 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     }
 
     private String buildRouteText(DocumentSnapshot doc) {
-        String notificationTarget = getStringValue(doc, "notificationTarget");
-        String sacStatus = getStringValue(doc, "sacStatus");
+        StringBuilder builder = new StringBuilder("Route:");
 
-        if ("Approved".equalsIgnoreCase(sacStatus)) {
-            if ("ITSO".equalsIgnoreCase(notificationTarget)) {
-                return "Route: Requestor → SAC Approved → ITSO → GSO";
-            }
-
-            if ("GSO".equalsIgnoreCase(notificationTarget)) {
-                return "Route: Requestor → SAC Approved → GSO";
-            }
-
-            return "Route: Requestor → SAC Approved";
+        if (doc == null) {
+            return builder.toString();
         }
 
-        return "Route: Requestor → SAC Approval → GSO / ITSO";
+        String workflowStage = getStringValue(doc, "workflowStage");
+        String notificationTarget = getStringValue(doc, "notificationTarget");
+        String sacStatus = getStringValue(doc, "sacStatus");
+        String itsoStatus = getStringValue(doc, "itsoStatus");
+        String gsoStatus = getStringValue(doc, "gsoStatus");
+        String status = getStringValue(doc, "status");
+
+        appendLabelLine(builder, "Workflow Stage", workflowStage);
+        appendLabelLine(builder, "Current Target", notificationTarget);
+        appendLabelLine(builder, "SAC Status", sacStatus);
+        appendLabelLine(builder, "ITSO Status", itsoStatus);
+        appendLabelLine(builder, "GSO Status", gsoStatus);
+        appendLabelLine(builder, "Overall Status", status);
+
+        return builder.toString();
     }
 
     private String buildAmenities(DocumentSnapshot doc) {
-        boolean tablesRequested = getBooleanValue(doc, "tablesRequested");
-        boolean chairsRequested = getBooleanValue(doc, "chairsRequested");
-
-        String tablesCount = getLongString(doc, "tablesCount");
-        String chairsCount = getLongString(doc, "chairsCount");
+        String tables = buildRequestedValue(doc, "tablesRequested", getLongString(doc, "tablesCount"));
+        String chairs = buildRequestedValue(doc, "chairsRequested", getLongString(doc, "chairsCount"));
         String otherAmenities = getStringValue(doc, "otherAmenities");
 
-        return "Tables: " + (tablesRequested
-                ? "Requested (" + fallback(tablesCount) + ")"
-                : "Not requested") +
-                "\nChairs: " + (chairsRequested
-                ? "Requested (" + fallback(chairsCount) + ")"
-                : "Not requested") +
-                "\nOther Amenities: " + fallback(otherAmenities);
+        return buildAmenitiesText(tables, chairs, otherAmenities);
+    }
+
+    private String buildAmenitiesText(String tables, String chairs, String otherAmenities) {
+        return "Tables: " + safeText(tables) +
+                "\nChairs: " + safeText(chairs) +
+                "\nOther Amenities: " + safeText(otherAmenities);
+    }
+
+    private String buildRequestedValue(DocumentSnapshot doc, String requestedField, String count) {
+        if (!doc.contains(requestedField)) {
+            return "";
+        }
+
+        Boolean requested = doc.getBoolean(requestedField);
+        if (Boolean.TRUE.equals(requested)) {
+            String cleanCount = safeText(count);
+            return cleanCount.isEmpty() ? "Requested" : "Requested (" + cleanCount + ")";
+        }
+
+        return "Not requested";
     }
 
     private String buildTechnicalList(DocumentSnapshot doc) {
@@ -727,7 +799,7 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         if (getBooleanValue(doc, "tripod")) selected.add("Tripod");
         if (getBooleanValue(doc, "multimediaProjector")) selected.add("Multimedia Projector");
 
-        if (selected.isEmpty()) return "None";
+        if (selected.isEmpty()) return "";
 
         StringBuilder builder = new StringBuilder();
         for (String item : selected) builder.append("• ").append(item).append("\n");
@@ -735,11 +807,16 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     }
 
     private String buildSchedule(String startDate, String endDate, String startTime, String endTime) {
-        return buildDate(startDate, endDate) + " • " + buildTime(startTime, endTime);
+        String date = buildDate(startDate, endDate);
+        String time = buildTime(startTime, endTime);
+
+        if (!date.isEmpty() && !time.isEmpty()) return date + " • " + time;
+        if (!date.isEmpty()) return date;
+        return time;
     }
 
     private String buildDate(String startDate, String endDate) {
-        if (startDate.isEmpty() && endDate.isEmpty()) return "No date";
+        if (startDate.isEmpty() && endDate.isEmpty()) return "";
         if (!startDate.isEmpty() && !endDate.isEmpty() && !startDate.equalsIgnoreCase(endDate)) {
             return startDate + " - " + endDate;
         }
@@ -747,7 +824,7 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     }
 
     private String buildTime(String startTime, String endTime) {
-        if (startTime.isEmpty() && endTime.isEmpty()) return "No time";
+        if (startTime.isEmpty() && endTime.isEmpty()) return "";
         if (!startTime.isEmpty() && !endTime.isEmpty()) return startTime + " - " + endTime;
         return !startTime.isEmpty() ? startTime : endTime;
     }
@@ -763,12 +840,86 @@ public class sacRequestsViewDetailsFragment extends Fragment {
         return facility;
     }
 
+    private void setHeaderValue(TextView textView, String value) {
+        if (textView == null) return;
+
+        String cleanValue = safeText(value);
+        textView.setText(cleanValue);
+        textView.setVisibility(cleanValue.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    private void setLabelValue(TextView textView, String label, String value, boolean multiline) {
+        if (textView == null) return;
+
+        String cleanLabel = safeText(label);
+        String cleanValue = safeText(value);
+        String separator = multiline ? ":\n" : ": ";
+
+        if (cleanValue.isEmpty()) {
+            textView.setText(cleanLabel + ":");
+        } else {
+            textView.setText(cleanLabel + separator + cleanValue);
+        }
+    }
+
+    private String buildRequestorInfoText(String requestorName, String contactNumber, String department, String course) {
+        StringBuilder builder = new StringBuilder();
+        appendFixedLabelLine(builder, "Name", requestorName);
+        appendFixedLabelLine(builder, "Contact", contactNumber);
+        appendFixedLabelLine(builder, "College / Department", department);
+        appendFixedLabelLine(builder, "Office / Course", course);
+        return builder.toString();
+    }
+
+    private String buildParticipantsText(String participants, String numberOfParticipants) {
+        StringBuilder builder = new StringBuilder();
+        appendFixedLabelLine(builder, "Participants", participants);
+        appendFixedLabelLine(builder, "Number of Participants", numberOfParticipants);
+        return builder.toString();
+    }
+
+    private void appendFixedLabelLine(StringBuilder builder, String label, String value) {
+        if (builder.length() > 0) {
+            builder.append("\n");
+        }
+
+        builder.append(label).append(": ").append(safeText(value));
+    }
+
+    private void appendLabelLine(StringBuilder builder, String label, String value) {
+        String cleanValue = safeText(value);
+        if (cleanValue.isEmpty()) return;
+
+        builder.append("\n").append(label).append(": ").append(cleanValue);
+    }
+
+    private String cleanGeneratedValue(String value) {
+        String clean = safeText(value);
+        if (clean.isEmpty()) return "";
+
+        String lower = clean.toLowerCase(Locale.US);
+        if ("—".equals(clean)
+                || "-".equals(clean)
+                || "none".equals(lower)
+                || "no date".equals(lower)
+                || "no time".equals(lower)
+                || "no schedule".equals(lower)
+                || "no facility".equals(lower)
+                || "no facilities".equals(lower)) {
+            return "";
+        }
+
+        return clean;
+    }
+
     private String getMapString(Map<?, ?> map, String key) {
+        if (map == null || key == null) return "";
         Object value = map.get(key);
         return value == null ? "" : String.valueOf(value).trim();
     }
 
     private long getMapLong(Map<?, ?> map, String key) {
+        if (map == null || key == null) return 0;
         Object value = map.get(key);
         if (value instanceof Number) return ((Number) value).longValue();
         if (value != null) {
@@ -829,8 +980,9 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     }
 
     private String sanitizeFileName(String name) {
-        if (name == null || name.trim().isEmpty()) return "proposal_file";
-        return name.replaceAll("[^a-zA-Z0-9._-]", "_");
+        String cleanName = safeText(name);
+        if (cleanName.isEmpty()) return "proposal_file";
+        return cleanName.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
     private boolean hasFileExtension(String name) {
@@ -852,16 +1004,19 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     }
 
     private boolean getBooleanValue(DocumentSnapshot doc, String field) {
+        if (doc == null || field == null) return false;
         Boolean value = doc.getBoolean(field);
         return Boolean.TRUE.equals(value);
     }
 
     private String getLongString(DocumentSnapshot doc, String field) {
+        if (doc == null || field == null) return "";
         Object value = doc.get(field);
-        return value == null ? "" : String.valueOf(value);
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private String getStringValue(DocumentSnapshot doc, String field) {
+        if (doc == null || field == null) return "";
         Object value = doc.get(field);
         return value == null ? "" : String.valueOf(value).trim();
     }
@@ -872,8 +1027,8 @@ public class sacRequestsViewDetailsFragment extends Fragment {
                 : "";
     }
 
-    private String fallback(String value) {
-        return value == null || value.trim().isEmpty() ? "—" : value.trim();
+    private String safeText(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private String firstNonEmpty(String first, String second) {

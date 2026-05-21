@@ -63,7 +63,7 @@ import android.os.Environment;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
-
+import com.google.firebase.firestore.FieldValue;
 public class RequestorRequestFragment extends Fragment {
 
     // Firestore has a 1 MiB maximum document size.
@@ -1137,7 +1137,7 @@ public class RequestorRequestFragment extends Fragment {
                         || !getText(etConnectors).isEmpty()
         );
 
-        boolean needsSAC = RequestDataHelper.hasStudentCenter(facilityNames);
+        boolean needsSAC = isStudentCenterSelected(facilityNames);
 
         boolean sendToSAC = false;
         boolean sendToITSO = false;
@@ -1167,9 +1167,11 @@ public class RequestorRequestFragment extends Fragment {
         if (!participantsCountText.isEmpty()) {
             numberOfParticipants = Long.parseLong(participantsCountText);
         }
+
         if (cbTables.isChecked() && !getText(etTablesCount).isEmpty()) {
             tablesCount = Long.parseLong(getText(etTablesCount));
         }
+
         if (cbChairs.isChecked() && !getText(etChairsCount).isEmpty()) {
             chairsCount = Long.parseLong(getText(etChairsCount));
         }
@@ -1232,13 +1234,40 @@ public class RequestorRequestFragment extends Fragment {
         requestMap.put("proposalFiles", firestoreProposalFiles);
         requestMap.put("proposalFileStorage", "firestore_base64");
 
+        if (needsSAC) {
+            requestMap.put("sendToSAC", true);
+            requestMap.put("needsSAC", true);
+            requestMap.put("notificationForSAC", true);
+            requestMap.put("notificationTarget", "SAC");
+            requestMap.put("workflowStage", "SAC_REVIEW");
+
+            requestMap.put("sacStatus", "Pending");
+            requestMap.put("sacSeen", false);
+            requestMap.put("sacNotificationSeen", false);
+            requestMap.put("sacNotifiedAt", FieldValue.serverTimestamp());
+            requestMap.put("notificationUpdatedAt", FieldValue.serverTimestamp());
+
+            requestMap.put("sacNotificationTitle", "New Student Center Booking");
+            requestMap.put("sacNotificationMessage", "A new Student Center booking request is waiting for SAC review.");
+        } else {
+            requestMap.put("sendToSAC", false);
+            requestMap.put("needsSAC", false);
+            requestMap.put("notificationForSAC", false);
+            requestMap.put("sacNotificationSeen", true);
+            requestMap.put("sacSeen", true);
+            requestMap.put("sacStatus", "");
+        }
+
         Log.d(TAG, "Saving request document with ID: " + requestId);
+
         setSubmitting(true, "Submitting request...");
+
         db.collection("requests")
                 .document(requestId)
                 .set(requestMap)
                 .addOnSuccessListener(unused -> {
                     if (!isAdded()) return;
+
                     Log.d(TAG, "Firestore document created with ID: " + requestId);
                     setSubmitting(false, "");
                     showSuccessToast(needsSAC, needsITSO);
@@ -1246,12 +1275,35 @@ public class RequestorRequestFragment extends Fragment {
                 })
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
+
                     Log.e(TAG, "Failed to create Firestore document: " + e.getMessage());
                     setSubmitting(false, "");
-                    Toast.makeText(requireContext(),
+
+                    Toast.makeText(
+                            requireContext(),
                             "Failed to submit request: " + e.getMessage(),
-                            Toast.LENGTH_LONG).show();
+                            Toast.LENGTH_LONG
+                    ).show();
                 });
+    }
+
+    private boolean isStudentCenterSelected(List<String> facilityNames) {
+        if (facilityNames == null || facilityNames.isEmpty()) {
+            return false;
+        }
+
+        for (String facility : facilityNames) {
+            if (facility == null) continue;
+
+            String normalized = facility.trim().toLowerCase(Locale.ROOT);
+
+            if ("student center".equals(normalized)
+                    || normalized.contains("student center")) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void showSuccessToast(boolean needsSAC, boolean needsITSO) {

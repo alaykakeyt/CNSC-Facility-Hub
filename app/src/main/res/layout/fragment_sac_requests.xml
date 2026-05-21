@@ -25,16 +25,6 @@
             android:textSize="28sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tvRequestsSubtitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:alpha="0.75"
-            android:text="Approve or reject Student Center booking requests"
-            android:textColor="#313131"
-            android:textSize="14sp" />
-
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilRequestFilter"
             style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"

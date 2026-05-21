@@ -27,7 +27,7 @@ import com.google.android.material.chip.Chip;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.Source;
+import com.google.firebase.firestore.ListenerRegistration;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -42,7 +42,9 @@ public class RequestorRequestDetailsFragment extends Fragment {
     private static final String ARG_REQUEST_ID = "requestId";
 
     private FirebaseFirestore db;
+    private ListenerRegistration requestListener;
     private String requestId = "";
+    private boolean requestMarkedAsSeen = false;
 
     private final List<FirestoreProposalFile> proposalFilesToOpen = new ArrayList<>();
 
@@ -123,7 +125,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
     private void bindViews(View view) {
         btnBack = view.findViewById(R.id.btnBack);
-        btnBackBottom = view.findViewById(R.id.btnBackBottom);
 
         tvDetailsSubtitle = view.findViewById(R.id.tvDetailsSubtitle);
         tvDetailPurpose = view.findViewById(R.id.tvDetailPurpose);
@@ -154,9 +155,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         tvDetailTechnicalList = view.findViewById(R.id.tvDetailTechnicalList);
         tvDetailConnectors = view.findViewById(R.id.tvDetailConnectors);
 
-        tvDetailProposalFileName = view.findViewById(R.id.tvDetailProposalFileName);
-        tvDetailNotificationTarget = view.findViewById(R.id.tvDetailNotificationTarget);
-        tvDetailAgreement = view.findViewById(R.id.tvDetailAgreement);
+
         layoutProposalFiles = view.findViewById(R.id.layoutProposalFiles);
 
         cardAdminRemarks = view.findViewById(R.id.cardAdminRemarks);
@@ -174,7 +173,12 @@ public class RequestorRequestDetailsFragment extends Fragment {
     }
 
     private void clearDynamicFields() {
-        hideText(tvDetailsSubtitle);
+        if (hasDisplayValue(requestId)) {
+            setLabelOnly(tvDetailsSubtitle, "Request ID: " + requestId);
+        } else {
+            hideText(tvDetailsSubtitle);
+        }
+
         hideText(tvDetailPurpose);
         hideText(tvDetailActivityType);
 
@@ -186,34 +190,35 @@ public class RequestorRequestDetailsFragment extends Fragment {
         hideText(tvDetailScheduleSummary);
         hideText(tvDetailFacilitySummary);
 
-        hideText(tvDetailRequestorName);
-        hideText(tvDetailContactNumber);
-        hideText(tvDetailCollegeDepartment);
-        hideText(tvDetailOfficeCourse);
+        setLabelOnly(tvDetailRequestorName, "Name: ");
+        setLabelOnly(tvDetailContactNumber, "Contact Number: ");
+        setLabelOnly(tvDetailCollegeDepartment, "College / Department: ");
+        setLabelOnly(tvDetailOfficeCourse, "Office / Course: ");
 
-        hideText(tvDetailDateRange);
-        hideText(tvDetailTimeRange);
-        hideText(tvDetailFacility);
+        setLabelOnly(tvDetailDateRange, "Schedule:\n");
+        if (tvDetailTimeRange != null) {
+            tvDetailTimeRange.setVisibility(View.GONE);
+        }
+        setLabelOnly(tvDetailFacility, "Facilities: ");
 
-        hideText(tvDetailParticipants);
-        hideText(tvDetailNumberOfParticipants);
-        hideText(tvDetailPurposeFull);
+        setLabelOnly(tvDetailParticipants, "Participants: ");
+        setLabelOnly(tvDetailNumberOfParticipants, "Number of Participants: ");
+        setLabelOnly(tvDetailPurposeFull, "Purpose: ");
 
-        hideText(tvDetailTables);
-        hideText(tvDetailChairs);
-        hideText(tvDetailOtherAmenities);
-
-        hideText(tvDetailNeedsTechnical);
-        hideText(tvDetailTechnicalList);
-        hideText(tvDetailConnectors);
+        setLabelOnly(tvDetailTables, "Tables: ");
+        setLabelOnly(tvDetailChairs, "Chairs: ");
+        setLabelOnly(tvDetailOtherAmenities, "Other Amenities: ");
 
         if (cardTechnicalDetails != null) {
-            cardTechnicalDetails.setVisibility(View.GONE);
+            cardTechnicalDetails.setVisibility(View.VISIBLE);
         }
+        setLabelOnly(tvDetailNeedsTechnical, "Technical Needed: ");
+        setLabelOnly(tvDetailTechnicalList, "Selected Technicals: ");
+        setLabelOnly(tvDetailConnectors, "Connectors / Cables: ");
 
-        hideText(tvDetailProposalFileName);
-        hideText(tvDetailNotificationTarget);
-        hideText(tvDetailAgreement);
+        setLabelOnly(tvDetailProposalFileName, "Proposal / Supporting Files: ");
+        setLabelOnly(tvDetailNotificationTarget, "Sent To: ");
+        setLabelOnly(tvDetailAgreement, "Agreement Accepted: ");
 
         if (layoutProposalFiles != null) {
             layoutProposalFiles.removeAllViews();
@@ -223,54 +228,59 @@ public class RequestorRequestDetailsFragment extends Fragment {
         if (cardAdminRemarks != null) {
             cardAdminRemarks.setVisibility(View.GONE);
         }
-
         hideText(tvDetailRemarks);
     }
 
     private void loadRequestDetails() {
-        db.collection("requests")
+        if (requestListener != null) {
+            requestListener.remove();
+            requestListener = null;
+        }
+
+        requestListener = db.collection("requests")
                 .document(requestId)
-                .get(Source.CACHE)
-                .addOnSuccessListener(documentSnapshot -> {
+                .addSnapshotListener((documentSnapshot, error) -> {
                     if (!isAdded()) return;
 
-                    if (documentSnapshot.exists()) {
-                        displayRequestDetails(documentSnapshot);
+                    if (error != null) {
+                        Toast.makeText(
+                                requireContext(),
+                                "Failed to load request details: " + error.getMessage(),
+                                Toast.LENGTH_LONG
+                        ).show();
+                        return;
                     }
 
-                    loadRequestDetailsFromServer();
-                })
-                .addOnFailureListener(e -> loadRequestDetailsFromServer());
-    }
-
-    private void loadRequestDetailsFromServer() {
-        db.collection("requests")
-                .document(requestId)
-                .get(Source.SERVER)
-                .addOnSuccessListener(documentSnapshot -> {
-                    if (!isAdded()) return;
+                    if (documentSnapshot == null) {
+                        return;
+                    }
 
                     if (!documentSnapshot.exists()) {
-                        Toast.makeText(requireContext(), "Request not found.", Toast.LENGTH_SHORT).show();
-                        goBack();
+                        if (!documentSnapshot.getMetadata().isFromCache()) {
+                            Toast.makeText(requireContext(), "Request not found.", Toast.LENGTH_SHORT).show();
+                            goBack();
+                        }
                         return;
                     }
 
                     displayRequestDetails(documentSnapshot);
                     loadRequestorInfoIfNeeded(documentSnapshot);
-                    markAsSeenIfUnseen(documentSnapshot);
-                })
-                .addOnFailureListener(e -> {
-                    if (!isAdded()) return;
 
-                    Toast.makeText(
-                            requireContext(),
-                            "Failed to load request details: " + e.getMessage(),
-                            Toast.LENGTH_LONG
-                    ).show();
-
-                    goBack();
+                    if (!documentSnapshot.getMetadata().isFromCache() && !requestMarkedAsSeen) {
+                        requestMarkedAsSeen = true;
+                        markAsSeenIfUnseen(documentSnapshot);
+                    }
                 });
+    }
+
+    @Override
+    public void onDestroyView() {
+        if (requestListener != null) {
+            requestListener.remove();
+            requestListener = null;
+        }
+
+        super.onDestroyView();
     }
 
     private void displayRequestDetails(DocumentSnapshot doc) {
@@ -349,7 +359,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         setLabeledTextOrHide(tvDetailPurposeFull, "Purpose: ", purpose);
 
         if (tablesRequested == null) {
-            hideText(tvDetailTables);
+            setLabelOnly(tvDetailTables, "Tables: ");
         } else {
             String tableValue = tablesRequested
                     ? "Requested" + (hasDisplayValue(tablesCount) ? " (" + tablesCount + ")" : "")
@@ -359,7 +369,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         }
 
         if (chairsRequested == null) {
-            hideText(tvDetailChairs);
+            setLabelOnly(tvDetailChairs, "Chairs: ");
         } else {
             String chairValue = chairsRequested
                     ? "Requested" + (hasDisplayValue(chairsCount) ? " (" + chairsCount + ")" : "")
@@ -374,25 +384,23 @@ public class RequestorRequestDetailsFragment extends Fragment {
                 || hasDisplayValue(selectedTechnicals)
                 || hasDisplayValue(connectors);
 
-        if (hasTechnicalData) {
+        if (cardTechnicalDetails != null) {
             cardTechnicalDetails.setVisibility(View.VISIBLE);
-
-            if (technicalNeeded == null) {
-                hideText(tvDetailNeedsTechnical);
-            } else {
-                setLabeledTextOrHide(tvDetailNeedsTechnical, "Technical Needed: ", yesNo(technicalNeeded));
-            }
-
-            setLabeledTextOrHide(tvDetailTechnicalList, "Selected Technicals: ", selectedTechnicals);
-            setLabeledTextOrHide(tvDetailConnectors, "Connectors / Cables: ", connectors);
-        } else {
-            cardTechnicalDetails.setVisibility(View.GONE);
         }
+
+        if (technicalNeeded == null) {
+            setLabelOnly(tvDetailNeedsTechnical, "Technical Needed: ");
+        } else {
+            setLabeledTextOrHide(tvDetailNeedsTechnical, "Technical Needed: ", yesNo(technicalNeeded));
+        }
+
+        setLabeledTextOrHide(tvDetailTechnicalList, "Selected Technicals: ", selectedTechnicals);
+        setLabeledTextOrHide(tvDetailConnectors, "Connectors / Cables: ", connectors);
 
         setLabeledTextOrHide(tvDetailNotificationTarget, "Sent To: ", notificationTarget);
 
         if (agreementAccepted == null) {
-            hideText(tvDetailAgreement);
+            setLabelOnly(tvDetailAgreement, "Agreement Accepted: ");
         } else {
             setLabeledTextOrHide(tvDetailAgreement, "Agreement Accepted: ", yesNo(agreementAccepted));
         }
@@ -411,14 +419,17 @@ public class RequestorRequestDetailsFragment extends Fragment {
         return value ? "Yes" : "No";
     }
     private void setLabeledTextOrHide(TextView textView, String label, String value) {
+        if (textView == null) return;
+
         String cleaned = cleanDisplayValue(value);
-
-        if (cleaned.isEmpty()) {
-            hideText(textView);
-            return;
-        }
-
         textView.setText(label + cleaned);
+        textView.setVisibility(View.VISIBLE);
+    }
+
+    private void setLabelOnly(TextView textView, String label) {
+        if (textView == null) return;
+
+        textView.setText(label);
         textView.setVisibility(View.VISIBLE);
     }
 
@@ -596,7 +607,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
             layoutProposalFiles.removeAllViews();
         }
 
-        hideText(tvDetailProposalFileName);
+        setLabelOnly(tvDetailProposalFileName, "Proposal / Supporting Files: ");
 
         if (files.isEmpty()) {
             if (layoutProposalFiles != null) {
@@ -604,6 +615,8 @@ public class RequestorRequestDetailsFragment extends Fragment {
             }
             return;
         }
+
+        setLabeledTextOrHide(tvDetailProposalFileName, "Proposal / Supporting Files: ", files.size() + " file(s)");
 
         if (layoutProposalFiles != null) {
             layoutProposalFiles.setVisibility(View.VISIBLE);

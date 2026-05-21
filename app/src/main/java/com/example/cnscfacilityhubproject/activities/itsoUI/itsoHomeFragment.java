@@ -48,6 +48,7 @@ public class itsoHomeFragment extends Fragment {
     private FirebaseAuth auth;
     private FirebaseFirestore db;
     private ListenerRegistration dashboardListener;
+    private ListenerRegistration userListener;
 
     public itsoHomeFragment() {
         super(R.layout.fragment_itso_home);
@@ -75,12 +76,17 @@ public class itsoHomeFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
-        super.onDestroyView();
-
         if (dashboardListener != null) {
             dashboardListener.remove();
             dashboardListener = null;
         }
+
+        if (userListener != null) {
+            userListener.remove();
+            userListener = null;
+        }
+
+        super.onDestroyView();
     }
 
     private void bindViews(View view) {
@@ -114,42 +120,56 @@ public class itsoHomeFragment extends Fragment {
     private void loadITSOName() {
         if (tvITSOName == null) return;
 
-        if (auth == null || auth.getCurrentUser() == null) {
-            tvITSOName.setText("Hello, ITSO Staff");
+        setHelloName("");
+
+        if (auth == null || auth.getCurrentUser() == null || db == null) {
             return;
         }
 
-        db.collection("users")
+        if (userListener != null) {
+            userListener.remove();
+            userListener = null;
+        }
+
+        userListener = db.collection("users")
                 .document(auth.getCurrentUser().getUid())
-                .get()
-                .addOnSuccessListener(documentSnapshot -> {
+                .addSnapshotListener((documentSnapshot, error) -> {
                     if (!isAdded() || tvITSOName == null) return;
 
-                    String fullName = documentSnapshot.getString("fullName");
-
-                    if (fullName != null && !fullName.trim().isEmpty()) {
-                        tvITSOName.setText("Hello, " + fullName.trim());
-                    } else {
-                        tvITSOName.setText("Hello, ITSO Staff");
+                    if (error != null || documentSnapshot == null || !documentSnapshot.exists()) {
+                        setHelloName("");
+                        return;
                     }
-                })
-                .addOnFailureListener(e -> {
-                    if (!isAdded() || tvITSOName == null) return;
-                    tvITSOName.setText("Hello, ITSO Staff");
+
+                    setHelloName(getStringValue(documentSnapshot, "fullName"));
                 });
+    }
+
+    private void setHelloName(String fullName) {
+        String cleanName = cleanText(fullName);
+
+        if (tvITSOName == null) return;
+
+        if (cleanName.isEmpty()) {
+            tvITSOName.setText("Hello,");
+        } else {
+            tvITSOName.setText("Hello, " + cleanName);
+        }
+
+        tvITSOName.setVisibility(View.VISIBLE);
     }
 
     private void setupActions() {
         if (btnViewRequests != null) {
-            btnViewRequests.setOnClickListener(v -> openRequestsList("All"));
+            btnViewRequests.setOnClickListener(v -> openNotificationList("All"));
         }
 
         if (itsoPendingReq != null) {
-            itsoPendingReq.setOnClickListener(v -> openRequestsList("Pending"));
+            itsoPendingReq.setOnClickListener(v -> openNotificationList("Pending"));
         }
 
         if (itsoApprovedReq != null) {
-            itsoApprovedReq.setOnClickListener(v -> openRequestsList("Approved - Available"));
+            itsoApprovedReq.setOnClickListener(v -> openNotificationList("Available"));
         }
     }
 
@@ -166,8 +186,8 @@ public class itsoHomeFragment extends Fragment {
                     if (!isAdded()) return;
 
                     if (error != null || queryDocumentSnapshots == null) {
-                        if (tvPendingCount != null) tvPendingCount.setText("00");
-                        if (tvApprovedCount != null) tvApprovedCount.setText("00");
+                        if (tvPendingCount != null) tvPendingCount.setText("");
+                        if (tvApprovedCount != null) tvApprovedCount.setText("");
 
                         if (layoutRecentRequests != null) layoutRecentRequests.removeAllViews();
 
@@ -259,7 +279,7 @@ public class itsoHomeFragment extends Fragment {
         container.setPadding(dp(16), dp(16), dp(16), dp(16));
 
         TextView title = new TextView(requireContext());
-        title.setText("Tomorrow: " + (purpose.isEmpty() ? "Technical Event" : purpose));
+        title.setText(purpose.isEmpty() ? "Tomorrow:" : "Tomorrow: " + purpose);
         title.setTextColor(requireContext().getColor(R.color.cnsc_text_primary));
         title.setTypeface(null, android.graphics.Typeface.BOLD);
 
@@ -376,13 +396,13 @@ public class itsoHomeFragment extends Fragment {
         titleLayout.setLayoutParams(titleParams);
 
         TextView tvTitle = new TextView(requireContext());
-        tvTitle.setText(!purpose.isEmpty() ? purpose : "ITSO Request");
+        setTextOrHide(tvTitle, purpose);
         tvTitle.setTextColor(Color.parseColor("#313131"));
         tvTitle.setTextSize(16f);
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
 
         TextView tvMeta = new TextView(requireContext());
-        tvMeta.setText(buildMetaText(facility, startDateText, endDateText, timeStart, timeEnd));
+        setTextOrHide(tvMeta, buildMetaText(facility, startDateText, endDateText, timeStart, timeEnd));
         tvMeta.setTextColor(Color.parseColor("#313131"));
         tvMeta.setTextSize(12f);
         tvMeta.setAlpha(0.68f);
@@ -391,7 +411,7 @@ public class itsoHomeFragment extends Fragment {
         titleLayout.addView(tvMeta);
 
         Chip chipStatus = new Chip(requireContext());
-        chipStatus.setText(displayStatus);
+        setTextOrHide(chipStatus, displayStatus);
         chipStatus.setTextColor(getStatusMainColor(displayStatus));
         chipStatus.setChipBackgroundColor(ColorStateList.valueOf(getStatusLightColor(displayStatus)));
         chipStatus.setChipStrokeWidth(0);
@@ -400,10 +420,12 @@ public class itsoHomeFragment extends Fragment {
 
         headerRow.addView(iconCard);
         headerRow.addView(titleLayout);
-        headerRow.addView(chipStatus);
+        if (!cleanText(displayStatus).isEmpty()) {
+            headerRow.addView(chipStatus);
+        }
 
         TextView tvDescription = new TextView(requireContext());
-        tvDescription.setText(buildTechnicalSummary(doc));
+        setTextOrHide(tvDescription, buildTechnicalSummary(doc));
         tvDescription.setTextColor(Color.parseColor("#313131"));
         tvDescription.setTextSize(14f);
         tvDescription.setLineSpacing(3f, 1f);
@@ -434,7 +456,9 @@ public class itsoHomeFragment extends Fragment {
         btnViewRequest.setOnClickListener(v -> openViewDetails(requestId));
 
         container.addView(headerRow);
-        container.addView(tvDescription);
+        if (tvDescription.getVisibility() == View.VISIBLE) {
+            container.addView(tvDescription);
+        }
         container.addView(btnViewRequest);
 
         card.addView(container);
@@ -549,6 +573,8 @@ public class itsoHomeFragment extends Fragment {
         String itsoAvailability = getStringValue(doc, "itsoAvailability");
         String itsoStatus = getStringValue(doc, "itsoStatus");
         String status = getStringValue(doc, "status");
+        String notificationTarget = getStringValue(doc, "notificationTarget");
+        Boolean sendToITSO = doc.getBoolean("sendToITSO");
 
         if ("Not Available".equalsIgnoreCase(itsoAvailability)
                 || "Unavailable".equalsIgnoreCase(itsoAvailability)
@@ -568,7 +594,14 @@ public class itsoHomeFragment extends Fragment {
             return "Approved - Available";
         }
 
-        return "Pending";
+        if ("Pending".equalsIgnoreCase(itsoStatus)
+                || "Pending".equalsIgnoreCase(status)
+                || Boolean.TRUE.equals(sendToITSO)
+                || "ITSO".equalsIgnoreCase(notificationTarget)) {
+            return "Pending";
+        }
+
+        return firstNonEmpty(itsoAvailability, firstNonEmpty(itsoStatus, status));
     }
 
     private String buildTechnicalSummary(DocumentSnapshot doc) {
@@ -591,7 +624,7 @@ public class itsoHomeFragment extends Fragment {
             selected.add("Connectors: " + connectors);
         }
 
-        if (selected.isEmpty()) return "Technical support request submitted.";
+        if (selected.isEmpty()) return "";
 
         StringBuilder builder = new StringBuilder();
 
@@ -628,7 +661,7 @@ public class itsoHomeFragment extends Fragment {
             }
         }
 
-        return builder.length() == 0 ? "No schedule details" : builder.toString();
+        return builder.toString();
     }
 
     private String getFinalFacility(DocumentSnapshot doc) {
@@ -682,12 +715,14 @@ public class itsoHomeFragment extends Fragment {
         return Color.parseColor("#EEEEEE");
     }
 
-    private void openRequestsList(String filter) {
-        itsoRequestsFragment fragment = new itsoRequestsFragment();
+    private void openNotificationList(String filter) {
+        itsoNotificationFragment fragment = new itsoNotificationFragment();
 
         Bundle bundle = new Bundle();
         bundle.putString("filter", filter);
         fragment.setArguments(bundle);
+
+        highlightNotificationTab();
 
         requireActivity()
                 .getSupportFragmentManager()
@@ -695,6 +730,31 @@ public class itsoHomeFragment extends Fragment {
                 .replace(R.id.itso_fragment_container, fragment)
                 .addToBackStack(null)
                 .commit();
+    }
+
+    private void highlightNotificationTab() {
+        int activeColor = Color.parseColor("#970705");
+        int inactiveColor = Color.parseColor("#313131");
+
+        ImageView iconHome = requireActivity().findViewById(R.id.iconHome);
+        ImageView iconRequests = requireActivity().findViewById(R.id.iconRequests);
+        ImageView iconNotifications = requireActivity().findViewById(R.id.iconNotifications);
+        ImageView iconProfile = requireActivity().findViewById(R.id.iconProfile);
+
+        TextView textHome = requireActivity().findViewById(R.id.itsotextHome);
+        TextView textRequests = requireActivity().findViewById(R.id.itsotextRequests);
+        TextView textNotifications = requireActivity().findViewById(R.id.itsotextNotifications);
+        TextView textProfile = requireActivity().findViewById(R.id.itsotextProfile);
+
+        if (iconHome != null) iconHome.setColorFilter(inactiveColor);
+        if (iconRequests != null) iconRequests.setColorFilter(inactiveColor);
+        if (iconNotifications != null) iconNotifications.setColorFilter(activeColor);
+        if (iconProfile != null) iconProfile.setColorFilter(inactiveColor);
+
+        if (textHome != null) textHome.setTextColor(inactiveColor);
+        if (textRequests != null) textRequests.setTextColor(inactiveColor);
+        if (textNotifications != null) textNotifications.setTextColor(activeColor);
+        if (textProfile != null) textProfile.setTextColor(inactiveColor);
     }
 
     private void openViewDetails(String requestId) {
@@ -713,9 +773,28 @@ public class itsoHomeFragment extends Fragment {
                 .commit();
     }
 
-    private String getStringValue(DocumentSnapshot doc, String field) {
-        String value = doc.getString(field);
+    private void setTextOrHide(TextView textView, String value) {
+        if (textView == null) return;
+
+        String cleanValue = cleanText(value);
+        textView.setText(cleanValue);
+        textView.setVisibility(cleanValue.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    private String cleanText(String value) {
         return value != null ? value.trim() : "";
+    }
+
+    private String firstNonEmpty(String first, String second) {
+        String cleanFirst = cleanText(first);
+        if (!cleanFirst.isEmpty()) return cleanFirst;
+
+        return cleanText(second);
+    }
+
+    private String getStringValue(DocumentSnapshot doc, String field) {
+        Object value = doc.get(field);
+        return value != null ? String.valueOf(value).trim() : "";
     }
 
     private String formatCount(int count) {

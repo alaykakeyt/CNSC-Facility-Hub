@@ -1,7 +1,12 @@
 package com.example.cnscfacilityhubproject.activities.sacUI;
 
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -11,13 +16,26 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
-import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.chip.Chip;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 
 public class sacNotificationFragment extends Fragment {
 
@@ -26,7 +44,16 @@ public class sacNotificationFragment extends Fragment {
     private TextView tvIncomingCount;
 
     private FirebaseFirestore db;
-    private ListenerRegistration incomingNotificationListener;
+    private ListenerRegistration notificationListener;
+
+    private final List<DocumentSnapshot> notificationList = new ArrayList<>();
+    private final Set<String> locallySeenNotificationIds = new HashSet<>();
+
+    private int incomingRequestCount = 0;
+    private int unseenNotificationCount = 0;
+
+    private AutoCompleteTextView actvNotificationFilter;
+    private String selectedFilter = "All";
 
     public sacNotificationFragment() {
         super(R.layout.fragment_sac_notification);
@@ -39,182 +66,351 @@ public class sacNotificationFragment extends Fragment {
 
         db = FirebaseFirestore.getInstance();
 
-        layoutEmptyState =
-                view.findViewById(R.id.layoutEmptyState);
+        if (getArguments() != null) {
+            selectedFilter = getArguments().getString("filter", "All");
+        }
 
-        layoutNotificationList =
-                view.findViewById(R.id.layoutNotificationList);
+        actvNotificationFilter = view.findViewById(R.id.actvNotificationFilter);
+        layoutEmptyState = view.findViewById(R.id.layoutEmptyState);
+        layoutNotificationList = view.findViewById(R.id.layoutNotificationList);
+        tvIncomingCount = view.findViewById(R.id.tvIncomingCount);
 
-        tvIncomingCount =
-                view.findViewById(R.id.tvIncomingCount);
-
-        listenForIncomingNotifications();
+        setupFilter();
+        listenForSACNotifications();
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        listenForIncomingNotifications();
+    private void setupFilter() {
+        String[] filterOptions = {
+                "All",
+                "Pending",
+                "Approved",
+                "Rejected"
+        };
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                requireContext(),
+                android.R.layout.simple_list_item_1,
+                filterOptions
+        );
+
+        actvNotificationFilter.setAdapter(adapter);
+        actvNotificationFilter.setText(selectedFilter, false);
+
+        actvNotificationFilter.setOnItemClickListener((parent, view, position, id) -> {
+            selectedFilter = filterOptions[position];
+            renderNotifications();
+        });
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
 
-        if (incomingNotificationListener != null) {
-            incomingNotificationListener.remove();
-            incomingNotificationListener = null;
+        if (notificationListener != null) {
+            notificationListener.remove();
+            notificationListener = null;
         }
     }
 
-    private void listenForIncomingNotifications() {
-
-        if (incomingNotificationListener != null) {
-            incomingNotificationListener.remove();
+    private void listenForSACNotifications() {
+        if (notificationListener != null) {
+            return;
         }
 
-        incomingNotificationListener =
+        notificationListener =
                 db.collection("requests")
                         .addSnapshotListener((snapshot, error) -> {
-
                             if (!isAdded()) return;
 
                             if (error != null || snapshot == null) {
-
                                 Toast.makeText(
                                         requireContext(),
                                         "Failed to load notifications.",
                                         Toast.LENGTH_SHORT
                                 ).show();
 
-                                updateNotificationState(
-                                        new ArrayList<>()
-                                );
-
+                                showEmptyState();
                                 return;
                             }
 
-                            List<DocumentSnapshot> incomingDocs =
-                                    new ArrayList<>();
+                            List<DocumentSnapshot> docs =
+                                    new ArrayList<>(snapshot.getDocuments());
 
-                            for (DocumentSnapshot doc :
-                                    snapshot.getDocuments()) {
+                            Collections.sort(docs, new Comparator<DocumentSnapshot>() {
+                                @Override
+                                public int compare(DocumentSnapshot a,
+                                                   DocumentSnapshot b) {
+                                    Timestamp timeA = getBestNotificationTimestamp(a);
+                                    Timestamp timeB = getBestNotificationTimestamp(b);
 
-                                if (RequestDataHelper.shouldShowInRequestList(doc) && isIncomingSACRequest(doc)) {
-                                    incomingDocs.add(doc);
+                                    if (timeA == null && timeB == null) return 0;
+                                    if (timeA == null) return 1;
+                                    if (timeB == null) return -1;
+
+                                    return timeB.compareTo(timeA);
+                                }
+                            });
+
+                            notificationList.clear();
+                            incomingRequestCount = 0;
+                            unseenNotificationCount = 0;
+
+                            for (DocumentSnapshot doc : docs) {
+                                if (!shouldShowSACNotificationCard(doc)) {
+                                    continue;
+                                }
+
+                                notificationList.add(doc);
+
+                                if (isIncomingSACRequest(doc)) {
+                                    incomingRequestCount++;
+                                }
+
+                                if (shouldCountForNewChip(doc)) {
+                                    unseenNotificationCount++;
                                 }
                             }
 
-                            updateNotificationState(incomingDocs);
+                            renderNotifications();
                         });
     }
 
-    private void updateNotificationState(
-            List<DocumentSnapshot> docs
-    ) {
+    private void renderNotifications() {
+        if (layoutNotificationList == null || layoutEmptyState == null) {
+            return;
+        }
 
         layoutNotificationList.removeAllViews();
 
-        int count = docs.size();
+        List<DocumentSnapshot> filtered = new ArrayList<>();
 
-        tvIncomingCount.setText(
-                count
-                        + " incoming booking request"
-                        + (count == 1 ? "" : "s")
-        );
+        for (DocumentSnapshot doc : notificationList) {
+            String status = getDisplayStatus(doc);
 
-        if (count == 0) {
+            if ("All".equalsIgnoreCase(selectedFilter)
+                    || selectedFilter.equalsIgnoreCase(status)) {
+                filtered.add(doc);
+            }
+        }
 
-            layoutEmptyState.setVisibility(View.VISIBLE);
-            layoutNotificationList.setVisibility(View.GONE);
+        if (tvIncomingCount != null) {
+            tvIncomingCount.setText(
+                    incomingRequestCount + " incoming booking request" +
+                            (incomingRequestCount == 1 ? "" : "s") +
+                            " • " +
+                            filtered.size() + " shown notification" +
+                            (filtered.size() == 1 ? "" : "s")
+            );
+        }
 
+        if (filtered.isEmpty()) {
+            showEmptyStateForFilter();
             return;
         }
 
         layoutEmptyState.setVisibility(View.GONE);
         layoutNotificationList.setVisibility(View.VISIBLE);
 
-        for (DocumentSnapshot doc : docs) {
-
-            layoutNotificationList.addView(
-                    SACViewFactory.createNotificationCard(
-                            requireContext(),
-                            doc,
-                            v -> openRequestDetails(doc.getId())
-                    )
-            );
+        for (DocumentSnapshot doc : filtered) {
+            layoutNotificationList.addView(createNotificationCard(doc));
         }
     }
 
-    private boolean isIncomingSACRequest(
-            DocumentSnapshot doc
-    ) {
-
-        if (!isSACRequest(doc)) {
-            return false;
+    private void showEmptyStateForFilter() {
+        if (layoutNotificationList != null) {
+            layoutNotificationList.setVisibility(View.GONE);
         }
 
-        String status =
-                getStringValue(doc, "status");
-
-        String sacStatus =
-                getStringValue(doc, "sacStatus");
-
-        if ("Rejected".equalsIgnoreCase(status)
-                || "Rejected".equalsIgnoreCase(sacStatus)) {
-
-            return false;
+        if (layoutEmptyState != null) {
+            layoutEmptyState.setVisibility(View.VISIBLE);
         }
-
-        if ("Approved".equalsIgnoreCase(sacStatus)) {
-            return false;
-        }
-
-        return "Pending".equalsIgnoreCase(status)
-                || "Pending".equalsIgnoreCase(sacStatus)
-                || status.isEmpty();
     }
 
-    /**
-     * FIXED VERSION
-     *
-     * ONLY SHOW REQUESTS THAT ARE
-     * CURRENTLY ASSIGNED TO SAC.
-     */
-    private boolean isSACRequest(
-            DocumentSnapshot doc
-    ) {
+    private View createNotificationCard(DocumentSnapshot doc) {
+        String requestId = doc.getId();
 
-        Boolean sendToSAC =
-                doc.getBoolean("sendToSAC");
+        String status = getDisplayStatus(doc);
+        String purpose = getStringValue(doc, "purpose");
+        String facility = getFinalFacility(doc);
 
-        if (Boolean.TRUE.equals(sendToSAC)) {
-            return true;
-        }
+        String startDate = getStringValue(doc, "startDateText");
+        String endDate = getStringValue(doc, "endDateText");
+        String startTime = getStringValue(doc, "timeStartText");
+        String endTime = getStringValue(doc, "timeEndText");
 
-        String notificationTarget =
-                getStringValue(doc,
-                        "notificationTarget");
+        String notifiedDateText = buildNotifiedDateText(doc);
 
-        if ("SAC".equalsIgnoreCase(notificationTarget)) {
-            return true;
-        }
 
-        String workflowStage =
-                getStringValue(doc,
-                        "workflowStage");
+        LinearLayout outerLayout = new LinearLayout(requireContext());
+        outerLayout.setOrientation(LinearLayout.VERTICAL);
 
-        return "SAC_REVIEW"
-                .equalsIgnoreCase(workflowStage);
+        LinearLayout.LayoutParams outerParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        outerParams.setMargins(0, 0, 0, dp(12));
+        outerLayout.setLayoutParams(outerParams);
+
+        TextView tvNotifiedDate = new TextView(requireContext());
+        tvNotifiedDate.setText(notifiedDateText);
+        tvNotifiedDate.setTextColor(Color.parseColor("#970705"));
+        tvNotifiedDate.setTextSize(12f);
+        tvNotifiedDate.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        LinearLayout.LayoutParams notifiedDateParams =
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+        notifiedDateParams.setMargins(dp(4), 0, 0, dp(6));
+        tvNotifiedDate.setLayoutParams(notifiedDateParams);
+
+        MaterialCardView card = new MaterialCardView(requireContext());
+
+        LinearLayout.LayoutParams cardParams =
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+
+        card.setLayoutParams(cardParams);
+        card.setCardBackgroundColor(Color.WHITE);
+        card.setRadius(dp(24));
+        card.setCardElevation(dp(6));
+        card.setStrokeWidth(dp(2));
+        card.setStrokeColor(getStatusMainColor(status));
+
+        LinearLayout container = new LinearLayout(requireContext());
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dp(18), dp(18), dp(18), dp(18));
+
+        LinearLayout headerRow = new LinearLayout(requireContext());
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        MaterialCardView iconCard = new MaterialCardView(requireContext());
+
+        LinearLayout.LayoutParams iconCardParams =
+                new LinearLayout.LayoutParams(dp(46), dp(46));
+
+        iconCard.setLayoutParams(iconCardParams);
+        iconCard.setRadius(dp(15));
+        iconCard.setCardElevation(0);
+        iconCard.setCardBackgroundColor(getStatusMainColor(status));
+
+        ImageView icon = new ImageView(requireContext());
+        icon.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        icon.setPadding(dp(10), dp(10), dp(10), dp(10));
+        icon.setImageResource(getStatusIcon(status));
+        icon.setColorFilter(Color.WHITE);
+
+        iconCard.addView(icon);
+
+        LinearLayout titleLayout = new LinearLayout(requireContext());
+        titleLayout.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout.LayoutParams titleParams =
+                new LinearLayout.LayoutParams(
+                        0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        1f
+                );
+
+        titleParams.setMargins(dp(12), 0, dp(8), 0);
+        titleLayout.setLayoutParams(titleParams);
+
+        TextView tvTitle = new TextView(requireContext());
+        tvTitle.setText(!purpose.isEmpty() ? purpose : "Student Center Request");
+        tvTitle.setTextColor(Color.parseColor("#313131"));
+        tvTitle.setTextSize(16f);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        TextView tvMeta = new TextView(requireContext());
+        tvMeta.setText(buildMetaText(
+                facility,
+                startDate,
+                endDate,
+                startTime,
+                endTime
+        ));
+        tvMeta.setTextColor(Color.parseColor("#313131"));
+        tvMeta.setTextSize(12f);
+        tvMeta.setAlpha(0.65f);
+
+        titleLayout.addView(tvTitle);
+        titleLayout.addView(tvMeta);
+
+
+
+        Chip chipStatus = new Chip(requireContext());
+        chipStatus.setText(status);
+        chipStatus.setTextColor(getStatusMainColor(status));
+        chipStatus.setChipBackgroundColor(
+                ColorStateList.valueOf(getStatusLightColor(status))
+        );
+        chipStatus.setChipStrokeWidth(0);
+        chipStatus.setCheckable(false);
+        chipStatus.setClickable(false);
+
+        headerRow.addView(iconCard);
+        headerRow.addView(titleLayout);
+        headerRow.addView(chipStatus);
+
+        TextView tvDescription = new TextView(requireContext());
+        tvDescription.setText(buildDescriptionText(doc, status));
+        tvDescription.setTextColor(Color.parseColor("#313131"));
+        tvDescription.setTextSize(14f);
+        tvDescription.setLineSpacing(2f, 1f);
+
+        LinearLayout.LayoutParams descParams =
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+        descParams.setMargins(0, dp(12), 0, 0);
+        tvDescription.setLayoutParams(descParams);
+
+        MaterialButton btnViewDetails = new MaterialButton(requireContext());
+
+        btnViewDetails.setText("View Request");
+        btnViewDetails.setAllCaps(false);
+        btnViewDetails.setTextColor(Color.WHITE);
+        btnViewDetails.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        btnViewDetails.setBackgroundTintList(
+                ColorStateList.valueOf(Color.parseColor("#313131"))
+        );
+
+        btnViewDetails.setCornerRadius(dp(16));
+        btnViewDetails.setElevation(0);
+
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(46)
+        );
+
+        btnParams.setMargins(0, dp(14), 0, 0);
+        btnViewDetails.setLayoutParams(btnParams);
+
+        btnViewDetails.setOnClickListener(v -> openRequestDetails(requestId));
+
+        container.addView(headerRow);
+        container.addView(tvDescription);
+        container.addView(btnViewDetails);
+
+        card.addView(container);
+
+        outerLayout.addView(tvNotifiedDate);
+        outerLayout.addView(card);
+
+        return outerLayout;
     }
 
-    private void openRequestDetails(
-            String requestId
-    ) {
-
-        if (requestId == null
-                || requestId.trim().isEmpty()) {
-
+    private void openRequestDetails(String requestId) {
+        if (requestId == null || requestId.trim().isEmpty()) {
             Toast.makeText(
                     requireContext(),
                     "No request found.",
@@ -224,27 +420,356 @@ public class sacNotificationFragment extends Fragment {
             return;
         }
 
+        locallySeenNotificationIds.add(requestId);
+
+        db.collection("requests")
+                .document(requestId)
+                .update(
+                        "sacSeen", true,
+                        "sacNotificationSeen", true,
+                        "sacSeenAt", FieldValue.serverTimestamp(),
+                        "sacNotificationOpenedAt", FieldValue.serverTimestamp()
+                );
+
         requireActivity()
                 .getSupportFragmentManager()
                 .beginTransaction()
                 .replace(
                         R.id.sac_fragment_container,
-                        sacRequestsViewDetailsFragment
-                                .newInstance(requestId)
+                        sacRequestsViewDetailsFragment.newInstance(requestId)
                 )
                 .addToBackStack(null)
                 .commit();
     }
 
-    private String getStringValue(
-            DocumentSnapshot doc,
-            String field
-    ) {
+    private boolean shouldShowSACNotificationCard(DocumentSnapshot doc) {
+        return isStudentCenterFacility(doc) && isSACRelatedRequest(doc);
+    }
 
+    private boolean shouldCountForNewChip(DocumentSnapshot doc) {
+        if (locallySeenNotificationIds.contains(doc.getId())) {
+            return false;
+        }
+
+        Boolean sacNotificationSeen = doc.getBoolean("sacNotificationSeen");
+
+        if (Boolean.TRUE.equals(sacNotificationSeen)) {
+            return false;
+        }
+
+        return shouldShowSACNotificationCard(doc);
+    }
+
+    private boolean isIncomingSACRequest(DocumentSnapshot doc) {
+        if (!isStudentCenterFacility(doc)) {
+            return false;
+        }
+
+        if (!isSACRelatedRequest(doc)) {
+            return false;
+        }
+
+        String status = getStringValue(doc, "status");
+        String sacStatus = getStringValue(doc, "sacStatus");
+
+        if ("Rejected".equalsIgnoreCase(status)
+                || "Rejected".equalsIgnoreCase(sacStatus)
+                || "Returned".equalsIgnoreCase(status)
+                || "Returned".equalsIgnoreCase(sacStatus)
+                || "Cancelled".equalsIgnoreCase(status)
+                || "Canceled".equalsIgnoreCase(status)) {
+            return false;
+        }
+
+        if ("Approved".equalsIgnoreCase(sacStatus)) {
+            return false;
+        }
+
+        return "Pending".equalsIgnoreCase(status)
+                || "Pending".equalsIgnoreCase(sacStatus)
+                || status.isEmpty()
+                || sacStatus.isEmpty();
+    }
+
+    private boolean isSACRelatedRequest(DocumentSnapshot doc) {
+        if (!isStudentCenterFacility(doc)) {
+            return false;
+        }
+
+        Boolean sendToSAC = doc.getBoolean("sendToSAC");
+
+        if (Boolean.TRUE.equals(sendToSAC)) {
+            return true;
+        }
+
+        Boolean notificationForSAC = doc.getBoolean("notificationForSAC");
+
+        if (Boolean.TRUE.equals(notificationForSAC)) {
+            return true;
+        }
+
+        Boolean notificationForSac = doc.getBoolean("notificationForSac");
+
+        if (Boolean.TRUE.equals(notificationForSac)) {
+            return true;
+        }
+
+        String notificationTarget = getStringValue(doc, "notificationTarget");
+
+        if ("SAC".equalsIgnoreCase(notificationTarget)) {
+            return true;
+        }
+
+        String workflowStage = getStringValue(doc, "workflowStage");
+
+        if ("SAC_REVIEW".equalsIgnoreCase(workflowStage)
+                || "REJECTED_BY_SAC".equalsIgnoreCase(workflowStage)) {
+            return true;
+        }
+
+        String sacStatus = getStringValue(doc, "sacStatus");
+
+        return "Pending".equalsIgnoreCase(sacStatus)
+                || "Approved".equalsIgnoreCase(sacStatus)
+                || "Rejected".equalsIgnoreCase(sacStatus);
+    }
+
+    private boolean isStudentCenterFacility(DocumentSnapshot doc) {
+        String finalFacilityName = getStringValue(doc, "finalFacilityName");
+        String facility = getStringValue(doc, "facility");
+        String selectedFacility = getStringValue(doc, "selectedFacility");
+        String facilityName = getStringValue(doc, "facilityName");
+
+        return isStudentCenterText(finalFacilityName)
+                || isStudentCenterText(facility)
+                || isStudentCenterText(selectedFacility)
+                || isStudentCenterText(facilityName);
+    }
+
+    private boolean isStudentCenterText(String value) {
+        if (value == null) {
+            return false;
+        }
+
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+
+        return "student center".equals(normalized)
+                || normalized.contains("student center");
+    }
+
+    private String getDisplayStatus(DocumentSnapshot doc) {
+        String status = getStringValue(doc, "status");
+        String sacStatus = getStringValue(doc, "sacStatus");
+
+        if ("Rejected".equalsIgnoreCase(status)
+                || "Rejected".equalsIgnoreCase(sacStatus)
+                || "Returned".equalsIgnoreCase(status)
+                || "Returned".equalsIgnoreCase(sacStatus)) {
+            return "Rejected";
+        }
+
+        if ("Approved".equalsIgnoreCase(sacStatus)
+                || "Approved".equalsIgnoreCase(status)) {
+            return "Approved";
+        }
+
+        return "Pending";
+    }
+
+    private String buildDescriptionText(
+            DocumentSnapshot doc,
+            String status
+    ) {
+        String title = getStringValue(doc, "sacNotificationTitle");
+        String message = getStringValue(doc, "sacNotificationMessage");
+
+        if (title.isEmpty()) {
+            title = getStringValue(doc, "notificationTitle");
+        }
+
+        if (message.isEmpty()) {
+            message = getStringValue(doc, "notificationMessage");
+        }
+
+        if (!title.isEmpty() && !message.isEmpty()) {
+            return title + "\n" + message;
+        }
+
+        if (!message.isEmpty()) {
+            return message;
+        }
+
+        String requestorName = getStringValue(doc, "requestorName");
+        String fullName = getStringValue(doc, "fullName");
+        String nameToShow = !requestorName.isEmpty() ? requestorName : fullName;
+
+        if ("Approved".equalsIgnoreCase(status)) {
+            return "This Student Center request has already been approved by SAC.";
+        }
+
+        if ("Returned".equalsIgnoreCase(status)) {
+            return "This Student Center request has been returned or rejected.";
+        }
+
+        if (!nameToShow.isEmpty()) {
+            return nameToShow + " submitted a Student Center request that is waiting for SAC review.";
+        }
+
+        return "A new Student Center request is waiting for SAC review.";
+    }
+
+    private String buildNotifiedDateText(DocumentSnapshot doc) {
+        Timestamp timestamp = getBestNotificationTimestamp(doc);
+
+        if (timestamp == null) {
+            return "Notified date not available";
+        }
+
+        SimpleDateFormat formatter =
+                new SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault());
+
+        return formatter.format(timestamp.toDate());
+    }
+
+    private Timestamp getBestNotificationTimestamp(DocumentSnapshot doc) {
+        Timestamp timestamp = doc.getTimestamp("sacNotifiedAt");
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("notificationUpdatedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("sacNotificationOpenedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("updatedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("createdAt");
+        }
+
+        return timestamp;
+    }
+
+    private String buildMetaText(
+            String facility,
+            String startDate,
+            String endDate,
+            String startTime,
+            String endTime
+    ) {
+        StringBuilder builder = new StringBuilder();
+
+        if (!facility.isEmpty()) {
+            builder.append(facility);
+        }
+
+        if (!startDate.isEmpty()) {
+            if (builder.length() > 0) builder.append(" • ");
+
+            if (!endDate.isEmpty() && !startDate.equalsIgnoreCase(endDate)) {
+                builder.append(startDate).append(" - ").append(endDate);
+            } else {
+                builder.append(startDate);
+            }
+        }
+
+        if (!startTime.isEmpty()) {
+            if (builder.length() > 0) builder.append(" • ");
+
+            if (!endTime.isEmpty()) {
+                builder.append(startTime).append(" - ").append(endTime);
+            } else {
+                builder.append(startTime);
+            }
+        }
+
+        return builder.length() == 0
+                ? "No schedule details"
+                : builder.toString();
+    }
+
+    private String getFinalFacility(DocumentSnapshot doc) {
+        String finalFacilityName = getStringValue(doc, "finalFacilityName");
+
+        if (!finalFacilityName.isEmpty()) {
+            return finalFacilityName;
+        }
+
+        String facility = getStringValue(doc, "facility");
+        String otherFacility = getStringValue(doc, "otherFacility");
+
+        if ("Others".equalsIgnoreCase(facility)
+                && !otherFacility.isEmpty()) {
+            return otherFacility;
+        }
+
+        return facility;
+    }
+
+    private int getStatusIcon(String status) {
+        if ("Approved".equalsIgnoreCase(status)) {
+            return android.R.drawable.checkbox_on_background;
+        }
+
+        if ("Rejected".equalsIgnoreCase(status)) {
+            return android.R.drawable.ic_delete;
+        }
+
+        return android.R.drawable.ic_dialog_info;
+    }
+
+    private int getStatusMainColor(String status) {
+        if ("Approved".equalsIgnoreCase(status)) {
+            return Color.parseColor("#2E7D32");
+        }
+
+        if ("Rejected".equalsIgnoreCase(status)) {
+            return Color.parseColor("#970705");
+        }
+
+        return Color.parseColor("#313131");
+    }
+
+    private int getStatusLightColor(String status) {
+        if ("Approved".equalsIgnoreCase(status)) {
+            return Color.parseColor("#E7F4E8");
+        }
+
+        if ("Rejected".equalsIgnoreCase(status)) {
+            return Color.parseColor("#F3D9D9");
+        }
+
+        return Color.parseColor("#EEEEEE");
+    }
+
+    private void showEmptyState() {
+        if (layoutNotificationList != null) {
+            layoutNotificationList.setVisibility(View.GONE);
+        }
+
+        if (layoutEmptyState != null) {
+            layoutEmptyState.setVisibility(View.VISIBLE);
+        }
+
+        if (tvIncomingCount != null) {
+            tvIncomingCount.setText("0 incoming booking requests • 0 recent notifications");
+        }
+    }
+
+    private String getStringValue(DocumentSnapshot doc, String field) {
         Object value = doc.get(field);
 
         return value == null
                 ? ""
                 : String.valueOf(value).trim();
+    }
+
+    private int dp(int value) {
+        return Math.round(
+                value * getResources().getDisplayMetrics().density
+        );
     }
 }

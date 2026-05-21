@@ -82,7 +82,6 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private void setupFilter() {
-
         String[] filterOptions = {
                 "All",
                 "Pending",
@@ -106,18 +105,15 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private void listenForSACRequests() {
-
         if (requestsListener != null) {
             requestsListener.remove();
         }
 
         requestsListener = db.collection("requests")
                 .addSnapshotListener((snapshot, error) -> {
-
                     if (!isAdded()) return;
 
                     if (error != null || snapshot == null) {
-
                         Toast.makeText(
                                 requireContext(),
                                 "Failed to load SAC requests.",
@@ -135,7 +131,6 @@ public class sacRequestsFragment extends Fragment {
                     sacRequestList.clear();
 
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-
                         if (isSACRequest(doc) && RequestDataHelper.shouldShowInRequestList(doc)) {
                             sacRequestList.add(doc);
                         }
@@ -146,6 +141,9 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private boolean isSACRequest(DocumentSnapshot doc) {
+        if (!isStudentCenterFacility(doc)) {
+            return false;
+        }
 
         Boolean sendToSAC = doc.getBoolean("sendToSAC");
 
@@ -153,12 +151,9 @@ public class sacRequestsFragment extends Fragment {
             return true;
         }
 
-        String sacStatus = getStringValue(doc, "sacStatus");
+        Boolean notificationForSAC = doc.getBoolean("notificationForSAC");
 
-        if ("Approved".equalsIgnoreCase(sacStatus)
-                || "Rejected".equalsIgnoreCase(sacStatus)
-                || "Pending".equalsIgnoreCase(sacStatus)) {
-
+        if (Boolean.TRUE.equals(notificationForSAC)) {
             return true;
         }
 
@@ -170,14 +165,42 @@ public class sacRequestsFragment extends Fragment {
 
         String workflowStage = getStringValue(doc, "workflowStage");
 
-        return "SAC_REVIEW".equalsIgnoreCase(workflowStage)
-                || "GSO_REVIEW".equalsIgnoreCase(workflowStage)
-                || "WAITING_ITSO_APPROVAL".equalsIgnoreCase(workflowStage)
-                || "REJECTED_BY_SAC".equalsIgnoreCase(workflowStage);
+        if ("SAC_REVIEW".equalsIgnoreCase(workflowStage)
+                || "REJECTED_BY_SAC".equalsIgnoreCase(workflowStage)) {
+            return true;
+        }
+
+        String sacStatus = getStringValue(doc, "sacStatus");
+
+        return "Pending".equalsIgnoreCase(sacStatus)
+                || "Approved".equalsIgnoreCase(sacStatus)
+                || "Rejected".equalsIgnoreCase(sacStatus);
+    }
+
+    private boolean isStudentCenterFacility(DocumentSnapshot doc) {
+        String finalFacilityName = getStringValue(doc, "finalFacilityName");
+        String facility = getStringValue(doc, "facility");
+        String selectedFacility = getStringValue(doc, "selectedFacility");
+        String facilityName = getStringValue(doc, "facilityName");
+
+        return isStudentCenterText(finalFacilityName)
+                || isStudentCenterText(facility)
+                || isStudentCenterText(selectedFacility)
+                || isStudentCenterText(facilityName);
+    }
+
+    private boolean isStudentCenterText(String value) {
+        if (value == null) {
+            return false;
+        }
+
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+
+        return "student center".equals(normalized)
+                || normalized.contains("student center");
     }
 
     private void renderRequestList() {
-
         if (layoutRequestList == null || layoutEmptyState == null) return;
 
         layoutRequestList.removeAllViews();
@@ -185,21 +208,18 @@ public class sacRequestsFragment extends Fragment {
         List<DocumentSnapshot> filtered = new ArrayList<>();
 
         for (DocumentSnapshot doc : sacRequestList) {
-
             String status = getDisplayStatus(doc);
 
             if ("All".equalsIgnoreCase(selectedFilter)
                     || selectedFilter.equalsIgnoreCase(status)) {
-
                 filtered.add(doc);
             }
         }
 
         if (filtered.isEmpty()) {
-
             showEmptyState(
                     "No " + selectedFilter.toLowerCase(Locale.getDefault()) + " requests",
-                    "There are no SAC requests under this selected filter."
+                    "There are no Student Center requests under this selected filter."
             );
 
             return;
@@ -214,7 +234,6 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private View createRequestCard(DocumentSnapshot doc) {
-
         String requestId = doc.getId();
 
         String purpose = getStringValue(doc, "purpose");
@@ -291,7 +310,7 @@ public class sacRequestsFragment extends Fragment {
 
         TextView tvTitle = new TextView(requireContext());
 
-        tvTitle.setText(!purpose.isEmpty() ? purpose : "SAC Request");
+        tvTitle.setText(!purpose.isEmpty() ? purpose : "Student Center Request");
         tvTitle.setTextColor(Color.parseColor("#313131"));
         tvTitle.setTextSize(16f);
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -385,9 +404,7 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private void openViewDetails(String requestId) {
-
         if (requestId == null || requestId.trim().isEmpty()) {
-
             Toast.makeText(
                     requireContext(),
                     "Request ID not found.",
@@ -409,19 +426,16 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private String getDisplayStatus(DocumentSnapshot doc) {
-
         String sacStatus = getStringValue(doc, "sacStatus");
         String status = getStringValue(doc, "status");
 
         if ("Rejected".equalsIgnoreCase(sacStatus)
                 || "Rejected".equalsIgnoreCase(status)) {
-
             return "Rejected";
         }
 
         if ("Approved".equalsIgnoreCase(sacStatus)
                 || "Approved".equalsIgnoreCase(status)) {
-
             return "Approved";
         }
 
@@ -429,18 +443,11 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private String buildRequestSummary(DocumentSnapshot doc) {
-
         StringBuilder builder = new StringBuilder();
 
         String facility = getFinalFacility(doc);
-
         String participants = getStringValue(doc, "participants");
-
-        String numberOfParticipants = getStringValue(
-                doc,
-                "numberOfParticipants"
-        );
-
+        String numberOfParticipants = getStringValue(doc, "numberOfParticipants");
         String purpose = getStringValue(doc, "purpose");
 
         builder.append("Facility: ")
@@ -469,7 +476,6 @@ public class sacRequestsFragment extends Fragment {
             String startTime,
             String endTime
     ) {
-
         StringBuilder builder = new StringBuilder();
 
         if (!facility.isEmpty()) {
@@ -477,35 +483,29 @@ public class sacRequestsFragment extends Fragment {
         }
 
         if (!startDate.isEmpty()) {
-
             if (builder.length() > 0) {
                 builder.append(" • ");
             }
 
             if (!endDate.isEmpty()
                     && !startDate.equalsIgnoreCase(endDate)) {
-
                 builder.append(startDate)
                         .append(" - ")
                         .append(endDate);
-
             } else {
                 builder.append(startDate);
             }
         }
 
         if (!startTime.isEmpty()) {
-
             if (builder.length() > 0) {
                 builder.append(" • ");
             }
 
             if (!endTime.isEmpty()) {
-
                 builder.append(startTime)
                         .append(" - ")
                         .append(endTime);
-
             } else {
                 builder.append(startTime);
             }
@@ -517,7 +517,6 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private String getFinalFacility(DocumentSnapshot doc) {
-
         String finalFacilityName = getStringValue(
                 doc,
                 "finalFacilityName"
@@ -536,7 +535,6 @@ public class sacRequestsFragment extends Fragment {
 
         if ("Others".equalsIgnoreCase(facility)
                 && !otherFacility.isEmpty()) {
-
             return otherFacility;
         }
 
@@ -544,7 +542,6 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private int getStatusIcon(String status) {
-
         if ("Approved".equalsIgnoreCase(status)) {
             return android.R.drawable.checkbox_on_background;
         }
@@ -557,7 +554,6 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private int getStatusMainColor(String status) {
-
         if ("Approved".equalsIgnoreCase(status)) {
             return Color.parseColor("#2E7D32");
         }
@@ -570,7 +566,6 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private int getStatusLightColor(String status) {
-
         if ("Approved".equalsIgnoreCase(status)) {
             return Color.parseColor("#E7F4E8");
         }
@@ -583,7 +578,6 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private void showEmptyState(String title, String subtitle) {
-
         layoutRequestList.setVisibility(View.GONE);
         layoutEmptyState.setVisibility(View.VISIBLE);
 
@@ -597,7 +591,6 @@ public class sacRequestsFragment extends Fragment {
     }
 
     private String getStringValue(DocumentSnapshot doc, String field) {
-
         Object value = doc.get(field);
 
         return value == null
