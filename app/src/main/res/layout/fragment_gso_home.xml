@@ -37,7 +37,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:alpha="0.75"
-                    android:text="Good Day"
+                    tools:text="Good Morning"
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
@@ -46,45 +46,13 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="Hello, GSO Admin"
+                    android:text="Hello,"
                     android:textColor="#313131"
                     android:textSize="26sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    tools:text="Hello, Maria Santos" />
             </LinearLayout>
 
-            <FrameLayout
-                android:layout_width="50dp"
-                android:layout_height="50dp">
-
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
-                    app:cardBackgroundColor="#970705"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="0dp">
-
-                    <ImageView
-                        android:id="@+id/ivNotifications"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:contentDescription="Notifications"
-                        android:padding="12dp"
-                        android:src="@android:drawable/ic_dialog_email"
-                        app:tint="#FFFFFF" />
-                </com.google.android.material.card.MaterialCardView>
-
-                <TextView
-                    android:id="@+id/badgeGsoNotifications"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:layout_gravity="end|top"
-                    android:gravity="center"
-                    android:text="0"
-                    android:textColor="#FFFFFF"
-                    android:textSize="9sp"
-                    android:textStyle="bold"
-                    android:visibility="gone" />
-            </FrameLayout>
         </LinearLayout>
 
         <com.google.android.material.card.MaterialCardView
@@ -185,10 +153,10 @@
                         android:id="@+id/tvPendingCount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="12"
                         android:textColor="#FFFFFF"
                         android:textSize="28sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        tools:text="12" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -225,10 +193,10 @@
                         android:id="@+id/tvApprovedCount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="26"
                         android:textColor="#970705"
                         android:textSize="28sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        tools:text="26" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -271,10 +239,10 @@
                         android:id="@+id/tvUsersCount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="48"
                         android:textColor="#313131"
                         android:textSize="28sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        tools:text="48" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -309,10 +277,10 @@
                         android:id="@+id/tvReportsCount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="09"
                         android:textColor="#970705"
                         android:textSize="28sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        tools:text="09" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -330,7 +298,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="Booked Schedule Calendar"
+            android:text="Scheduled Requests"
             android:textColor="#313131"
             android:textSize="21sp"
             android:textStyle="bold" />
@@ -373,10 +341,10 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:gravity="center"
-                        android:text="April 2026"
                         android:textColor="#313131"
                         android:textSize="22sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        tools:text="April 2026" />
 
                     <ImageButton
                         android:id="@+id/btnNextMonth"
@@ -395,134 +363,37 @@
                     android:gravity="center"
                     android:orientation="horizontal">
 
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:text="SUN"
-                        android:textColor="#970705"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:text="MON"
-                        android:textColor="#970705"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:text="TUE"
-                        android:textColor="#970705"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:text="WED"
-                        android:textColor="#970705"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:text="THU"
-                        android:textColor="#970705"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:text="FRI"
-                        android:textColor="#970705"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:text="SAT"
-                        android:textColor="#970705"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="SUN" android:textColor="#970705" android:textSize="12sp" android:textStyle="bold" />
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="MON" android:textColor="#970705" android:textSize="12sp" android:textStyle="bold" />
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="TUE" android:textColor="#970705" android:textSize="12sp" android:textStyle="bold" />
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="WED" android:textColor="#970705" android:textSize="12sp" android:textStyle="bold" />
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="THU" android:textColor="#970705" android:textSize="12sp" android:textStyle="bold" />
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="FRI" android:textColor="#970705" android:textSize="12sp" android:textStyle="bold" />
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="SAT" android:textColor="#970705" android:textSize="12sp" android:textStyle="bold" />
                 </LinearLayout>
 
                 <GridLayout
                     android:id="@+id/calendarGrid"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:alignmentMode="alignMargins"
-                    android:columnCount="7"
-                    android:rowCount="6"
-                    android:useDefaultMargins="true" />
+                    android:layout_marginTop="8dp"
+                    android:columnCount="7" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:gravity="center_vertical"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
                     android:orientation="horizontal">
 
-                    <View
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:background="#970705" />
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:background="#970705" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:text="Fully booked" android:textColor="#313131" android:textSize="12sp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:text="Fully booked"
-                        android:textColor="#313131"
-                        android:textSize="12sp" />
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:layout_marginStart="14dp" android:background="#313131" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:text="Selected day" android:textColor="#313131" android:textSize="12sp" />
 
-                    <View
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:layout_marginStart="14dp"
-                        android:background="#313131" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:text="Selected day"
-                        android:textColor="#313131"
-                        android:textSize="12sp" />
-
-                    <View
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:layout_marginStart="14dp"
-                        android:background="#F3D9D9" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:text="Partially booked"
-                        android:textColor="#313131"
-                        android:textSize="12sp" />
+                    <View android:layout_width="12dp" android:layout_height="12dp" android:layout_marginStart="14dp" android:background="#F3D9D9" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:text="Partially booked" android:textColor="#313131" android:textSize="12sp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -559,13 +430,11 @@
                     android:id="@+id/tvSelectedDate"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Selected Date"
                     android:textColor="#313131"
                     android:textSize="17sp"
-                    android:textStyle="bold" />
-
+                    android:textStyle="bold"
+                    tools:text="Selected Date" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

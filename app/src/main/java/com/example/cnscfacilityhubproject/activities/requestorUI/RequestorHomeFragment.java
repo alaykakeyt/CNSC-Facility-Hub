@@ -1,48 +1,18 @@
 package com.example.cnscfacilityhubproject.activities.requestorUI;
 
-import android.content.res.ColorStateList;
-import android.graphics.Color;
-import android.os.Bundle;
-import android.view.Gravity;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.GridLayout;
-import android.widget.ImageButton;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.Toast;
+import android.content.res.ColorStateList;import android.graphics.Color;import android.os.Bundle;import android.view.Gravity;import android.view.View;import android.view.ViewGroup;import android.widget.GridLayout;import android.widget.ImageButton;import android.widget.LinearLayout;import android.widget.TextView;import android.widget.Toast;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
+import androidx.annotation.NonNull;import androidx.annotation.Nullable;import androidx.fragment.app.Fragment;
 
-import com.example.cnscfacilityhubproject.R;
-import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.card.MaterialCardView;
-import com.google.android.material.chip.Chip;
-import com.google.firebase.Timestamp;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.ListenerRegistration;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.example.cnscfacilityhubproject.R;import com.example.cnscfacilityhubproject.utils.RequestDataHelper;import com.google.android.material.button.MaterialButton;import com.google.android.material.card.MaterialCardView;import com.google.android.material.chip.Chip;import com.google.firebase.Timestamp;import com.google.firebase.auth.FirebaseAuth;import com.google.firebase.firestore.DocumentSnapshot;import com.google.firebase.firestore.FirebaseFirestore;import com.google.firebase.firestore.ListenerRegistration;import com.google.firebase.firestore.QueryDocumentSnapshot;
 
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.text.SimpleDateFormat;import java.util.ArrayList;import java.util.Arrays;import java.util.Calendar;import java.util.Collections;import java.util.HashMap;import java.util.List;import java.util.Locale;import java.util.Map;
 
 import android.widget.ImageView;
 
-import android.content.Context;
-import android.content.SharedPreferences;
-public class RequestorHomeFragment extends Fragment {
+import android.content.Context;import android.content.SharedPreferences;
+
+import android.text.TextUtils;public class RequestorHomeFragment extends Fragment {
 
     private TextView tvGreeting;
     private TextView tvRequestorName;
@@ -77,7 +47,6 @@ public class RequestorHomeFragment extends Fragment {
 
     private static final int COLOR_PRIMARY = Color.parseColor("#970705");
     private static final int COLOR_DEFAULT = Color.parseColor("#313131");
-
 
 
     public RequestorHomeFragment() {
@@ -437,9 +406,10 @@ public class RequestorHomeFragment extends Fragment {
             }
         }
 
-        String status = getSafeString(doc.getString("status"), "Pending");
+        String status = getRequestorScheduleDisplayStatus(doc);
 
         return new BookingItem(
+                doc.getId(),
                 dateKey,
                 purpose,
                 facility,
@@ -449,6 +419,53 @@ public class RequestorHomeFragment extends Fragment {
                 timeEndText,
                 status
         );
+    }
+
+    private String getRequestorScheduleDisplayStatus(DocumentSnapshot doc) {
+        String status = getSafeString(doc.getString("status"), "Pending");
+        String sacStatus = firstNonEmpty(
+                getSafeString(doc.getString("sacStatus"), ""),
+                getSafeString(doc.getString("sacApprovalStatus"), "")
+        );
+        String itsoStatus = firstNonEmpty(
+                getSafeString(doc.getString("itsoStatus"), ""),
+                getSafeString(doc.getString("itsoApprovalStatus"), "")
+        );
+        String gsoStatus = getSafeString(doc.getString("gsoStatus"), "");
+        String workflowStage = getSafeString(doc.getString("workflowStage"), "");
+        String approvedBy = getSafeString(doc.getString("approvedBy"), "");
+
+        if (isReturnedOrRejected(status)
+                || isReturnedOrRejected(sacStatus)
+                || isReturnedOrRejected(itsoStatus)
+                || isReturnedOrRejected(gsoStatus)) {
+            return "Returned";
+        }
+
+        if (isApprovedByGSO(gsoStatus, workflowStage, approvedBy)) {
+            return "Approved";
+        }
+
+        return "Pending";
+    }
+
+    private boolean isApprovedByGSO(String gsoStatus, String workflowStage, String approvedBy) {
+        boolean approvedByGSO = "GSO".equalsIgnoreCase(approvedBy);
+
+        if (!approvedByGSO) {
+            return false;
+        }
+
+        return "Approved".equalsIgnoreCase(gsoStatus)
+                || "GSO_APPROVED".equalsIgnoreCase(workflowStage)
+                || "APPROVED".equalsIgnoreCase(workflowStage);
+    }
+
+    private boolean isReturnedOrRejected(String status) {
+        return "Returned".equalsIgnoreCase(status)
+                || "Rejected".equalsIgnoreCase(status)
+                || "Cancelled".equalsIgnoreCase(status)
+                || "Declined".equalsIgnoreCase(status);
     }
 
     private List<String> getDateKeysFromDocument(DocumentSnapshot doc) {
@@ -724,26 +741,31 @@ public class RequestorHomeFragment extends Fragment {
         );
         row.setLayoutParams(rowParams);
 
-        MaterialCardView timeCard = new MaterialCardView(requireContext());
-        LinearLayout.LayoutParams timeCardParams = new LinearLayout.LayoutParams(dp(54), dp(54));
-        timeCard.setLayoutParams(timeCardParams);
-        timeCard.setCardBackgroundColor(Color.parseColor("#970705"));
-        timeCard.setRadius(dp(18));
-        timeCard.setCardElevation(0);
+        String timeBadge = getTimeBadgeText(item.timeStartText);
 
-        TextView timeText = new TextView(requireContext());
-        timeText.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-        ));
-        timeText.setGravity(Gravity.CENTER);
-        timeText.setText(getTimeBadgeText(item.timeStartText));
-        timeText.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        timeText.setTextColor(Color.WHITE);
-        timeText.setTextSize(12f);
-        timeText.setTypeface(null, android.graphics.Typeface.BOLD);
+        if (!timeBadge.isEmpty()) {
+            MaterialCardView timeCard = new MaterialCardView(requireContext());
+            LinearLayout.LayoutParams timeCardParams = new LinearLayout.LayoutParams(dp(54), dp(54));
+            timeCard.setLayoutParams(timeCardParams);
+            timeCard.setCardBackgroundColor(Color.parseColor("#970705"));
+            timeCard.setRadius(dp(18));
+            timeCard.setCardElevation(0f);
 
-        timeCard.addView(timeText);
+            TextView timeText = new TextView(requireContext());
+            timeText.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+            ));
+            timeText.setGravity(Gravity.CENTER);
+            timeText.setText(timeBadge);
+            timeText.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+            timeText.setTextColor(Color.WHITE);
+            timeText.setTextSize(12f);
+            timeText.setTypeface(null, android.graphics.Typeface.BOLD);
+
+            timeCard.addView(timeText);
+            row.addView(timeCard);
+        }
 
         LinearLayout detailsLayout = new LinearLayout(requireContext());
         detailsLayout.setOrientation(LinearLayout.VERTICAL);
@@ -753,79 +775,241 @@ public class RequestorHomeFragment extends Fragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 1f
         );
-        detailsParams.setMargins(dp(14), 0, dp(10), 0);
+        detailsParams.setMargins(timeBadge.isEmpty() ? 0 : dp(14), 0, dp(10), 0);
         detailsLayout.setLayoutParams(detailsParams);
 
-        TextView titleText = new TextView(requireContext());
-        titleText.setText(item.purpose);
-        titleText.setTextColor(Color.parseColor("#313131"));
-        titleText.setTextSize(15f);
-        titleText.setTypeface(null, android.graphics.Typeface.BOLD);
+        String title = firstNonEmpty(item.purpose, item.facility);
+        if (!title.isEmpty()) {
+            TextView titleText = new TextView(requireContext());
+            titleText.setText(title);
+            titleText.setTextColor(Color.parseColor("#313131"));
+            titleText.setTextSize(15f);
+            titleText.setTypeface(null, android.graphics.Typeface.BOLD);
+            titleText.setSingleLine(true);
+            titleText.setEllipsize(TextUtils.TruncateAt.END);
+            detailsLayout.addView(titleText);
+        }
 
-        TextView subtitleText = new TextView(requireContext());
-        subtitleText.setText(item.facility + " • " + item.timeStartText + " - " + item.timeEndText);
-        subtitleText.setTextColor(Color.parseColor("#313131"));
-        subtitleText.setTextSize(12f);
-        subtitleText.setAlpha(0.72f);
+        String facilityMeta = buildFacilityMeta(item, title);
+        if (!facilityMeta.isEmpty()) {
+            detailsLayout.addView(createScheduleInfoText(facilityMeta, false));
+        }
 
-        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        subtitleParams.setMargins(0, dp(4), 0, 0);
-        subtitleText.setLayoutParams(subtitleParams);
+        String dateRange = buildDateRange(item.startDateText, item.endDateText);
+        if (!dateRange.isEmpty()) {
+            detailsLayout.addView(createScheduleInfoText("" + dateRange, true));
+        }
 
-        detailsLayout.addView(titleText);
-        detailsLayout.addView(subtitleText);
+        String timeRange = buildTimeRange(item.timeStartText, item.timeEndText);
+        if (!timeRange.isEmpty()) {
+            detailsLayout.addView(createScheduleInfoText("" + timeRange, true));
+        }
 
-        Chip statusChip = new Chip(requireContext());
-        statusChip.setText(item.status);
-        statusChip.setTextSize(12f);
-        statusChip.setTextColor(Color.parseColor("#970705"));
-        statusChip.setChipBackgroundColor(ColorStateList.valueOf(Color.parseColor("#F3D9D9")));
-        statusChip.setChipStrokeWidth(0);
-        statusChip.setCheckable(false);
-        statusChip.setClickable(false);
-
-        row.addView(timeCard);
         row.addView(detailsLayout);
-        row.addView(statusChip);
+
+        if (item.status != null && !item.status.trim().isEmpty()) {
+            Chip statusChip = new Chip(requireContext());
+
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(
+                    dp(104),
+                    dp(34)
+            );
+            chipParams.setMargins(dp(4), 0, 0, 0);
+            statusChip.setLayoutParams(chipParams);
+
+            statusChip.setText(item.status);
+            statusChip.setTextSize(11f);
+            statusChip.setGravity(Gravity.CENTER);
+            statusChip.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+            statusChip.setSingleLine(true);
+            statusChip.setEllipsize(TextUtils.TruncateAt.END);
+
+            statusChip.setMinWidth(dp(104));
+            statusChip.setMaxWidth(dp(104));
+            statusChip.setMinHeight(dp(34));
+            statusChip.setHeight(dp(34));
+            statusChip.setChipMinHeight(dp(34));
+            statusChip.setEnsureMinTouchTargetSize(false);
+
+            statusChip.setTextColor(getStatusTextColor(item.status));
+            statusChip.setChipBackgroundColor(ColorStateList.valueOf(getStatusBackgroundColor(item.status)));
+            statusChip.setChipStrokeWidth(0);
+            statusChip.setCheckable(false);
+            statusChip.setClickable(true);
+            statusChip.setFocusable(true);
+            statusChip.setOnClickListener(v -> openRequestDetailsFromSchedule(item));
+
+            row.addView(statusChip);
+        }
 
         return row;
     }
 
+    private void openRequestDetailsFromSchedule(BookingItem item) {
+        if (!isAdded() || item == null || item.requestId == null || item.requestId.trim().isEmpty()) {
+            Toast.makeText(requireContext(), "Request details not available.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            requireActivity()
+                    .getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(
+                            R.id.fragment_container,
+                            RequestorRequestDetailsFragment.newInstance(
+                                    item.requestId,
+                                    true,
+                                    true
+                            )
+                    )
+                    .addToBackStack(null)
+                    .commit();
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Unable to open request details.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private TextView createScheduleInfoText(String text, boolean importantLine) {
+        TextView infoText = new TextView(requireContext());
+        infoText.setText(text);
+        infoText.setTextColor(Color.parseColor("#313131"));
+        infoText.setTextSize(12f);
+        infoText.setAlpha(importantLine ? 0.82f : 0.72f);
+        infoText.setSingleLine(true);
+        infoText.setEllipsize(TextUtils.TruncateAt.END);
+
+        LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        infoParams.setMargins(0, dp(4), 0, 0);
+        infoText.setLayoutParams(infoParams);
+
+        return infoText;
+    }
+
+    private String buildFacilityMeta(BookingItem item, String title) {
+        String facility = item.facility == null ? "" : item.facility.trim();
+        if (!facility.isEmpty() && !facility.equalsIgnoreCase(title)) {
+            return facility;
+        }
+        return "";
+    }
+
+    private String buildDateRange(String startDate, String endDate) {
+        String cleanStart = startDate == null ? "" : startDate.trim();
+        String cleanEnd = endDate == null ? "" : endDate.trim();
+
+        if (!cleanStart.isEmpty() && !cleanEnd.isEmpty() && !cleanStart.equalsIgnoreCase(cleanEnd)) {
+            return cleanStart + " - " + cleanEnd;
+        }
+
+        return !cleanStart.isEmpty() ? cleanStart : cleanEnd;
+    }
+
+    private String buildTimeRange(String startTime, String endTime) {
+        String cleanStart = startTime == null ? "" : startTime.trim();
+        String cleanEnd = endTime == null ? "" : endTime.trim();
+
+        if (!cleanStart.isEmpty() && !cleanEnd.isEmpty()) return cleanStart + " - " + cleanEnd;
+        return !cleanStart.isEmpty() ? cleanStart : cleanEnd;
+    }
+
+    private String joinParts(List<String> parts, String separator) {
+        StringBuilder builder = new StringBuilder();
+
+        for (String part : parts) {
+            if (part == null || part.trim().isEmpty()) continue;
+            if (builder.length() > 0) builder.append(separator);
+            builder.append(part.trim());
+        }
+
+        return builder.toString();
+    }
+
+    private int getStatusTextColor(String status) {
+        if ("Approved".equalsIgnoreCase(status)) return Color.parseColor("#2E7D32");
+        if ("Pending".equalsIgnoreCase(status)) return Color.parseColor("#313131");
+        if ("Returned".equalsIgnoreCase(status) || "Rejected".equalsIgnoreCase(status)) return Color.parseColor("#970705");
+        return Color.parseColor("#313131");
+    }
+
+    private int getStatusBackgroundColor(String status) {
+        if ("Approved".equalsIgnoreCase(status)) return Color.parseColor("#E7F4E8");
+        if ("Pending".equalsIgnoreCase(status)) return Color.parseColor("#EEEEEE");
+        if ("Returned".equalsIgnoreCase(status) || "Rejected".equalsIgnoreCase(status)) return Color.parseColor("#F3D9D9");
+        return Color.parseColor("#EEEEEE");
+    }
+
+    private void applyFixedStatusChipSize(Chip statusChip) {
+        if (statusChip == null) return;
+
+        int chipWidth = dp(104);
+        int chipHeight = dp(34);
+
+        LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(chipWidth, chipHeight);
+        statusChip.setLayoutParams(chipParams);
+
+        statusChip.setWidth(chipWidth);
+        statusChip.setMinWidth(chipWidth);
+        statusChip.setMaxWidth(chipWidth);
+
+        statusChip.setHeight(chipHeight);
+        statusChip.setMinHeight(chipHeight);
+        statusChip.setMinimumHeight(chipHeight);
+        statusChip.setChipMinHeight(chipHeight);
+
+        statusChip.setEnsureMinTouchTargetSize(false);
+
+        statusChip.setSingleLine(true);
+        statusChip.setMaxLines(1);
+        statusChip.setEllipsize(TextUtils.TruncateAt.END);
+        statusChip.setGravity(Gravity.CENTER);
+        statusChip.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+        statusChip.setIncludeFontPadding(false);
+
+        statusChip.setChipStartPadding(0f);
+        statusChip.setChipEndPadding(0f);
+        statusChip.setTextStartPadding(0f);
+        statusChip.setTextEndPadding(0f);
+        statusChip.setPadding(0, 0, 0, 0);
+    }
+
+
     private String requestorNameLabel = "";
 
     private String getTimeBadgeText(String timeStartText) {
-        try {
-            if (timeStartText == null || timeStartText.trim().isEmpty()) {
-                return "--\n--";
-            }
-
-            SimpleDateFormat inputFormat = new SimpleDateFormat("hh:mm a", Locale.getDefault());
-            SimpleDateFormat hourFormat = new SimpleDateFormat("hh", Locale.getDefault());
-            SimpleDateFormat amPmFormat = new SimpleDateFormat("a", Locale.getDefault());
-
-            java.util.Date date = inputFormat.parse(timeStartText.trim());
-
-            if (date != null) {
-                return hourFormat.format(date) + "\n" + amPmFormat.format(date);
-            }
-        } catch (Exception ignored) {
-        }
-
         if (timeStartText == null || timeStartText.trim().isEmpty()) {
-            return "--\n--";
+            return "";
         }
 
-        String[] parts = timeStartText.trim().split(" ");
+        String cleanTime = timeStartText.trim();
+        String[] patterns = {"hh:mm a", "h:mm a", "HH:mm"};
+
+        for (String pattern : patterns) {
+            try {
+                SimpleDateFormat inputFormat = new SimpleDateFormat(pattern, Locale.getDefault());
+                SimpleDateFormat hourFormat = new SimpleDateFormat("hh", Locale.getDefault());
+                SimpleDateFormat amPmFormat = new SimpleDateFormat("a", Locale.getDefault());
+
+                java.util.Date parsedTime = inputFormat.parse(cleanTime);
+
+                if (parsedTime != null) {
+                    return hourFormat.format(parsedTime) + "\n" + amPmFormat.format(parsedTime);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        String[] parts = cleanTime.split("\\s+");
 
         if (parts.length >= 2) {
             String hour = parts[0].contains(":") ? parts[0].split(":")[0] : parts[0];
             return hour + "\n" + parts[1];
         }
 
-        return timeStartText;
+        return cleanTime;
     }
 
     private String getDateKeyFromCalendar(Calendar calendar) {
@@ -867,6 +1051,7 @@ public class RequestorHomeFragment extends Fragment {
     }
 
     private static class BookingItem {
+        String requestId;
         String dateKey;
         String purpose;
         String facility;
@@ -877,6 +1062,7 @@ public class RequestorHomeFragment extends Fragment {
         String status;
 
         BookingItem(
+                String requestId,
                 String dateKey,
                 String purpose,
                 String facility,
@@ -886,6 +1072,7 @@ public class RequestorHomeFragment extends Fragment {
                 String timeEndText,
                 String status
         ) {
+            this.requestId = requestId;
             this.dateKey = dateKey;
             this.purpose = purpose;
             this.facility = facility;

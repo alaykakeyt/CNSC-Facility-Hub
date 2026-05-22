@@ -541,7 +541,6 @@ public class sacRequestsViewDetailsFragment extends Fragment {
                                     "requestorNotificationSeen", false,
                                     "requestorNotificationType", "SAC Approved",
                                     "requestorNotificationTitle", "SAC Approved Your Request",
-                                    "requestorNotificationMessage", "SAC approved your Student Center request.",
                                     "notificationForRequestor", true,
                                     "notificationUpdatedAt", FieldValue.serverTimestamp(),
 

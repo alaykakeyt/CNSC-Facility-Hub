@@ -11,6 +11,7 @@
     tools:context=".activities.gsoUI.gsoRequestsViewDetailsFragment">
 
     <LinearLayout
+
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
@@ -22,18 +23,7 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnBack"
-                android:layout_width="46dp"
-                android:layout_height="46dp"
-                android:text="‹"
-                android:textColor="#313131"
-                android:textSize="28sp"
-                app:backgroundTint="#FFFFFF"
-                app:cornerRadius="18dp"
-                app:elevation="0dp"
-                app:strokeColor="#313131"
-                app:strokeWidth="1dp" />
+
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -45,19 +35,11 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="View Request"
+                    android:text="Request Details"
                     android:textColor="#313131"
                     android:textSize="26sp"
                     android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:alpha="0.72"
-                    android:text="Review booking request details"
-                    android:textColor="#313131"
-                    android:textSize="13sp" />
             </LinearLayout>
         </LinearLayout>
 
@@ -91,10 +73,10 @@
                             android:id="@+id/tvPurpose"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Request Details"
                             android:textColor="#FFFFFF"
                             android:textSize="22sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            tools:text="Purpose from Firestore" />
 
                         <TextView
                             android:id="@+id/tvActivityType"
@@ -102,19 +84,19 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="5dp"
                             android:alpha="0.88"
-                            android:text="Facility booking request"
                             android:textColor="#FFFFFF"
-                            android:textSize="13sp" />
+                            android:textSize="13sp"
+                            tools:text="Activity type from Firestore" />
                     </LinearLayout>
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chipStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Pending"
                         android:textStyle="bold"
                         app:chipBackgroundColor="#FFFFFF"
-                        app:chipCornerRadius="18dp" />
+                        app:chipCornerRadius="18dp"
+                        tools:text="Status" />
                 </LinearLayout>
 
                 <TextView
@@ -122,19 +104,19 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Schedule: —"
                     android:textColor="#FFFFFF"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Schedule: Firestore schedule" />
 
                 <TextView
                     android:id="@+id/tvFacility"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="5dp"
-                    android:text="Facility: —"
                     android:textColor="#FFFFFF"
                     android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    tools:text="Facilities: Firestore facilities" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -168,9 +150,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Name: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Name: Firestore name" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -204,9 +186,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Participants: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Participants: Firestore participants" />
 
                 <TextView
                     android:id="@+id/tvPurposeFull"
@@ -214,9 +196,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Purpose: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Purpose: Firestore purpose" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -250,9 +232,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Amenities: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Amenities from Firestore" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -286,18 +268,18 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Technical Requirements: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Technical Requirements: Firestore technicals" />
 
                 <TextView
                     android:id="@+id/tvConnectors"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Connectors / Cables: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Connectors / Cables: Firestore connectors" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -330,9 +312,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="Proposal / Supporting Files: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Proposal / Supporting Files: Firestore files" />
 
                 <LinearLayout
                     android:id="@+id/layoutProposalFiles"
@@ -346,9 +328,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="Route: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Route: Firestore route" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -383,9 +365,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Remarks: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Remarks: Firestore remarks" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

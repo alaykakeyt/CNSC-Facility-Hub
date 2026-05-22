@@ -489,29 +489,37 @@ public class RequestorNotificationFragment extends Fragment {
 
     private String getDisplayStatus(DocumentSnapshot doc) {
         String status = getStringValue(doc, "status");
-        String sacStatus = getStringValue(doc, "sacStatus");
-        String itsoStatus = getStringValue(doc, "itsoStatus");
         String gsoStatus = getStringValue(doc, "gsoStatus");
+        String gsoAvailability = getStringValue(doc, "gsoAvailability");
+        String notificationTarget = getStringValue(doc, "notificationTarget");
+        String workflowStage = getStringValue(doc, "workflowStage");
 
-        if ("Rejected".equalsIgnoreCase(status)
-                || "Rejected".equalsIgnoreCase(sacStatus)
-                || "Rejected".equalsIgnoreCase(itsoStatus)
-                || "Rejected".equalsIgnoreCase(gsoStatus)) {
+        boolean isGsoReturned =
+                "Returned".equalsIgnoreCase(gsoStatus)
+                        || "Rejected".equalsIgnoreCase(gsoStatus)
+                        || "Not Available".equalsIgnoreCase(gsoAvailability)
+                        || "Unavailable".equalsIgnoreCase(gsoAvailability)
+                        || (
+                        "Returned".equalsIgnoreCase(status)
+                                && (
+                                "GSO".equalsIgnoreCase(notificationTarget)
+                                        || "GSO_REVIEW".equalsIgnoreCase(workflowStage)
+                                        || "GSO_RETURNED".equalsIgnoreCase(workflowStage)
+                        )
+                );
+
+        if (isGsoReturned) {
             return "Returned";
         }
 
-        if ("Returned".equalsIgnoreCase(status)
-                || "Returned".equalsIgnoreCase(gsoStatus)) {
-            return "Returned";
-        }
+        boolean isApproved =
+                "Approved".equalsIgnoreCase(status)
+                        || "Approved - Available".equalsIgnoreCase(status)
+                        || "Approved".equalsIgnoreCase(gsoStatus)
+                        || "Available".equalsIgnoreCase(gsoAvailability);
 
-        if ("Approved".equalsIgnoreCase(status)
-                || "Approved".equalsIgnoreCase(gsoStatus)) {
+        if (isApproved) {
             return "Approved";
-        }
-
-        if ("Approved".equalsIgnoreCase(sacStatus)) {
-            return "Pending";
         }
 
         return "Pending";

@@ -40,18 +40,20 @@ import java.util.Map;
 public class RequestorRequestDetailsFragment extends Fragment {
 
     private static final String ARG_REQUEST_ID = "requestId";
+    private static final String ARG_HIDE_REQUESTOR_INFORMATION = "hideRequestorInformation";
+    private static final String ARG_HIDE_PROPOSAL_SECTION = "hideProposalSection";
 
     private FirebaseFirestore db;
     private ListenerRegistration requestListener;
     private String requestId = "";
     private boolean requestMarkedAsSeen = false;
+    private boolean hideRequestorInformation = false;
+    private boolean hideProposalSection = false;
 
     private final List<FirestoreProposalFile> proposalFilesToOpen = new ArrayList<>();
 
     private MaterialButton btnBack;
-    private MaterialButton btnBackBottom;
 
-    private TextView tvDetailsSubtitle;
     private TextView tvDetailPurpose;
     private TextView tvDetailActivityType;
     private Chip chipDetailStatus;
@@ -84,18 +86,32 @@ public class RequestorRequestDetailsFragment extends Fragment {
     private TextView tvDetailNotificationTarget;
     private TextView tvDetailAgreement;
     private LinearLayout layoutProposalFiles;
+    private MaterialCardView cardRequestorInformation;
+    private MaterialCardView cardProposalFiles;
 
     private MaterialCardView cardAdminRemarks;
-    private TextView tvDetailRemarks;
+    private TextView tvDetailItsoRemarks;
+    private TextView tvDetailSacRemarks;
+    private TextView tvDetailGsoRemarks;
 
     public RequestorRequestDetailsFragment() {
         super(R.layout.fragment_requestor_request_details);
     }
 
     public static RequestorRequestDetailsFragment newInstance(String requestId) {
+        return newInstance(requestId, false, false);
+    }
+
+    public static RequestorRequestDetailsFragment newInstance(
+            String requestId,
+            boolean hideRequestorInformation,
+            boolean hideProposalSection
+    ) {
         RequestorRequestDetailsFragment fragment = new RequestorRequestDetailsFragment();
         Bundle args = new Bundle();
         args.putString(ARG_REQUEST_ID, requestId);
+        args.putBoolean(ARG_HIDE_REQUESTOR_INFORMATION, hideRequestorInformation);
+        args.putBoolean(ARG_HIDE_PROPOSAL_SECTION, hideProposalSection);
         fragment.setArguments(args);
         return fragment;
     }
@@ -108,11 +124,14 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
         if (getArguments() != null) {
             requestId = getArguments().getString(ARG_REQUEST_ID, "");
+            hideRequestorInformation = getArguments().getBoolean(ARG_HIDE_REQUESTOR_INFORMATION, false);
+            hideProposalSection = getArguments().getBoolean(ARG_HIDE_PROPOSAL_SECTION, false);
         }
 
         bindViews(view);
         setupButtons();
         clearDynamicFields();
+        applyDetailsVisibilityMode();
 
         if (TextUtils.isEmpty(requestId)) {
             Toast.makeText(requireContext(), "Request ID not found.", Toast.LENGTH_SHORT).show();
@@ -125,8 +144,9 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
     private void bindViews(View view) {
         btnBack = view.findViewById(R.id.btnBack);
+        cardRequestorInformation = view.findViewById(R.id.cardRequestorInformation);
+        cardProposalFiles = view.findViewById(R.id.cardProposalFiles);
 
-        tvDetailsSubtitle = view.findViewById(R.id.tvDetailsSubtitle);
         tvDetailPurpose = view.findViewById(R.id.tvDetailPurpose);
         tvDetailActivityType = view.findViewById(R.id.tvDetailActivityType);
         chipDetailStatus = view.findViewById(R.id.chipDetailStatus);
@@ -159,25 +179,19 @@ public class RequestorRequestDetailsFragment extends Fragment {
         layoutProposalFiles = view.findViewById(R.id.layoutProposalFiles);
 
         cardAdminRemarks = view.findViewById(R.id.cardAdminRemarks);
-        tvDetailRemarks = view.findViewById(R.id.tvDetailRemarks);
+        tvDetailItsoRemarks = view.findViewById(R.id.tvDetailItsoRemarks);
+        tvDetailSacRemarks = view.findViewById(R.id.tvDetailSacRemarks);
+        tvDetailGsoRemarks = view.findViewById(R.id.tvDetailGsoRemarks);
+
     }
 
     private void setupButtons() {
         if (btnBack != null) {
             btnBack.setOnClickListener(v -> goBack());
         }
-
-        if (btnBackBottom != null) {
-            btnBackBottom.setOnClickListener(v -> goBack());
-        }
     }
 
     private void clearDynamicFields() {
-        if (hasDisplayValue(requestId)) {
-            setLabelOnly(tvDetailsSubtitle, "Request ID: " + requestId);
-        } else {
-            hideText(tvDetailsSubtitle);
-        }
 
         hideText(tvDetailPurpose);
         hideText(tvDetailActivityType);
@@ -228,7 +242,21 @@ public class RequestorRequestDetailsFragment extends Fragment {
         if (cardAdminRemarks != null) {
             cardAdminRemarks.setVisibility(View.GONE);
         }
-        hideText(tvDetailRemarks);
+        hideText(tvDetailItsoRemarks);
+        hideText(tvDetailSacRemarks);
+        hideText(tvDetailGsoRemarks);
+
+        applyDetailsVisibilityMode();
+    }
+
+    private void applyDetailsVisibilityMode() {
+        if (cardRequestorInformation != null) {
+            cardRequestorInformation.setVisibility(hideRequestorInformation ? View.GONE : View.VISIBLE);
+        }
+
+        if (cardProposalFiles != null) {
+            cardProposalFiles.setVisibility(hideProposalSection ? View.GONE : View.VISIBLE);
+        }
     }
 
     private void loadRequestDetails() {
@@ -264,7 +292,12 @@ public class RequestorRequestDetailsFragment extends Fragment {
                     }
 
                     displayRequestDetails(documentSnapshot);
-                    loadRequestorInfoIfNeeded(documentSnapshot);
+
+                    if (!hideRequestorInformation) {
+                        loadRequestorInfoIfNeeded(documentSnapshot);
+                    }
+
+                    applyDetailsVisibilityMode();
 
                     if (!documentSnapshot.getMetadata().isFromCache() && !requestMarkedAsSeen) {
                         requestMarkedAsSeen = true;
@@ -330,11 +363,9 @@ public class RequestorRequestDetailsFragment extends Fragment {
         String notificationTarget = getStringValue(doc, "notificationTarget");
         Boolean agreementAccepted = getNullableBooleanValue(doc, "agreementAccepted");
 
-        String remarks = getRemarks(doc);
         String scheduleDisplay = cleanDisplayValue(RequestDataHelper.getScheduleDisplay(doc));
         String facilitiesDisplay = cleanDisplayValue(RequestDataHelper.getFacilitiesDisplay(doc));
 
-        tvDetailsSubtitle.setText("Request ID: " + requestId);
 
         setPlainTextOrHide(tvDetailPurpose, purpose);
         setPlainTextOrHide(tvDetailActivityType, activityType);
@@ -405,14 +436,150 @@ public class RequestorRequestDetailsFragment extends Fragment {
             setLabeledTextOrHide(tvDetailAgreement, "Agreement Accepted: ", yesNo(agreementAccepted));
         }
 
-        bindProposalFiles(proposalFiles);
-
-        if (hasDisplayValue(remarks)) {
-            cardAdminRemarks.setVisibility(View.VISIBLE);
-            setPlainTextOrHide(tvDetailRemarks, remarks);
-        } else {
-            cardAdminRemarks.setVisibility(View.GONE);
+        if (!hideProposalSection) {
+            bindProposalFiles(proposalFiles);
         }
+
+        bindOfficeRemarks(doc, technicalNeeded, selectedTechnicals, connectors, facilitiesDisplay);
+        applyDetailsVisibilityMode();
+    }
+
+    private void bindOfficeRemarks(
+            DocumentSnapshot doc,
+            Boolean technicalNeeded,
+            String selectedTechnicals,
+            String connectors,
+            String facilitiesDisplay
+    ) {
+        boolean showItsoRemarks = shouldShowItsoRemarks(technicalNeeded, selectedTechnicals, connectors, doc);
+        boolean showSacRemarks = shouldShowSacRemarks(facilitiesDisplay, doc);
+
+        String itsoRemarks = getItsoRemarks(doc);
+        String sacRemarks = getSacRemarks(doc);
+        String gsoRemarks = getGsoRemarks(doc);
+
+        if (cardAdminRemarks != null) {
+            cardAdminRemarks.setVisibility(View.VISIBLE);
+        }
+
+
+
+        setOfficeRemarksRow(
+                tvDetailSacRemarks,
+                "SAC Remarks: ",
+                showSacRemarks,
+                sacRemarks,
+                ""
+        );
+        setOfficeRemarksRow(
+                tvDetailItsoRemarks,
+                "ITSO Remarks: ",
+                showItsoRemarks,
+                itsoRemarks,
+                ""
+        );
+
+        setOfficeRemarksRow(
+                tvDetailGsoRemarks,
+                "GSO Remarks: ",
+                true,
+                gsoRemarks,
+                ""
+        );
+    }
+
+    private void setOfficeRemarksRow(
+            TextView textView,
+            String label,
+            boolean shouldShow,
+            String remarks,
+            String emptyText
+    ) {
+        if (textView == null) return;
+
+        if (!shouldShow) {
+            hideText(textView);
+            return;
+        }
+
+        String cleaned = cleanDisplayValue(remarks);
+        textView.setText(label + (cleaned.isEmpty() ? emptyText : cleaned));
+        textView.setVisibility(View.VISIBLE);
+    }
+
+    private boolean shouldShowItsoRemarks(
+            Boolean technicalNeeded,
+            String selectedTechnicals,
+            String connectors,
+            DocumentSnapshot doc
+    ) {
+        if (technicalNeeded != null && technicalNeeded) {
+            return true;
+        }
+
+        if (hasDisplayValue(selectedTechnicals) || hasDisplayValue(connectors)) {
+            return true;
+        }
+
+        String notificationTarget = getStringValue(doc, "notificationTarget");
+        return notificationTarget.toLowerCase(Locale.US).contains("itso");
+    }
+
+    private boolean shouldShowSacRemarks(String facilitiesDisplay, DocumentSnapshot doc) {
+        if (containsStudentCenter(facilitiesDisplay)) {
+            return true;
+        }
+
+        String rawFacilities = firstNonEmpty(
+                getStringValue(doc, "facility"),
+                getStringValue(doc, "facilityName"),
+                getStringValue(doc, "selectedFacility"),
+                getStringValue(doc, "selectedFacilities"),
+                stringifyFirestoreValue(doc.get("facilities")),
+                stringifyFirestoreValue(doc.get("selectedFacilitiesList"))
+        );
+
+        return containsStudentCenter(rawFacilities);
+    }
+
+    private boolean containsStudentCenter(String value) {
+        String cleaned = cleanDisplayValue(value).toLowerCase(Locale.US);
+        if (cleaned.isEmpty()) return false;
+
+        String normalized = cleaned.replaceAll("[^a-z0-9]+", " ").trim();
+        return normalized.contains("student center") || cleaned.replace(" ", "").contains("studentcenter");
+    }
+
+    private String getItsoRemarks(DocumentSnapshot doc) {
+        return firstNonEmpty(
+                getStringValue(doc, "itsoRemarks"),
+                getStringValue(doc, "itsoRemark"),
+                getStringValue(doc, "technicalRemarks"),
+                getStringValue(doc, "technicalRemark"),
+                getStringValue(doc, "itsoReturnReason"),
+                getStringValue(doc, "technicalReturnReason")
+        );
+    }
+
+    private String getSacRemarks(DocumentSnapshot doc) {
+        return firstNonEmpty(
+                getStringValue(doc, "sacRemarks"),
+                getStringValue(doc, "sacRemark"),
+                getStringValue(doc, "studentCenterRemarks"),
+                getStringValue(doc, "studentCenterRemark"),
+                getStringValue(doc, "sacReturnReason")
+        );
+    }
+
+    private String getGsoRemarks(DocumentSnapshot doc) {
+        return firstNonEmpty(
+                getStringValue(doc, "gsoRemarks"),
+                getStringValue(doc, "gsoRemark"),
+                getStringValue(doc, "gsoReturnReason"),
+                getStringValue(doc, "adminRemarks"),
+                getStringValue(doc, "remarks"),
+                getStringValue(doc, "returnReason")
+        );
     }
 
     private String yesNo(boolean value) {
@@ -928,6 +1095,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
                     ColorStateList.valueOf(Color.parseColor("#E7F4E8"))
             );
         } else if ("Returned".equalsIgnoreCase(status)
+                || "Reject".equalsIgnoreCase(status)
                 || "Rejected".equalsIgnoreCase(status)) {
             chipDetailStatus.setTextColor(Color.parseColor("#970705"));
             chipDetailStatus.setChipBackgroundColor(
@@ -1012,13 +1180,17 @@ public class RequestorRequestDetailsFragment extends Fragment {
         return String.valueOf(value).trim();
     }
 
-    private String firstNonEmpty(String first, String second) {
-        if (first != null && !first.trim().isEmpty()) {
-            return first.trim();
+    private String firstNonEmpty(String... values) {
+        if (values == null) {
+            return "";
         }
 
-        if (second != null && !second.trim().isEmpty()) {
-            return second.trim();
+        for (String value : values) {
+            String cleaned = cleanDisplayValue(value);
+
+            if (!cleaned.isEmpty()) {
+                return cleaned;
+            }
         }
 
         return "";

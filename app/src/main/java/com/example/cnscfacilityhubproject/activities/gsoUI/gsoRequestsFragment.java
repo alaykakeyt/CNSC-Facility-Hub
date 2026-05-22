@@ -24,13 +24,17 @@ import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
-import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 public class gsoRequestsFragment extends Fragment {
 
@@ -43,7 +47,6 @@ public class gsoRequestsFragment extends Fragment {
     private TextView tvEmptySubtitle;
 
     private FirebaseFirestore db;
-    private FirebaseAuth mAuth;
     private ListenerRegistration requestsListener;
 
     private String selectedFilter = "All";
@@ -62,10 +65,10 @@ public class gsoRequestsFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view,
+                              @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
 
         if (savedInstanceState != null) {
@@ -85,7 +88,6 @@ public class gsoRequestsFragment extends Fragment {
 
         if (actvRequestFilter != null) {
             actvRequestFilter.setText(selectedFilter, false);
-            setupFilter();
         }
     }
 
@@ -131,12 +133,16 @@ public class gsoRequestsFragment extends Fragment {
         actvRequestFilter.setText(selectedFilter, false);
 
         actvRequestFilter.setOnClickListener(v -> actvRequestFilter.showDropDown());
+
         actvRequestFilter.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) actvRequestFilter.showDropDown();
+            if (hasFocus) {
+                actvRequestFilter.showDropDown();
+            }
         });
 
         actvRequestFilter.setOnItemClickListener((parent, view, position, id) -> {
             Object item = parent.getItemAtPosition(position);
+
             if (item != null) {
                 selectedFilter = item.toString();
                 actvRequestFilter.setText(selectedFilter, false);
@@ -148,6 +154,7 @@ public class gsoRequestsFragment extends Fragment {
     private void listenForGSORequests() {
         if (requestsListener != null) {
             requestsListener.remove();
+            requestsListener = null;
         }
 
         requestsListener = db.collection("requests")
@@ -165,13 +172,33 @@ public class gsoRequestsFragment extends Fragment {
                                 "Unable to load requests",
                                 "Please check your connection and try again."
                         );
+
                         return;
                     }
 
+                    List<DocumentSnapshot> docs =
+                            new ArrayList<>(queryDocumentSnapshots.getDocuments());
+
+                    Collections.sort(docs, new Comparator<DocumentSnapshot>() {
+                        @Override
+                        public int compare(DocumentSnapshot a,
+                                           DocumentSnapshot b) {
+                            Timestamp timeA = getBestNotificationTimestamp(a);
+                            Timestamp timeB = getBestNotificationTimestamp(b);
+
+                            if (timeA == null && timeB == null) return 0;
+                            if (timeA == null) return 1;
+                            if (timeB == null) return -1;
+
+                            return timeB.compareTo(timeA);
+                        }
+                    });
+
                     gsoRequestList.clear();
 
-                    for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
-                        if (isGSORequest(doc) && RequestDataHelper.shouldShowInRequestList(doc)) {
+                    for (DocumentSnapshot doc : docs) {
+                        if (isGSORequest(doc)
+                                && RequestDataHelper.shouldShowInRequestList(doc)) {
                             gsoRequestList.add(doc);
                         }
                     }
@@ -181,7 +208,9 @@ public class gsoRequestsFragment extends Fragment {
     }
 
     private void renderRequestList() {
-        if (layoutRequestList == null || layoutEmptyState == null) return;
+        if (layoutRequestList == null || layoutEmptyState == null) {
+            return;
+        }
 
         layoutRequestList.removeAllViews();
 
@@ -190,18 +219,18 @@ public class gsoRequestsFragment extends Fragment {
         for (DocumentSnapshot doc : gsoRequestList) {
             String displayStatus = getDisplayStatus(doc);
 
-            if ("All".equalsIgnoreCase(selectedFilter)) {
-                filteredList.add(doc);
-            } else if (selectedFilter.equalsIgnoreCase(displayStatus)) {
+            if ("All".equalsIgnoreCase(selectedFilter)
+                    || selectedFilter.equalsIgnoreCase(displayStatus)) {
                 filteredList.add(doc);
             }
         }
 
         if (filteredList.isEmpty()) {
             showEmptyState(
-                    "No " + selectedFilter.toLowerCase() + " requests",
+                    "No " + selectedFilter.toLowerCase(Locale.getDefault()) + " requests",
                     "There are no GSO requests under this selected filter."
             );
+
             return;
         }
 
@@ -219,25 +248,53 @@ public class gsoRequestsFragment extends Fragment {
         String purpose = getStringValue(doc, "purpose");
         String displayStatus = getDisplayStatus(doc);
         String facility = getFinalFacility(doc);
+
         String startDate = getStringValue(doc, "startDateText");
         String endDate = getStringValue(doc, "endDateText");
         String startTime = getStringValue(doc, "timeStartText");
         String endTime = getStringValue(doc, "timeEndText");
 
+        String notifiedDateText = buildNotifiedDateText(doc);
+
+        LinearLayout outerLayout = new LinearLayout(requireContext());
+        outerLayout.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout.LayoutParams outerParams =
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+        outerParams.setMargins(0, 0, 0, dp(12));
+        outerLayout.setLayoutParams(outerParams);
+
+        TextView tvNotifiedDate = new TextView(requireContext());
+        tvNotifiedDate.setText(notifiedDateText);
+        tvNotifiedDate.setTextColor(Color.parseColor("#970705"));
+        tvNotifiedDate.setTextSize(12f);
+        tvNotifiedDate.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        LinearLayout.LayoutParams notifiedDateParams =
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+        notifiedDateParams.setMargins(dp(4), 0, 0, dp(6));
+        tvNotifiedDate.setLayoutParams(notifiedDateParams);
+
         MaterialCardView card = new MaterialCardView(requireContext());
 
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        cardParams.setMargins(0, 0, 0, dp(14));
+        LinearLayout.LayoutParams cardParams =
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
 
         card.setLayoutParams(cardParams);
         card.setCardBackgroundColor(Color.WHITE);
-        card.setRadius(dp(26));
-        card.setCardElevation(dp(7));
-        card.setStrokeWidth(dp(1));
-        card.setStrokeColor(Color.parseColor("#313131"));
+        card.setRadius(dp(24));
+        card.setCardElevation(dp(6));
+        card.setStrokeWidth(dp(2));
+        card.setStrokeColor(getStatusMainColor(displayStatus));
 
         LinearLayout container = new LinearLayout(requireContext());
         container.setOrientation(LinearLayout.VERTICAL);
@@ -248,9 +305,12 @@ public class gsoRequestsFragment extends Fragment {
         headerRow.setGravity(Gravity.CENTER_VERTICAL);
 
         MaterialCardView iconCard = new MaterialCardView(requireContext());
-        LinearLayout.LayoutParams iconCardParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+
+        LinearLayout.LayoutParams iconCardParams =
+                new LinearLayout.LayoutParams(dp(46), dp(46));
+
         iconCard.setLayoutParams(iconCardParams);
-        iconCard.setRadius(dp(16));
+        iconCard.setRadius(dp(15));
         iconCard.setCardElevation(0);
         iconCard.setCardBackgroundColor(getStatusMainColor(displayStatus));
 
@@ -268,11 +328,13 @@ public class gsoRequestsFragment extends Fragment {
         LinearLayout titleLayout = new LinearLayout(requireContext());
         titleLayout.setOrientation(LinearLayout.VERTICAL);
 
-        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
-        );
+        LinearLayout.LayoutParams titleParams =
+                new LinearLayout.LayoutParams(
+                        0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        1f
+                );
+
         titleParams.setMargins(dp(12), 0, dp(8), 0);
         titleLayout.setLayoutParams(titleParams);
 
@@ -283,10 +345,16 @@ public class gsoRequestsFragment extends Fragment {
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
 
         TextView tvMeta = new TextView(requireContext());
-        tvMeta.setText(buildMetaText(facility, startDate, endDate, startTime, endTime));
+        tvMeta.setText(buildMetaText(
+                facility,
+                startDate,
+                endDate,
+                startTime,
+                endTime
+        ));
         tvMeta.setTextColor(Color.parseColor("#313131"));
         tvMeta.setTextSize(12f);
-        tvMeta.setAlpha(0.68f);
+        tvMeta.setAlpha(0.65f);
 
         titleLayout.addView(tvTitle);
         titleLayout.addView(tvMeta);
@@ -294,7 +362,9 @@ public class gsoRequestsFragment extends Fragment {
         Chip chipStatus = new Chip(requireContext());
         chipStatus.setText(displayStatus);
         chipStatus.setTextColor(getStatusMainColor(displayStatus));
-        chipStatus.setChipBackgroundColor(ColorStateList.valueOf(getStatusLightColor(displayStatus)));
+        chipStatus.setChipBackgroundColor(
+                ColorStateList.valueOf(getStatusLightColor(displayStatus))
+        );
         chipStatus.setChipStrokeWidth(0);
         chipStatus.setCheckable(false);
         chipStatus.setClickable(false);
@@ -307,13 +377,14 @@ public class gsoRequestsFragment extends Fragment {
         tvDescription.setText(buildRequestSummary(doc));
         tvDescription.setTextColor(Color.parseColor("#313131"));
         tvDescription.setTextSize(14f);
-        tvDescription.setLineSpacing(3f, 1f);
+        tvDescription.setLineSpacing(2f, 1f);
 
-        LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        descParams.setMargins(0, dp(14), 0, 0);
+        LinearLayout.LayoutParams descParams =
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+        descParams.setMargins(0, dp(12), 0, 0);
         tvDescription.setLayoutParams(descParams);
 
         MaterialButton btnViewRequest = new MaterialButton(requireContext());
@@ -321,15 +392,19 @@ public class gsoRequestsFragment extends Fragment {
         btnViewRequest.setAllCaps(false);
         btnViewRequest.setTextColor(Color.WHITE);
         btnViewRequest.setTypeface(null, android.graphics.Typeface.BOLD);
-        btnViewRequest.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#313131")));
+        btnViewRequest.setBackgroundTintList(
+                ColorStateList.valueOf(Color.parseColor("#313131"))
+        );
         btnViewRequest.setCornerRadius(dp(16));
         btnViewRequest.setElevation(0);
 
-        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(48)
-        );
-        buttonParams.setMargins(0, dp(16), 0, 0);
+        LinearLayout.LayoutParams buttonParams =
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        dp(46)
+                );
+
+        buttonParams.setMargins(0, dp(14), 0, 0);
         btnViewRequest.setLayoutParams(buttonParams);
 
         btnViewRequest.setOnClickListener(v -> openViewDetails(requestId));
@@ -340,16 +415,25 @@ public class gsoRequestsFragment extends Fragment {
 
         card.addView(container);
 
-        return card;
+        outerLayout.addView(tvNotifiedDate);
+        outerLayout.addView(card);
+
+        return outerLayout;
     }
 
     private void openViewDetails(String requestId) {
         if (requestId == null || requestId.trim().isEmpty()) {
-            Toast.makeText(requireContext(), "Request ID not found.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(
+                    requireContext(),
+                    "Request ID not found.",
+                    Toast.LENGTH_SHORT
+            ).show();
+
             return;
         }
 
-        gsoRequestsViewDetailsFragment fragment = gsoRequestsViewDetailsFragment.newInstance(requestId);
+        gsoRequestsViewDetailsFragment fragment =
+                gsoRequestsViewDetailsFragment.newInstance(requestId);
 
         requireActivity()
                 .getSupportFragmentManager()
@@ -370,7 +454,9 @@ public class gsoRequestsFragment extends Fragment {
     private boolean isGSORequest(DocumentSnapshot doc) {
         String workflowStage = getStringValue(doc, "workflowStage");
 
-        if ("GSO_REVIEW".equalsIgnoreCase(workflowStage)) {
+        if ("GSO_REVIEW".equalsIgnoreCase(workflowStage)
+                || "WAITING_GSO_APPROVAL".equalsIgnoreCase(workflowStage)
+                || "REJECTED_BY_GSO".equalsIgnoreCase(workflowStage)) {
             return true;
         }
 
@@ -381,19 +467,35 @@ public class gsoRequestsFragment extends Fragment {
         }
 
         Boolean sendToGSO = doc.getBoolean("sendToGSO");
+        Boolean needsGSO = doc.getBoolean("needsGSO");
+        Boolean notificationForGSO = doc.getBoolean("notificationForGSO");
+        Boolean notificationForGso = doc.getBoolean("notificationForGso");
 
-        return Boolean.TRUE.equals(sendToGSO);
+        if (Boolean.TRUE.equals(sendToGSO)
+                || Boolean.TRUE.equals(needsGSO)
+                || Boolean.TRUE.equals(notificationForGSO)
+                || Boolean.TRUE.equals(notificationForGso)) {
+            return true;
+        }
+
+        String gsoStatus = getStringValue(doc, "gsoStatus");
+
+        return !gsoStatus.isEmpty();
     }
 
     private String getDisplayStatus(DocumentSnapshot doc) {
         String gsoStatus = getStringValue(doc, "gsoStatus");
         String status = getStringValue(doc, "status");
 
-        if ("Approved".equalsIgnoreCase(gsoStatus) || "Approved".equalsIgnoreCase(status)) {
+        if ("Approved".equalsIgnoreCase(gsoStatus)
+                || "Approved".equalsIgnoreCase(status)) {
             return "Approved";
         }
 
-        if ("Returned".equalsIgnoreCase(gsoStatus) || "Returned".equalsIgnoreCase(status)) {
+        if ("Returned".equalsIgnoreCase(gsoStatus)
+                || "Returned".equalsIgnoreCase(status)
+                || "Rejected".equalsIgnoreCase(gsoStatus)
+                || "Rejected".equalsIgnoreCase(status)) {
             return "Returned";
         }
 
@@ -439,10 +541,18 @@ public class gsoRequestsFragment extends Fragment {
         return builder.toString();
     }
 
-    private String buildMetaText(String facility, String startDate, String endDate, String startTime, String endTime) {
+    private String buildMetaText(
+            String facility,
+            String startDate,
+            String endDate,
+            String startTime,
+            String endTime
+    ) {
         StringBuilder builder = new StringBuilder();
 
-        if (!facility.isEmpty()) builder.append(facility);
+        if (!facility.isEmpty()) {
+            builder.append(facility);
+        }
 
         if (!startDate.isEmpty()) {
             if (builder.length() > 0) builder.append(" • ");
@@ -464,18 +574,58 @@ public class gsoRequestsFragment extends Fragment {
             }
         }
 
-        return builder.length() == 0 ? "No schedule details" : builder.toString();
+        return builder.length() == 0
+                ? "No schedule details"
+                : builder.toString();
+    }
+
+    private String buildNotifiedDateText(DocumentSnapshot doc) {
+        Timestamp timestamp = getBestNotificationTimestamp(doc);
+
+        if (timestamp == null) {
+            return "Notified date not available";
+        }
+
+        SimpleDateFormat formatter =
+                new SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault());
+
+        return formatter.format(timestamp.toDate());
+    }
+
+    private Timestamp getBestNotificationTimestamp(DocumentSnapshot doc) {
+        Timestamp timestamp = doc.getTimestamp("gsoNotifiedAt");
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("notificationUpdatedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("gsoNotificationOpenedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("updatedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("createdAt");
+        }
+
+        return timestamp;
     }
 
     private String getFinalFacility(DocumentSnapshot doc) {
         String finalFacilityName = getStringValue(doc, "finalFacilityName");
 
-        if (!finalFacilityName.isEmpty()) return finalFacilityName;
+        if (!finalFacilityName.isEmpty()) {
+            return finalFacilityName;
+        }
 
         String facility = getStringValue(doc, "facility");
         String otherFacility = getStringValue(doc, "otherFacility");
 
-        if ("Others".equalsIgnoreCase(facility) && !otherFacility.isEmpty()) {
+        if ("Others".equalsIgnoreCase(facility)
+                && !otherFacility.isEmpty()) {
             return otherFacility;
         }
 
@@ -483,34 +633,65 @@ public class gsoRequestsFragment extends Fragment {
     }
 
     private int getStatusIcon(String status) {
-        if ("Approved".equalsIgnoreCase(status)) return android.R.drawable.checkbox_on_background;
-        if ("Returned".equalsIgnoreCase(status)) return android.R.drawable.ic_delete;
-        return android.R.drawable.ic_menu_recent_history;
+        if ("Approved".equalsIgnoreCase(status)) {
+            return android.R.drawable.checkbox_on_background;
+        }
+
+        if ("Returned".equalsIgnoreCase(status)) {
+            return android.R.drawable.ic_delete;
+        }
+
+        return android.R.drawable.ic_dialog_info;
     }
 
     private int getStatusMainColor(String status) {
-        if ("Approved".equalsIgnoreCase(status)) return Color.parseColor("#2E7D32");
-        if ("Returned".equalsIgnoreCase(status)) return Color.parseColor("#970705");
+        if ("Approved".equalsIgnoreCase(status)) {
+            return Color.parseColor("#2E7D32");
+        }
+
+        if ("Returned".equalsIgnoreCase(status)) {
+            return Color.parseColor("#970705");
+        }
+
         return Color.parseColor("#313131");
     }
 
     private int getStatusLightColor(String status) {
-        if ("Approved".equalsIgnoreCase(status)) return Color.parseColor("#E7F4E8");
-        if ("Returned".equalsIgnoreCase(status)) return Color.parseColor("#F3D9D9");
+        if ("Approved".equalsIgnoreCase(status)) {
+            return Color.parseColor("#E7F4E8");
+        }
+
+        if ("Returned".equalsIgnoreCase(status)) {
+            return Color.parseColor("#F3D9D9");
+        }
+
         return Color.parseColor("#EEEEEE");
     }
 
     private void showEmptyState(String title, String subtitle) {
-        if (layoutRequestList != null) layoutRequestList.setVisibility(View.GONE);
-        if (layoutEmptyState != null) layoutEmptyState.setVisibility(View.VISIBLE);
+        if (layoutRequestList != null) {
+            layoutRequestList.setVisibility(View.GONE);
+        }
 
-        if (tvEmptyTitle != null) tvEmptyTitle.setText(title);
-        if (tvEmptySubtitle != null) tvEmptySubtitle.setText(subtitle);
+        if (layoutEmptyState != null) {
+            layoutEmptyState.setVisibility(View.VISIBLE);
+        }
+
+        if (tvEmptyTitle != null) {
+            tvEmptyTitle.setText(title);
+        }
+
+        if (tvEmptySubtitle != null) {
+            tvEmptySubtitle.setText(subtitle);
+        }
     }
 
     private String getStringValue(DocumentSnapshot doc, String field) {
-        String value = doc.getString(field);
-        return value != null ? value.trim() : "";
+        Object value = doc.get(field);
+
+        return value == null
+                ? ""
+                : String.valueOf(value).trim();
     }
 
     private int dp(int value) {
@@ -520,6 +701,7 @@ public class gsoRequestsFragment extends Fragment {
     private static class NonFilteringArrayAdapter extends ArrayAdapter<String> {
 
         private final String[] items;
+
         private final Filter noFilter = new Filter() {
             @Override
             protected FilterResults performFiltering(CharSequence constraint) {
@@ -530,7 +712,8 @@ public class gsoRequestsFragment extends Fragment {
             }
 
             @Override
-            protected void publishResults(CharSequence constraint, FilterResults results) {
+            protected void publishResults(CharSequence constraint,
+                                          FilterResults results) {
                 clear();
 
                 if (results != null && results.values instanceof String[]) {
@@ -541,7 +724,11 @@ public class gsoRequestsFragment extends Fragment {
             }
         };
 
-        public NonFilteringArrayAdapter(@NonNull Context context, int resource, @NonNull String[] objects) {
+        public NonFilteringArrayAdapter(
+                @NonNull Context context,
+                int resource,
+                @NonNull String[] objects
+        ) {
             super(context, resource, new ArrayList<String>());
             this.items = objects;
             addAll(objects);

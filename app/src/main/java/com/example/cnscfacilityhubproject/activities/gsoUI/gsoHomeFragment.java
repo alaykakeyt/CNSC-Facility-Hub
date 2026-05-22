@@ -1,6 +1,8 @@
 package com.example.cnscfacilityhubproject.activities.gsoUI;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -41,17 +43,20 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import android.text.TextUtils;
+
 public class gsoHomeFragment extends Fragment {
 
     private TextView tvCalendarMonth;
     private TextView tvSelectedDate;
+    private TextView tvGreeting;
     private TextView gsoHomeWelcome;
 
     private TextView tvPendingCount;
     private TextView tvApprovedCount;
     private TextView tvUsersCount;
     private TextView tvReportsCount;
-    private TextView badgeGsoNotifications;
+
 
     private ImageButton btnPrevMonth;
     private ImageButton btnNextMonth;
@@ -59,7 +64,7 @@ public class gsoHomeFragment extends Fragment {
 
     private MaterialButton btnViewRequests;
     private MaterialButton btnGenerateReport;
-    private ImageView ivNotifications;
+
 
     private View gsoPendingReq;
     private View gsoApprovedReq;
@@ -75,6 +80,7 @@ public class gsoHomeFragment extends Fragment {
     private ListenerRegistration usersListener;
     private ListenerRegistration reportsListener;
     private ListenerRegistration gsoNotificationBadgeListener;
+    private ListenerRegistration gsoProfileListener;
 
     private Calendar currentCalendar;
     private Calendar selectedCalendar;
@@ -100,18 +106,16 @@ public class gsoHomeFragment extends Fragment {
 
         bindViews(view);
         setDefaultTexts();
-        setupActions();
+
         setupCalendarNavigation();
 
-        updateHomeWelcome();
+        listenForGsoProfile();
         updateSelectedDateSection();
 
         listenForRequestsAndCalendar();
         listenForUsersCount();
         listenForReportsCount();
 
-        setupGsoBadgeStyle();
-        listenForGsoNotificationBadge();
     }
 
     @Override
@@ -122,11 +126,19 @@ public class gsoHomeFragment extends Fragment {
         if (usersListener != null) usersListener.remove();
         if (reportsListener != null) reportsListener.remove();
         if (gsoNotificationBadgeListener != null) gsoNotificationBadgeListener.remove();
+        if (gsoProfileListener != null) gsoProfileListener.remove();
+
+        requestsListener = null;
+        usersListener = null;
+        reportsListener = null;
+        gsoNotificationBadgeListener = null;
+        gsoProfileListener = null;
     }
 
     private void bindViews(View view) {
         tvCalendarMonth = view.findViewById(R.id.tvCalendarMonth);
         tvSelectedDate = view.findViewById(R.id.tvSelectedDate);
+        tvGreeting = view.findViewById(R.id.tvGreeting);
         gsoHomeWelcome = view.findViewById(R.id.tvGSOName);
 
         tvPendingCount = view.findViewById(R.id.tvPendingCount);
@@ -134,7 +146,6 @@ public class gsoHomeFragment extends Fragment {
         tvUsersCount = view.findViewById(R.id.tvUsersCount);
         tvReportsCount = view.findViewById(R.id.tvReportsCount);
 
-        badgeGsoNotifications = view.findViewById(R.id.badgeGsoNotifications);
 
         btnPrevMonth = view.findViewById(R.id.btnPrevMonth);
         btnNextMonth = view.findViewById(R.id.btnNextMonth);
@@ -142,7 +153,6 @@ public class gsoHomeFragment extends Fragment {
 
         btnViewRequests = view.findViewById(R.id.btnViewRequests);
         btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
-        ivNotifications = view.findViewById(R.id.ivNotifications);
 
         gsoPendingReq = view.findViewById(R.id.gsoPendingReq);
         gsoApprovedReq = view.findViewById(R.id.gsoApprovedReq);
@@ -153,59 +163,87 @@ public class gsoHomeFragment extends Fragment {
     }
 
     private void setDefaultTexts() {
-        if (gsoHomeWelcome != null) gsoHomeWelcome.setText("Hello, GSO!");
-        if (tvPendingCount != null) tvPendingCount.setText("00");
-        if (tvApprovedCount != null) tvApprovedCount.setText("00");
-        if (tvUsersCount != null) tvUsersCount.setText("00");
-        if (tvReportsCount != null) tvReportsCount.setText("00");
+        setGreetingByTime();
 
-        updateSelectedDateSection();
+        if (gsoHomeWelcome != null) gsoHomeWelcome.setText("Hello,");
+        if (tvPendingCount != null) tvPendingCount.setText("");
+        if (tvApprovedCount != null) tvApprovedCount.setText("");
+        if (tvUsersCount != null) tvUsersCount.setText("");
+        if (tvReportsCount != null) tvReportsCount.setText("");
+        if (tvCalendarMonth != null) tvCalendarMonth.setText("");
+        if (tvSelectedDate != null) tvSelectedDate.setText("");
     }
 
-    private void setupGsoBadgeStyle() {
-        if (badgeGsoNotifications == null) return;
+    private void setGreetingByTime() {
+        if (tvGreeting == null) return;
 
-        GradientDrawable badgeBackground = new GradientDrawable();
-        badgeBackground.setShape(GradientDrawable.OVAL);
-        badgeBackground.setColor(Color.parseColor("#970705"));
+        Calendar calendar = Calendar.getInstance();
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
 
-        badgeGsoNotifications.setBackground(badgeBackground);
-        badgeGsoNotifications.setGravity(Gravity.CENTER);
-        badgeGsoNotifications.setTextColor(Color.WHITE);
-        badgeGsoNotifications.setTextSize(8f);
-        badgeGsoNotifications.setTypeface(null, Typeface.BOLD);
-        badgeGsoNotifications.setVisibility(View.GONE);
-        badgeGsoNotifications.setText("0");
+        if (hour < 12) {
+            tvGreeting.setText("Good Morning");
+        } else if (hour < 18) {
+            tvGreeting.setText("Good Afternoon");
+        } else {
+            tvGreeting.setText("Good Evening");
+        }
     }
 
-    private void listenForGsoNotificationBadge() {
-        updateGsoBadge(0);
-
-        if (gsoNotificationBadgeListener != null) {
-            gsoNotificationBadgeListener.remove();
-            gsoNotificationBadgeListener = null;
+    private void listenForGsoProfile() {
+        if (gsoProfileListener != null) {
+            gsoProfileListener.remove();
+            gsoProfileListener = null;
         }
 
-        gsoNotificationBadgeListener = db.collection("requests")
-                .addSnapshotListener((snapshot, error) -> {
-                    if (!isAdded()) return;
+        if (auth == null || auth.getCurrentUser() == null) {
+            if (gsoHomeWelcome != null) gsoHomeWelcome.setText("Hello,");
+            return;
+        }
 
-                    if (error != null || snapshot == null) {
-                        updateGsoBadge(0);
+        String userId = auth.getCurrentUser().getUid();
+        String label = gsoHomeWelcome != null && gsoHomeWelcome.getText() != null
+                ? gsoHomeWelcome.getText().toString().trim()
+                : "";
+
+        if (!label.endsWith(",")) {
+            label = "Hello,";
+        }
+
+        final String prefix = label + " ";
+
+        SharedPreferences prefs = requireContext().getSharedPreferences("user_cache", Context.MODE_PRIVATE);
+        String cachedFullName = prefs.getString("fullName_" + userId, "");
+
+        if (gsoHomeWelcome != null && cachedFullName != null && !cachedFullName.trim().isEmpty()) {
+            gsoHomeWelcome.setText(prefix + cachedFullName.trim());
+        } else if (gsoHomeWelcome != null) {
+            gsoHomeWelcome.setText(label);
+        }
+
+        gsoProfileListener = db.collection("users")
+                .document(userId)
+                .addSnapshotListener((doc, error) -> {
+                    if (!isAdded() || gsoHomeWelcome == null) return;
+
+                    if (error != null || doc == null || !doc.exists()) {
                         return;
                     }
 
-                    int unseenCount = 0;
+                    String fullName = getStringValue(doc, "fullName");
+                    if (!fullName.isEmpty()) {
+                        String cleanName = fullName.trim();
 
-                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (RequestDataHelper.shouldShowInRequestList(doc) && isIncomingGsoNotification(doc)) {
-                            unseenCount++;
-                        }
+                        prefs.edit()
+                                .putString("fullName_" + userId, cleanName)
+                                .apply();
+
+                        gsoHomeWelcome.setText(prefix + cleanName);
                     }
-
-                    updateGsoBadge(unseenCount);
                 });
     }
+
+
+
 
     private boolean isIncomingGsoNotification(DocumentSnapshot doc) {
         String status = getStringValue(doc, "status");
@@ -228,39 +266,9 @@ public class gsoHomeFragment extends Fragment {
         return unseen && pending && targetGSO;
     }
 
-    private void updateGsoBadge(int count) {
-        if (badgeGsoNotifications == null) return;
 
-        if (count <= 0) {
-            badgeGsoNotifications.setVisibility(View.GONE);
-            badgeGsoNotifications.setText("0");
-            return;
-        }
 
-        badgeGsoNotifications.setVisibility(View.VISIBLE);
-        badgeGsoNotifications.setText(count > 99 ? "99+" : String.valueOf(count));
-    }
 
-    private void markGsoNotificationsAsSeen() {
-        db.collection("requests")
-                .get()
-                .addOnSuccessListener(snapshot -> {
-                    if (snapshot == null) return;
-
-                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (isIncomingGsoNotification(doc)) {
-                            db.collection("requests")
-                                    .document(doc.getId())
-                                    .update(
-                                            "gsoSeen", true,
-                                            "gsoNotificationSeen", true
-                                    );
-                        }
-                    }
-
-                    updateGsoBadge(0);
-                });
-    }
 
     private void setupCalendarNavigation() {
         if (btnPrevMonth != null) {
@@ -280,38 +288,7 @@ public class gsoHomeFragment extends Fragment {
         }
     }
 
-    private void setupActions() {
-        if (btnViewRequests != null) {
-            btnViewRequests.setOnClickListener(v -> openGsoRequests("All"));
-        }
 
-        if (gsoPendingReq != null) {
-            gsoPendingReq.setOnClickListener(v -> openGsoRequests("Pending"));
-        }
-
-        if (gsoApprovedReq != null) {
-            gsoApprovedReq.setOnClickListener(v -> openGsoRequests("Approved"));
-        }
-
-        if (btnGenerateReport != null) {
-            btnGenerateReport.setOnClickListener(v -> openGsoReports());
-        }
-
-        if (gsoReports != null) {
-            gsoReports.setOnClickListener(v -> openGsoReports());
-        }
-
-        if (gsoUsers != null) {
-            gsoUsers.setOnClickListener(v -> openGsoUsers());
-        }
-
-        if (ivNotifications != null) {
-            ivNotifications.setOnClickListener(v -> {
-                markGsoNotificationsAsSeen();
-                openGsoNotifications();
-            });
-        }
-    }
 
     private void listenForRequestsAndCalendar() {
         if (requestsListener != null) {
@@ -324,8 +301,8 @@ public class gsoHomeFragment extends Fragment {
                     if (!isAdded()) return;
 
                     if (error != null || snapshot == null) {
-                        if (tvPendingCount != null) tvPendingCount.setText("00");
-                        if (tvApprovedCount != null) tvApprovedCount.setText("00");
+                        if (tvPendingCount != null) tvPendingCount.setText("");
+                        if (tvApprovedCount != null) tvApprovedCount.setText("");
 
                         bookedDatesMap.clear();
                         schedulesByDateMap.clear();
@@ -359,9 +336,9 @@ public class gsoHomeFragment extends Fragment {
                             approvedCount++;
                         }
 
-                        List<String> dateKeys = getDateKeysFromDocument(doc, keyFormat);
-
                         if (shouldShowOnCalendar(doc)) {
+                            List<String> dateKeys = getDateKeysFromDocument(doc, keyFormat);
+
                             for (String dateKey : dateKeys) {
                                 if (dateKey.isEmpty()) continue;
 
@@ -372,11 +349,9 @@ public class gsoHomeFragment extends Fragment {
                                 bookedDatesMap.put(dateKey, currentCount + 1);
 
                                 ScheduleItem item = createScheduleItem(doc, dateKey);
-
                                 if (item == null || item.dateKey.isEmpty()) continue;
 
                                 List<ScheduleItem> list = schedulesByDateMap.get(item.dateKey);
-
                                 if (list == null) {
                                     list = new ArrayList<>();
                                     schedulesByDateMap.put(item.dateKey, list);
@@ -413,7 +388,7 @@ public class gsoHomeFragment extends Fragment {
                     if (!isAdded()) return;
 
                     if (error != null || snapshot == null) {
-                        if (tvUsersCount != null) tvUsersCount.setText("00");
+                        if (tvUsersCount != null) tvUsersCount.setText("");
                         return;
                     }
 
@@ -434,7 +409,7 @@ public class gsoHomeFragment extends Fragment {
                     if (!isAdded()) return;
 
                     if (error != null || snapshot == null) {
-                        if (tvReportsCount != null) tvReportsCount.setText("00");
+                        if (tvReportsCount != null) tvReportsCount.setText("");
                         return;
                     }
 
@@ -500,11 +475,11 @@ public class gsoHomeFragment extends Fragment {
             return "Returned";
         }
 
-        return "Pending";
-    }
+        if ("Pending".equalsIgnoreCase(status) || "Pending".equalsIgnoreCase(gsoStatus)) {
+            return "Pending";
+        }
 
-    private boolean isApprovedRequest(DocumentSnapshot doc) {
-        return "Approved".equalsIgnoreCase(getDisplayStatus(doc));
+        return status;
     }
 
     private boolean shouldShowOnCalendar(DocumentSnapshot doc) {
@@ -514,21 +489,25 @@ public class gsoHomeFragment extends Fragment {
         Boolean calendarVisible = doc.getBoolean("calendarVisible");
         Boolean isCalendarBooking = doc.getBoolean("isCalendarBooking");
 
-        // Show on calendar if any of these statuses:
-        // - Pending: Under review
-        // - Approved: Approved and scheduled
-        // - Approved - Available: Approved with variable availability
-        // - Booked: Confirmed reservation
+        if ("Returned".equalsIgnoreCase(displayStatus)
+                || "Rejected".equalsIgnoreCase(displayStatus)
+                || "Cancelled".equalsIgnoreCase(displayStatus)) {
+            return false;
+        }
+
         if ("Pending".equalsIgnoreCase(displayStatus)) return true;
         if ("Approved".equalsIgnoreCase(displayStatus)) return true;
         if ("Approved - Available".equalsIgnoreCase(displayStatus)) return true;
         if ("Booked".equalsIgnoreCase(bookingStatus)) return true;
+        if (Boolean.TRUE.equals(calendarVisible) || Boolean.TRUE.equals(isCalendarBooking)) return true;
 
-        return Boolean.TRUE.equals(calendarVisible) || Boolean.TRUE.equals(isCalendarBooking);
+        return hasAnyScheduleDate(doc);
     }
 
     private List<String> getDateKeysFromDocument(DocumentSnapshot doc, SimpleDateFormat keyFormat) {
         List<String> keys = new ArrayList<>();
+
+        addScheduleDayDateKeys(doc, keys, keyFormat);
 
         Calendar startCalendar = getStartCalendarFromDocument(doc);
         Calendar endCalendar = getEndCalendarFromDocument(doc);
@@ -551,11 +530,89 @@ public class gsoHomeFragment extends Fragment {
         Calendar cursor = (Calendar) startCalendar.clone();
 
         while (!cursor.after(endCalendar)) {
-            keys.add(keyFormat.format(cursor.getTime()));
+            addDateKeyIfValid(keys, keyFormat.format(cursor.getTime()));
             cursor.add(Calendar.DAY_OF_MONTH, 1);
         }
 
         return keys;
+    }
+
+    private void addScheduleDayDateKeys(DocumentSnapshot doc, List<String> keys, SimpleDateFormat keyFormat) {
+        Object rawScheduleDays = doc.get("scheduleDays");
+
+        if (!(rawScheduleDays instanceof List<?>)) {
+            return;
+        }
+
+        List<?> scheduleDays = (List<?>) rawScheduleDays;
+
+        for (Object item : scheduleDays) {
+            if (!(item instanceof Map<?, ?>)) continue;
+
+            Map<?, ?> rawMap = (Map<?, ?>) item;
+
+            String directKey = firstNonEmpty(
+                    getRawMapString(rawMap, "dateKey"),
+                    getRawMapString(rawMap, "key")
+            );
+            addDateKeyIfValid(keys, directKey);
+
+            addDateKeyIfValid(keys, getDateKeyFromRawMapValue(rawMap, "dateText", keyFormat));
+            addDateKeyIfValid(keys, getDateKeyFromRawMapValue(rawMap, "date", keyFormat));
+            addDateKeyIfValid(keys, getDateKeyFromRawMapValue(rawMap, "selectedDate", keyFormat));
+            addDateKeyIfValid(keys, getDateKeyFromRawMapValue(rawMap, "startDate", keyFormat));
+        }
+    }
+
+    private boolean hasAnyScheduleDate(DocumentSnapshot doc) {
+        SimpleDateFormat keyFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        return !getDateKeysFromDocument(doc, keyFormat).isEmpty();
+    }
+
+    private void addDateKeyIfValid(List<String> keys, String key) {
+        if (key == null) return;
+
+        String cleanKey = key.trim();
+        if (cleanKey.isEmpty()) return;
+
+        if (!keys.contains(cleanKey)) {
+            keys.add(cleanKey);
+        }
+    }
+
+    private String getDateKeyFromRawMapValue(Map<?, ?> map, String key, SimpleDateFormat keyFormat) {
+        if (map == null || key == null) return "";
+        return getDateKeyFromValue(map.get(key), keyFormat);
+    }
+
+    private String getDateKeyFromValue(Object value, SimpleDateFormat keyFormat) {
+        if (value == null) return "";
+
+        if (value instanceof Timestamp) {
+            return keyFormat.format(((Timestamp) value).toDate());
+        }
+
+        if (value instanceof java.util.Date) {
+            return keyFormat.format((java.util.Date) value);
+        }
+
+        String textValue = String.valueOf(value).trim();
+        if (textValue.isEmpty()) return "";
+
+        if (textValue.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            return textValue;
+        }
+
+        Calendar calendar = parseDateTextToCalendar(textValue);
+        if (calendar == null) return "";
+
+        return keyFormat.format(calendar.getTime());
+    }
+
+    private String getRawMapString(Map<?, ?> map, String key) {
+        if (map == null || key == null) return "";
+        Object value = map.get(key);
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private Calendar getStartCalendarFromDocument(DocumentSnapshot doc) {
@@ -567,17 +624,17 @@ public class gsoHomeFragment extends Fragment {
             return calendar;
         }
 
-        String startDateText = getStringValue(doc, "startDateText");
-
-        if (!startDateText.isEmpty()) {
-            return parseDateTextToCalendar(startDateText);
-        }
-
-        String dateText = getStringValue(doc, "date");
-
-        if (!dateText.isEmpty()) {
-            return parseDateTextToCalendar(dateText);
-        }
+        String startDateText = firstNonEmpty(
+                getStringValue(doc, "startDateText"),
+                firstNonEmpty(
+                        getStringValue(doc, "dateText"),
+                        firstNonEmpty(
+                                getStringValue(doc, "date"),
+                                getStringValue(doc, "selectedDate")
+                        )
+                )
+        );
+        if (!startDateText.isEmpty()) return parseDateTextToCalendar(startDateText);
 
         return null;
     }
@@ -591,11 +648,11 @@ public class gsoHomeFragment extends Fragment {
             return calendar;
         }
 
-        String endDateText = getStringValue(doc, "endDateText");
-
-        if (!endDateText.isEmpty()) {
-            return parseDateTextToCalendar(endDateText);
-        }
+        String endDateText = firstNonEmpty(
+                getStringValue(doc, "endDateText"),
+                getStringValue(doc, "dateEndText")
+        );
+        if (!endDateText.isEmpty()) return parseDateTextToCalendar(endDateText);
 
         return null;
     }
@@ -603,10 +660,14 @@ public class gsoHomeFragment extends Fragment {
     private Calendar parseDateTextToCalendar(String dateText) {
         String[] patterns = {
                 "MMMM dd, yyyy",
+                "MMMM d, yyyy",
                 "MMM dd, yyyy",
+                "MMM d, yyyy",
                 "yyyy-MM-dd",
                 "MM/dd/yyyy",
-                "dd/MM/yyyy"
+                "M/d/yyyy",
+                "dd/MM/yyyy",
+                "d/M/yyyy"
         };
 
         for (String pattern : patterns) {
@@ -638,22 +699,83 @@ public class gsoHomeFragment extends Fragment {
     private ScheduleItem createScheduleItem(DocumentSnapshot doc, String dateKey) {
         if (dateKey == null || dateKey.trim().isEmpty()) return null;
 
-        String purpose = getStringValue(doc, "purpose");
+        String purpose = firstNonEmpty(
+                getStringValue(doc, "purpose"),
+                getStringValue(doc, "activityType")
+        );
         String facility = getFinalFacility(doc);
-        String startDateText = getStringValue(doc, "startDateText");
-        String endDateText = getStringValue(doc, "endDateText");
-        String timeStartText = getStringValue(doc, "timeStartText");
-        String timeEndText = getStringValue(doc, "timeEndText");
+        String startDateText = firstNonEmpty(
+                getStringValue(doc, "startDateText"),
+                firstNonEmpty(getStringValue(doc, "dateText"), getStringValue(doc, "date"))
+        );
+        String endDateText = firstNonEmpty(
+                getStringValue(doc, "endDateText"),
+                getStringValue(doc, "dateEndText")
+        );
+        String timeStartText = firstNonEmpty(
+                getStringValue(doc, "timeStartText"),
+                firstNonEmpty(getStringValue(doc, "startTimeText"), getStringValue(doc, "startTime"))
+        );
+        String timeEndText = firstNonEmpty(
+                getStringValue(doc, "timeEndText"),
+                firstNonEmpty(getStringValue(doc, "endTimeText"), getStringValue(doc, "endTime"))
+        );
         String status = getDisplayStatus(doc);
+
+        Map<String, Object> scheduleDay = getScheduleDayForDate(doc, dateKey);
+
+        if (scheduleDay != null) {
+            String dayDateText = firstNonEmpty(
+                    getMapString(scheduleDay, "dateText"),
+                    firstNonEmpty(
+                            getMapString(scheduleDay, "date"),
+                            getMapString(scheduleDay, "selectedDate")
+                    )
+            );
+            String dayStartTime = firstNonEmpty(
+                    getMapString(scheduleDay, "startTimeText"),
+                    firstNonEmpty(
+                            getMapString(scheduleDay, "timeStartText"),
+                            getMapString(scheduleDay, "startTime")
+                    )
+            );
+            String dayEndTime = firstNonEmpty(
+                    getMapString(scheduleDay, "endTimeText"),
+                    firstNonEmpty(
+                            getMapString(scheduleDay, "timeEndText"),
+                            getMapString(scheduleDay, "endTime")
+                    )
+            );
+
+            if (!dayDateText.isEmpty()) {
+                startDateText = dayDateText;
+                endDateText = dayDateText;
+            }
+
+            if (!dayStartTime.isEmpty()) {
+                timeStartText = dayStartTime;
+            }
+
+            if (!dayEndTime.isEmpty()) {
+                timeEndText = dayEndTime;
+            }
+        }
 
         String requestorName = firstNonEmpty(
                 getStringValue(doc, "requestorName"),
                 getStringValue(doc, "fullName")
         );
 
-        if (purpose.isEmpty()) purpose = "Purpose / Activity";
-        if (facility.isEmpty()) facility = "Facility";
-        if (status.isEmpty()) status = "Pending";
+        if (purpose.isEmpty()
+                && facility.isEmpty()
+                && startDateText.isEmpty()
+                && endDateText.isEmpty()
+                && timeStartText.isEmpty()
+                && timeEndText.isEmpty()
+                && requestorName.isEmpty()
+                && status.isEmpty()) {
+            return null;
+        }
 
         return new ScheduleItem(
                 doc.getId(),
@@ -729,34 +851,13 @@ public class gsoHomeFragment extends Fragment {
 
             Calendar dayCalendar = (Calendar) currentCalendar.clone();
             dayCalendar.set(Calendar.DAY_OF_MONTH, day);
+            String key = keyFormat.format(dayCalendar.getTime());
 
             boolean isToday = isSameDate(dayCalendar, Calendar.getInstance());
             boolean isSelected = isSameDate(dayCalendar, selectedCalendar);
+            int bookedCount = bookedDatesMap.containsKey(key) ? bookedDatesMap.get(key) : 0;
 
-            String dateKey = keyFormat.format(dayCalendar.getTime());
-            int bookings = bookedDatesMap.containsKey(dateKey) ? bookedDatesMap.get(dateKey) : 0;
-
-            if (isSelected) {
-                dayView.setBackgroundColor(Color.parseColor("#313131"));
-                dayView.setTextColor(Color.WHITE);
-                dayView.setTypeface(null, Typeface.BOLD);
-            } else if (bookings >= FULLY_BOOKED_LIMIT) {
-                dayView.setBackgroundColor(Color.parseColor("#970705"));
-                dayView.setTextColor(Color.WHITE);
-                dayView.setTypeface(null, Typeface.BOLD);
-            } else if (bookings > 0) {
-                dayView.setBackgroundColor(Color.parseColor("#F3D9D9"));
-                dayView.setTextColor(Color.parseColor("#313131"));
-                dayView.setTypeface(null, Typeface.BOLD);
-            } else if (isToday) {
-                dayView.setBackgroundColor(Color.parseColor("#F3D9D9"));
-                dayView.setTextColor(Color.parseColor("#313131"));
-                dayView.setTypeface(null, Typeface.NORMAL);
-            } else {
-                dayView.setBackgroundColor(Color.TRANSPARENT);
-                dayView.setTextColor(Color.parseColor("#313131"));
-                dayView.setTypeface(null, Typeface.NORMAL);
-            }
+            styleCalendarDay(dayView, isSelected, isToday, bookedCount);
 
             dayView.setOnClickListener(v -> {
                 selectedCalendar = (Calendar) dayCalendar.clone();
@@ -768,7 +869,7 @@ public class gsoHomeFragment extends Fragment {
         }
     }
 
-    private GridLayout.LayoutParams createDayLayoutParams() {
+    private ViewGroup.LayoutParams createDayLayoutParams() {
         GridLayout.LayoutParams params = new GridLayout.LayoutParams();
         params.width = 0;
         params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -777,40 +878,227 @@ public class gsoHomeFragment extends Fragment {
         return params;
     }
 
+    private void styleCalendarDay(TextView dayView, boolean selected, boolean today, int bookedCount) {
+        // Match the Requestor Home calendar shade exactly: same colors and square shade corners.
+        dayView.setTypeface(null, Typeface.NORMAL);
+
+        if (selected) {
+            dayView.setBackgroundColor(Color.parseColor("#313131"));
+            dayView.setTextColor(Color.WHITE);
+        } else if (bookedCount >= FULLY_BOOKED_LIMIT) {
+            dayView.setBackgroundColor(Color.parseColor("#970705"));
+            dayView.setTextColor(Color.WHITE);
+        } else if (bookedCount > 0) {
+            dayView.setBackgroundColor(Color.parseColor("#F3D9D9"));
+            dayView.setTextColor(Color.parseColor("#313131"));
+        } else if (today) {
+            dayView.setBackgroundColor(Color.parseColor("#FFF0D8"));
+            dayView.setTextColor(Color.parseColor("#313131"));
+        } else {
+            dayView.setBackgroundColor(Color.TRANSPARENT);
+            dayView.setTextColor(Color.parseColor("#313131"));
+        }
+    }
+
     private void updateSelectedDateSection() {
-        if (!isAdded() || tvSelectedDate == null) return;
+        if (!isAdded()) return;
 
-        SimpleDateFormat readableFormat = new SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault());
-        String selectedDateText = readableFormat.format(selectedCalendar.getTime());
-
-        tvSelectedDate.setText(selectedDateText);
+        updateSelectedDateLabel();
 
         if (schedsContainer == null) return;
 
         schedsContainer.removeAllViews();
 
-        if (tvSelectedDate.getParent() != null) {
-            ((ViewGroup) tvSelectedDate.getParent()).removeView(tvSelectedDate);
+        if (tvSelectedDate != null) {
+            if (tvSelectedDate.getParent() != null) {
+                ((ViewGroup) tvSelectedDate.getParent()).removeView(tvSelectedDate);
+            }
+
+            tvSelectedDate.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+
+            schedsContainer.addView(tvSelectedDate);
         }
 
-        tvSelectedDate.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
+        String selectedKey = getDateKey(selectedCalendar);
+        List<ScheduleItem> items = schedulesByDateMap.get(selectedKey);
 
-        schedsContainer.addView(tvSelectedDate);
-
-        String selectedDateKey = getDateKeyFromCalendar(selectedCalendar);
-        List<ScheduleItem> schedules = schedulesByDateMap.get(selectedDateKey);
-
-        if (schedules == null || schedules.isEmpty()) {
+        if (items == null || items.isEmpty()) {
             schedsContainer.addView(createEmptyScheduleView());
             return;
         }
 
-        for (ScheduleItem item : schedules) {
-            schedsContainer.addView(createScheduleRow(item));
+        for (ScheduleItem item : items) {
+            schedsContainer.addView(createScheduleCard(item));
         }
+    }
+
+    private View createScheduleCard(ScheduleItem item) {
+        LinearLayout row = new LinearLayout(requireContext());
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(16), 0, 0);
+
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        row.setLayoutParams(rowParams);
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setOnClickListener(v -> openGsoRequestDetails(item.requestId));
+
+        String timeBadge = getTimeBadgeText(item.timeStartText);
+
+        if (!timeBadge.isEmpty()) {
+            MaterialCardView timeCard = new MaterialCardView(requireContext());
+            LinearLayout.LayoutParams timeCardParams = new LinearLayout.LayoutParams(dp(54), dp(54));
+            timeCard.setLayoutParams(timeCardParams);
+            timeCard.setCardBackgroundColor(Color.parseColor("#970705"));
+            timeCard.setRadius(dp(18));
+            timeCard.setCardElevation(0f);
+
+            TextView timeText = new TextView(requireContext());
+            timeText.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+            ));
+            timeText.setGravity(Gravity.CENTER);
+            timeText.setText(timeBadge);
+            timeText.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+            timeText.setTextColor(Color.WHITE);
+            timeText.setTextSize(12f);
+            timeText.setTypeface(null, Typeface.BOLD);
+
+            timeCard.addView(timeText);
+            row.addView(timeCard);
+        }
+
+        LinearLayout detailsLayout = new LinearLayout(requireContext());
+        detailsLayout.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout.LayoutParams detailsParams = new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+        );
+        detailsParams.setMargins(timeBadge.isEmpty() ? 0 : dp(14), 0, dp(10), 0);
+        detailsLayout.setLayoutParams(detailsParams);
+
+        String title = firstNonEmpty(item.purpose, item.facility);
+        if (!title.isEmpty()) {
+            TextView titleText = new TextView(requireContext());
+            titleText.setText(title);
+            titleText.setTextColor(Color.parseColor("#313131"));
+            titleText.setTextSize(15f);
+            titleText.setTypeface(null, Typeface.BOLD);
+            detailsLayout.addView(titleText);
+        }
+
+        String subtitle = buildScheduleMeta(item, title);
+        if (!subtitle.isEmpty()) {
+            TextView subtitleText = new TextView(requireContext());
+            subtitleText.setText(subtitle);
+            subtitleText.setTextColor(Color.parseColor("#313131"));
+            subtitleText.setTextSize(12f);
+            subtitleText.setAlpha(0.72f);
+
+            LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            subtitleParams.setMargins(0, dp(4), 0, 0);
+            subtitleText.setLayoutParams(subtitleParams);
+            detailsLayout.addView(subtitleText);
+        }
+
+
+
+        row.addView(detailsLayout);
+
+        if (!item.status.isEmpty()) {
+            Chip statusChip = new Chip(requireContext());
+
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(
+                    dp(104),
+                    dp(34)
+            );
+            chipParams.setMargins(dp(4), 0, 0, 0);
+            statusChip.setLayoutParams(chipParams);
+
+            statusChip.setText(item.status);
+            statusChip.setTextSize(11f);
+            statusChip.setGravity(Gravity.CENTER);
+            statusChip.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+            statusChip.setSingleLine(true);
+            statusChip.setEllipsize(TextUtils.TruncateAt.END);
+
+            statusChip.setMinWidth(dp(104));
+            statusChip.setMaxWidth(dp(104));
+            statusChip.setMinHeight(dp(34));
+            statusChip.setHeight(dp(34));
+            statusChip.setChipMinHeight(dp(34));
+            statusChip.setEnsureMinTouchTargetSize(false);
+
+            statusChip.setTextColor(getStatusTextColor(item.status));
+            statusChip.setChipBackgroundColor(ColorStateList.valueOf(getStatusBackgroundColor(item.status)));
+            statusChip.setChipStrokeWidth(0);
+            statusChip.setCheckable(false);
+            statusChip.setClickable(false);
+            statusChip.setFocusable(false);
+
+            row.addView(statusChip);
+        }
+
+        return row;
+    }
+
+    private String buildScheduleMeta(ScheduleItem item, String title) {
+        List<String> parts = new ArrayList<>();
+
+        if (!item.facility.isEmpty() && !item.facility.equalsIgnoreCase(title)) {
+            parts.add(item.facility);
+        }
+
+        String dateRange = buildDateRange(item.startDateText, item.endDateText);
+        if (!dateRange.isEmpty()) parts.add(dateRange);
+
+        String timeRange = buildTimeRange(item.timeStartText, item.timeEndText);
+        if (!timeRange.isEmpty()) parts.add(timeRange);
+
+        return joinParts(parts, " • ");
+    }
+
+    private String buildDateRange(String startDate, String endDate) {
+        if (!startDate.isEmpty() && !endDate.isEmpty() && !startDate.equalsIgnoreCase(endDate)) {
+            return startDate + " - " + endDate;
+        }
+        return !startDate.isEmpty() ? startDate : endDate;
+    }
+
+    private String buildTimeRange(String startTime, String endTime) {
+        if (!startTime.isEmpty() && !endTime.isEmpty()) return startTime + " - " + endTime;
+        return !startTime.isEmpty() ? startTime : endTime;
+    }
+
+    private String joinParts(List<String> parts, String separator) {
+        StringBuilder builder = new StringBuilder();
+        for (String part : parts) {
+            if (part == null || part.trim().isEmpty()) continue;
+            if (builder.length() > 0) builder.append(separator);
+            builder.append(part.trim());
+        }
+        return builder.toString();
+    }
+
+
+    private void updateSelectedDateLabel() {
+        if (tvSelectedDate == null) return;
+
+        SimpleDateFormat selectedFormat = new SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault());
+        tvSelectedDate.setText(selectedFormat.format(selectedCalendar.getTime()));
     }
 
     private View createEmptyScheduleView() {
@@ -823,7 +1111,7 @@ public class gsoHomeFragment extends Fragment {
         params.setMargins(0, dp(16), 0, 0);
 
         emptyView.setLayoutParams(params);
-        emptyView.setText("No pending or approved bookings for this date.");
+        emptyView.setText("No scheduled requests for this date.");
         emptyView.setTextColor(Color.parseColor("#313131"));
         emptyView.setTextSize(14f);
         emptyView.setAlpha(0.72f);
@@ -833,101 +1121,12 @@ public class gsoHomeFragment extends Fragment {
         return emptyView;
     }
 
-    private View createScheduleRow(ScheduleItem item) {
-        LinearLayout row = new LinearLayout(requireContext());
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, dp(16), 0, 0);
-
-        row.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
-
-        MaterialCardView timeCard = new MaterialCardView(requireContext());
-        LinearLayout.LayoutParams timeCardParams = new LinearLayout.LayoutParams(dp(54), dp(54));
-        timeCard.setLayoutParams(timeCardParams);
-        timeCard.setCardBackgroundColor(
-                "Approved".equalsIgnoreCase(item.status)
-                        ? Color.parseColor("#2E7D32")
-                        : Color.parseColor("#970705")
-        );
-        timeCard.setRadius(dp(18));
-        timeCard.setCardElevation(0);
-
-        TextView timeText = new TextView(requireContext());
-        timeText.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-        ));
-        timeText.setGravity(Gravity.CENTER);
-        timeText.setText(getTimeBadgeText(item.timeStartText));
-        timeText.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        timeText.setTextColor(Color.WHITE);
-        timeText.setTextSize(12f);
-        timeText.setTypeface(null, Typeface.BOLD);
-
-        timeCard.addView(timeText);
-
-        LinearLayout details = new LinearLayout(requireContext());
-        details.setOrientation(LinearLayout.VERTICAL);
-
-        LinearLayout.LayoutParams detailsParams = new LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
-        );
-        detailsParams.setMargins(dp(14), 0, dp(8), 0);
-        details.setLayoutParams(detailsParams);
-
-        TextView title = new TextView(requireContext());
-        title.setText(item.purpose);
-        title.setTextColor(Color.parseColor("#313131"));
-        title.setTextSize(15f);
-        title.setTypeface(null, Typeface.BOLD);
-
-        TextView meta = new TextView(requireContext());
-        meta.setText(buildScheduleMeta(item));
-        meta.setTextColor(Color.parseColor("#313131"));
-        meta.setTextSize(12f);
-        meta.setAlpha(0.72f);
-
-        TextView requestor = new TextView(requireContext());
-        requestor.setText("Requestor: " + fallback(item.requestorName));
-        requestor.setTextColor(Color.parseColor("#313131"));
-        requestor.setTextSize(12f);
-        requestor.setAlpha(0.72f);
-
-        details.addView(title);
-        details.addView(meta);
-        details.addView(requestor);
-
-        Chip statusChip = new Chip(requireContext());
-        statusChip.setText(item.status);
-        statusChip.setCheckable(false);
-        statusChip.setClickable(false);
-
-        if ("Approved".equalsIgnoreCase(item.status)) {
-            statusChip.setTextColor(Color.parseColor("#2E7D32"));
-            statusChip.setChipBackgroundColor(ColorStateList.valueOf(Color.parseColor("#E7F4E8")));
-        } else {
-            statusChip.setTextColor(Color.parseColor("#970705"));
-            statusChip.setChipBackgroundColor(ColorStateList.valueOf(Color.parseColor("#F3D9D9")));
+    private String getTimeBadgeText(String timeStartText) {
+        if (timeStartText == null || timeStartText.trim().isEmpty()) {
+            return "";
         }
 
-        row.addView(timeCard);
-        row.addView(details);
-        row.addView(statusChip);
-
-        row.setOnClickListener(v -> openGsoRequests(item.status));
-
-        return row;
-    }
-
-    private String getTimeBadgeText(String timeText) {
-        if (timeText == null || timeText.trim().isEmpty()) {
-            return "--";
-        }
+        String cleanTime = timeStartText.trim();
 
         String[] patterns = {"hh:mm a", "h:mm a", "HH:mm"};
 
@@ -937,7 +1136,7 @@ public class gsoHomeFragment extends Fragment {
                 SimpleDateFormat hourFormat = new SimpleDateFormat("hh", Locale.getDefault());
                 SimpleDateFormat amPmFormat = new SimpleDateFormat("a", Locale.getDefault());
 
-                java.util.Date parsedTime = inputFormat.parse(timeText.trim());
+                java.util.Date parsedTime = inputFormat.parse(cleanTime);
 
                 if (parsedTime != null) {
                     return hourFormat.format(parsedTime) + "\n" + amPmFormat.format(parsedTime);
@@ -946,37 +1145,90 @@ public class gsoHomeFragment extends Fragment {
             }
         }
 
-        return timeText;
-    }
+        String[] parts = cleanTime.split("\\s+");
 
-    private String buildScheduleMeta(ScheduleItem item) {
-        StringBuilder builder = new StringBuilder();
-
-        builder.append(item.facility);
-
-        if (!item.timeStartText.isEmpty() || !item.timeEndText.isEmpty()) {
-            builder.append(" • ");
-
-            if (!item.timeStartText.isEmpty() && !item.timeEndText.isEmpty()) {
-                builder.append(item.timeStartText).append(" - ").append(item.timeEndText);
-            } else if (!item.timeStartText.isEmpty()) {
-                builder.append(item.timeStartText);
-            } else {
-                builder.append(item.timeEndText);
-            }
+        if (parts.length >= 2) {
+            String hour = parts[0].contains(":") ? parts[0].split(":")[0] : parts[0];
+            return hour + "\n" + parts[1];
         }
 
-        return builder.toString();
+        return cleanTime;
     }
 
-    private String getDateKeyFromCalendar(Calendar calendar) {
+    private int getStatusTextColor(String status) {
+        if ("Approved".equalsIgnoreCase(status)) return Color.parseColor("#2E7D32");
+        if ("Returned".equalsIgnoreCase(status) || "Rejected".equalsIgnoreCase(status)) return Color.parseColor("#970705");
+        return Color.parseColor("#313131");
+    }
+
+    private int getStatusBackgroundColor(String status) {
+        if ("Approved".equalsIgnoreCase(status)) return Color.parseColor("#E7F4E8");
+        if ("Returned".equalsIgnoreCase(status) || "Rejected".equalsIgnoreCase(status)) return Color.parseColor("#F3D9D9");
+        return Color.parseColor("#EEEEEE");
+    }
+
+    private String getDateKey(Calendar calendar) {
         SimpleDateFormat keyFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         return keyFormat.format(calendar.getTime());
     }
 
+
+    private Map<String, Object> getScheduleDayForDate(DocumentSnapshot doc, String targetDateKey) {
+        Object rawScheduleDays = doc.get("scheduleDays");
+
+        if (!(rawScheduleDays instanceof List<?>)) {
+            return null;
+        }
+
+        List<?> scheduleDays = (List<?>) rawScheduleDays;
+
+        for (Object item : scheduleDays) {
+            if (!(item instanceof Map<?, ?>)) {
+                continue;
+            }
+
+            Map<?, ?> rawMap = (Map<?, ?>) item;
+            Map<String, Object> dayMap = new HashMap<>();
+
+            for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+                if (entry.getKey() != null) {
+                    dayMap.put(String.valueOf(entry.getKey()), entry.getValue());
+                }
+            }
+
+            String dateText = getMapString(dayMap, "dateText");
+            String dateKey = convertDateTextToKey(dateText);
+
+            if (targetDateKey.equals(dateKey)) {
+                return dayMap;
+            }
+        }
+
+        return null;
+    }
+
+    private String convertDateTextToKey(String dateText) {
+        Calendar calendar = parseDateTextToCalendar(dateText);
+
+        if (calendar == null) {
+            return "";
+        }
+
+        SimpleDateFormat keyFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        return keyFormat.format(calendar.getTime());
+    }
+
+    private String getMapString(Map<String, Object> map, String key) {
+        if (map == null || key == null) {
+            return "";
+        }
+
+        Object value = map.get(key);
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
     private String getFinalFacility(DocumentSnapshot doc) {
         String finalFacilityName = getStringValue(doc, "finalFacilityName");
-
         if (!finalFacilityName.isEmpty()) return finalFacilityName;
 
         String facility = getStringValue(doc, "facility");
@@ -989,35 +1241,6 @@ public class gsoHomeFragment extends Fragment {
         return facility;
     }
 
-    private void updateHomeWelcome() {
-        if (!isAdded() || gsoHomeWelcome == null) return;
-
-        if (auth == null || auth.getCurrentUser() == null) {
-            gsoHomeWelcome.setText("Hello, GSO!");
-            return;
-        }
-
-        db.collection("users")
-                .document(auth.getCurrentUser().getUid())
-                .get()
-                .addOnSuccessListener(doc -> {
-                    if (!isAdded() || gsoHomeWelcome == null) return;
-
-                    String fullName = doc.exists() ? doc.getString("fullName") : "";
-
-                    if (fullName != null && !fullName.trim().isEmpty()) {
-                        String firstName = fullName.trim().split("\\s+")[0];
-                        gsoHomeWelcome.setText("Hello, " + firstName + "!");
-                    } else {
-                        gsoHomeWelcome.setText("Hello, GSO!");
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    if (!isAdded() || gsoHomeWelcome == null) return;
-                    gsoHomeWelcome.setText("Hello, GSO!");
-                });
-    }
-
     private void openGsoRequests(String filter) {
         Bundle bundle = new Bundle();
         bundle.putString("filter", filter);
@@ -1026,6 +1249,11 @@ public class gsoHomeFragment extends Fragment {
         fragment.setArguments(bundle);
 
         openFragment(fragment);
+    }
+
+    private void openGsoRequestDetails(String requestId) {
+        if (requestId == null || requestId.trim().isEmpty()) return;
+        openFragment(gsoRequestsViewDetailsFragment.newInstance(requestId));
     }
 
     private void openGsoUsers() {
@@ -1055,16 +1283,7 @@ public class gsoHomeFragment extends Fragment {
         return R.id.fragment_container;
     }
 
-    private void openGsoNotifications() {
-        if (!isAdded()) return;
 
-        try {
-            Intent intent = new Intent(requireContext(), gsoNotificationsActivity.class);
-            startActivity(intent);
-        } catch (Exception e) {
-            Toast.makeText(requireContext(), "Unable to open notifications.", Toast.LENGTH_SHORT).show();
-        }
-    }
 
     private boolean isSameDate(Calendar cal1, Calendar cal2) {
         return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR)
@@ -1073,8 +1292,9 @@ public class gsoHomeFragment extends Fragment {
     }
 
     private String getStringValue(DocumentSnapshot doc, String field) {
-        String value = doc.getString(field);
-        return value != null ? value.trim() : "";
+        if (doc == null || field == null) return "";
+        Object value = doc.get(field);
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private String firstNonEmpty(String first, String second) {
@@ -1083,14 +1303,8 @@ public class gsoHomeFragment extends Fragment {
         return "";
     }
 
-    private String fallback(String value) {
-        return value != null && !value.trim().isEmpty() ? value.trim() : "—";
-    }
-
     private String formatCount(int count) {
-        if (count < 0) return "00";
-        if (count < 10) return "0" + count;
-        return String.valueOf(count);
+        return String.format(Locale.getDefault(), "%02d", count);
     }
 
     private int dp(int value) {
