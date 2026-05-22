@@ -22,20 +22,6 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnBack"
-                android:layout_width="46dp"
-                android:layout_height="46dp"
-                android:contentDescription="Back"
-                android:text="‹"
-                android:textColor="#313131"
-                android:textSize="28sp"
-                app:backgroundTint="#FFFFFF"
-                app:cornerRadius="18dp"
-                app:elevation="0dp"
-                app:strokeColor="#111111"
-                app:strokeWidth="1dp" />
-
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -51,15 +37,6 @@
                     android:textSize="26sp"
                     android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/tvDetailsSubtitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:alpha="0.72"
-                    tools:text="Complete booking request information"
-                    android:textColor="#313131"
-                    android:textSize="13sp" />
             </LinearLayout>
         </LinearLayout>
 
@@ -94,10 +71,10 @@
                             android:id="@+id/tvDetailPurpose"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            tools:text="Purpose / Activity"
                             android:textColor="#FFFFFF"
                             android:textSize="22sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            tools:text="Purpose / Activity" />
 
                         <TextView
                             android:id="@+id/tvDetailActivityType"
@@ -105,20 +82,20 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="5dp"
                             android:alpha="0.88"
-                            tools:text="Institutional"
                             android:textColor="#FFFFFF"
-                            android:textSize="13sp" />
+                            android:textSize="13sp"
+                            tools:text="Institutional" />
                     </LinearLayout>
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chipDetailStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        tools:text="Pending"
                         android:textColor="#970705"
                         android:textStyle="bold"
                         app:chipBackgroundColor="#FFFFFF"
-                        app:chipCornerRadius="18dp" />
+                        app:chipCornerRadius="18dp"
+                        tools:text="Pending" />
                 </LinearLayout>
 
                 <TextView
@@ -128,9 +105,9 @@
                     android:layout_marginTop="14dp"
                     android:alpha="0.94"
                     android:lineSpacingExtra="3dp"
-                    tools:text="May 1, 2026 • 8:00 AM - 5:00 PM"
                     android:textColor="#FFFFFF"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="May 1, 2026 • 8:00 AM - 5:00 PM" />
 
                 <TextView
                     android:id="@+id/tvDetailFacilitySummary"
@@ -138,14 +115,15 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="5dp"
                     android:alpha="0.94"
-                    tools:text="Amphitheater"
                     android:textColor="#FFFFFF"
                     android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    tools:text="Amphitheater" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardRequestorInformation"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
@@ -180,36 +158,36 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    tools:text="Name: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Name: —" />
 
                 <TextView
                     android:id="@+id/tvDetailContactNumber"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    tools:text="Contact Number: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Contact Number: —" />
 
                 <TextView
                     android:id="@+id/tvDetailCollegeDepartment"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    tools:text="College / Department: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="College / Department: —" />
 
                 <TextView
                     android:id="@+id/tvDetailOfficeCourse"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    tools:text="Office / Course: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Office / Course: —" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -248,27 +226,27 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    tools:text="Date: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Date: —" />
 
                 <TextView
                     android:id="@+id/tvDetailTimeRange"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    tools:text="Time: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Time: —" />
 
                 <TextView
                     android:id="@+id/tvDetailFacility"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    tools:text="Facility: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Facility: —" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -307,18 +285,18 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    tools:text="Participants: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Participants: —" />
 
                 <TextView
                     android:id="@+id/tvDetailNumberOfParticipants"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    tools:text="Number of Participants: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Number of Participants: —" />
 
                 <TextView
                     android:id="@+id/tvDetailPurposeFull"
@@ -326,9 +304,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="3dp"
-                    tools:text="Purpose: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Purpose: —" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -367,18 +345,18 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    tools:text="Tables: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Tables: —" />
 
                 <TextView
                     android:id="@+id/tvDetailChairs"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    tools:text="Chairs: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Chairs: —" />
 
                 <TextView
                     android:id="@+id/tvDetailOtherAmenities"
@@ -386,9 +364,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="3dp"
-                    tools:text="Other Amenities: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Other Amenities: —" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -428,9 +406,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    tools:text="Technical Needed: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Technical Needed: —" />
 
                 <TextView
                     android:id="@+id/tvDetailTechnicalList"
@@ -438,9 +416,9 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="4dp"
-                    tools:text="Selected Technicals: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Selected Technicals: —" />
 
                 <TextView
                     android:id="@+id/tvDetailConnectors"
@@ -448,13 +426,14 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="3dp"
-                    tools:text="Connectors / Cables: —"
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Connectors / Cables: —" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardProposalFiles"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
@@ -473,7 +452,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Proposal"
+                    android:text="Proposal / Supporting Files and Approval Route"
                     android:textColor="#313131"
                     android:textSize="18sp"
                     android:textStyle="bold" />
@@ -484,14 +463,13 @@
                     android:layout_marginTop="12dp"
                     android:background="#E6E1D2" />
 
-
-
                 <LinearLayout
                     android:id="@+id/layoutProposalFiles"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:orientation="vertical" />
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -500,11 +478,13 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
+            android:visibility="gone"
             app:cardBackgroundColor="#FBECEC"
             app:cardCornerRadius="26dp"
             app:cardElevation="4dp"
             app:strokeColor="#970705"
-            app:strokeWidth="1dp">
+            app:strokeWidth="1dp"
+            tools:visibility="visible">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -515,24 +495,42 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Remarks"
+                    android:text="Office Remarks"
                     android:textColor="#970705"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/tvDetailRemarks"
+                    android:id="@+id/tvDetailSacRemarks"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:lineSpacingExtra="4dp"
+                    android:textColor="#313131"
+                    android:textSize="14sp"
+                    tools:text="SAC Remarks: No SAC remarks yet." />
+
+                <TextView
+                    android:id="@+id/tvDetailItsoRemarks"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:lineSpacingExtra="4dp"
-                    tools:text="No remarks available."
                     android:textColor="#313131"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="ITSO Remarks: No ITSO remarks yet." />
+
+                <TextView
+                    android:id="@+id/tvDetailGsoRemarks"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:lineSpacingExtra="4dp"
+                    android:textColor="#313131"
+                    android:textSize="14sp"
+                    tools:text="GSO Remarks: No GSO remarks yet." />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
-
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

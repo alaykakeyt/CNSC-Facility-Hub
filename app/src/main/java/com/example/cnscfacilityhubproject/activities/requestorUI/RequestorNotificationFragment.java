@@ -1,37 +1,44 @@
 package com.example.cnscfacilityhubproject.activities.requestorUI;
 
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.cnscfacilityhubproject.R;
-import com.example.cnscfacilityhubproject.adapters.RequestorNotificationAdapter;
 import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.chip.Chip;
 import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
-import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.WriteBatch;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
-public class RequestorNotificationFragment extends Fragment implements RequestorNotificationAdapter.OnNotificationClickListener {
+public class RequestorNotificationFragment extends Fragment {
 
-    private RecyclerView rvNotifications;
+    private LinearLayout layoutNotificationList;
     private View layoutEmptyState;
     private TextView tvIncomingCount;
 
@@ -39,16 +46,13 @@ public class RequestorNotificationFragment extends Fragment implements Requestor
     private FirebaseFirestore db;
     private ListenerRegistration notificationListener;
 
-    private RequestorNotificationAdapter adapter;
-    private final List<DocumentSnapshot> notificationList = new ArrayList<>();
+    private final List<DocumentSnapshot> requestList = new ArrayList<>();
+    private final Set<String> locallySeenNotificationIds = new HashSet<>();
+
+    private int unseenNotificationCount = 0;
 
     public RequestorNotificationFragment() {
-        // Required empty public constructor
-    }
-
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_requestor_notification, container, false);
+        super(R.layout.fragment_requestor_notification);
     }
 
     @Override
@@ -58,113 +62,665 @@ public class RequestorNotificationFragment extends Fragment implements Requestor
         auth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
 
-        rvNotifications = view.findViewById(R.id.rvNotifications);
+        layoutNotificationList = view.findViewById(R.id.layoutNotificationList);
         layoutEmptyState = view.findViewById(R.id.layoutEmptyState);
         tvIncomingCount = view.findViewById(R.id.tvIncomingCount);
 
-        setupRecyclerView();
-        listenForNotifications();
+        listenForRequestorNotifications();
     }
 
-    private void setupRecyclerView() {
-        adapter = new RequestorNotificationAdapter(requireContext(), notificationList, this);
-        rvNotifications.setLayoutManager(new LinearLayoutManager(requireContext()));
-        rvNotifications.setAdapter(adapter);
+
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+
+        if (notificationListener != null) {
+            notificationListener.remove();
+            notificationListener = null;
+        }
     }
 
-    private void listenForNotifications() {
-        if (auth.getCurrentUser() == null) return;
+    private void listenForRequestorNotifications() {
+        if (notificationListener != null) {
+            return;
+        }
+
+        if (auth.getCurrentUser() == null) {
+            showEmptyState();
+            return;
+        }
 
         String userId = auth.getCurrentUser().getUid();
 
         notificationListener = db.collection("requests")
                 .whereEqualTo("userId", userId)
-                .whereEqualTo("notificationForRequestor", true)
                 .addSnapshotListener((snapshot, error) -> {
                     if (!isAdded()) return;
 
-                    if (error != null) {
-                        Toast.makeText(requireContext(), "Error loading notifications", Toast.LENGTH_SHORT).show();
+                    if (error != null || snapshot == null) {
+                        Toast.makeText(
+                                requireContext(),
+                                "Failed to load notifications.",
+                                Toast.LENGTH_LONG
+                        ).show();
+
+                        showEmptyState();
                         return;
                     }
 
-                    notificationList.clear();
-                    int unseenCount = 0;
+                    List<DocumentSnapshot> docs = new ArrayList<>(snapshot.getDocuments());
 
-                    if (snapshot != null && !snapshot.isEmpty()) {
-                        List<DocumentSnapshot> docs = snapshot.getDocuments();
-                        
-                        // Manual sort by timestamp (Firestore doesn't allow inequality filter on one field and order by another easily without composite index)
-                        // Actually, we are filtering by userId and notificationForRequestor (both equality).
-                        // So we CAN use orderBy if we want.
-                        
-                        notificationList.addAll(docs);
+                    Collections.sort(docs, new Comparator<DocumentSnapshot>() {
+                        @Override
+                        public int compare(DocumentSnapshot a, DocumentSnapshot b) {
+                            Timestamp timeA = getBestNotificationTimestamp(a);
+                            Timestamp timeB = getBestNotificationTimestamp(b);
 
-                        Collections.sort(notificationList, (a, b) -> {
-                            Timestamp t1 = getBestTimestamp(a);
-                            Timestamp t2 = getBestTimestamp(b);
-                            if (t1 == null || t2 == null) return 0;
-                            return t2.compareTo(t1);
-                        });
+                            if (timeA == null && timeB == null) return 0;
+                            if (timeA == null) return 1;
+                            if (timeB == null) return -1;
 
-                        for (DocumentSnapshot doc : docs) {
-                            if (RequestDataHelper.isRequestorNotificationUnseen(doc)) {
-                                unseenCount++;
-                            }
+                            return timeB.compareTo(timeA);
+                        }
+                    });
+
+                    requestList.clear();
+                    unseenNotificationCount = 0;
+
+                    List<DocumentSnapshot> docsToMarkSeen = new ArrayList<>();
+
+                    for (DocumentSnapshot doc : docs) {
+                        if (!RequestDataHelper.shouldShowInRequestList(doc)) {
+                            continue;
+                        }
+
+                        if (shouldShowNotificationCard(doc)) {
+                            requestList.add(doc);
+                        }
+
+                        if (shouldCountForBadge(doc)) {
+                            unseenNotificationCount++;
+                            docsToMarkSeen.add(doc);
                         }
                     }
 
-                    adapter.notifyDataSetChanged();
-                    updateUi(unseenCount);
+                    if (!docsToMarkSeen.isEmpty()) {
+                        for (DocumentSnapshot doc : docsToMarkSeen) {
+                            locallySeenNotificationIds.add(doc.getId());
+                        }
+
+                        unseenNotificationCount = 0;
+                        markNotificationsAsSeen(docsToMarkSeen);
+                    }
+
+                    renderNotifications();
                 });
     }
 
-    private Timestamp getBestTimestamp(DocumentSnapshot doc) {
-        Timestamp ts = doc.getTimestamp("notificationUpdatedAt");
-        if (ts == null) ts = doc.getTimestamp("updatedAt");
-        if (ts == null) ts = doc.getTimestamp("createdAt");
-        return ts;
-    }
+    private void renderNotifications() {
+        if (layoutNotificationList == null || layoutEmptyState == null) return;
 
-    private void updateUi(int unseenCount) {
-        if (notificationList.isEmpty()) {
-            rvNotifications.setVisibility(View.GONE);
-            layoutEmptyState.setVisibility(View.VISIBLE);
-            tvIncomingCount.setText("0 booking notifications");
-        } else {
-            rvNotifications.setVisibility(View.VISIBLE);
-            layoutEmptyState.setVisibility(View.GONE);
-            tvIncomingCount.setText(unseenCount + " unseen notification" + (unseenCount == 1 ? "" : "s"));
+        layoutNotificationList.removeAllViews();
+
+        int totalNotifications = requestList.size();
+
+        if (tvIncomingCount != null) {
+            tvIncomingCount.setText(
+                    unseenNotificationCount + " incoming notification" +
+                            (unseenNotificationCount == 1 ? "" : "s")
+            );
+        }
+
+        if (totalNotifications == 0) {
+            showEmptyState();
+            return;
+        }
+
+        layoutEmptyState.setVisibility(View.GONE);
+        layoutNotificationList.setVisibility(View.VISIBLE);
+
+        for (DocumentSnapshot doc : requestList) {
+            layoutNotificationList.addView(createNotificationCard(doc));
         }
     }
 
-    @Override
-    public void onNotificationClick(DocumentSnapshot doc) {
+    private View createNotificationCard(DocumentSnapshot doc) {
         String requestId = doc.getId();
 
-        // Mark as seen
-        doc.getReference().update(
-                "requestorSeen", true,
-                "requestorNotificationSeen", true,
-                "requestorApprovedSeen", true,
-                "notificationUpdatedAt", FieldValue.serverTimestamp(),
-                "updatedAt", FieldValue.serverTimestamp()
+        String status = getDisplayStatus(doc);
+        String purpose = getStringValue(doc, "purpose");
+        String facility = getFinalFacility(doc);
+
+        String startDate = getStringValue(doc, "startDateText");
+        String endDate = getStringValue(doc, "endDateText");
+        String startTime = getStringValue(doc, "timeStartText");
+        String endTime = getStringValue(doc, "timeEndText");
+
+        String notifiedDateText = buildNotifiedDateText(doc);
+        boolean isUnseen = shouldCountForBadge(doc);
+
+        LinearLayout outerLayout = new LinearLayout(requireContext());
+        outerLayout.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout.LayoutParams outerParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        outerParams.setMargins(0, 0, 0, dp(12));
+        outerLayout.setLayoutParams(outerParams);
+
+        TextView tvNotifiedDate = new TextView(requireContext());
+        tvNotifiedDate.setText(notifiedDateText);
+        tvNotifiedDate.setTextColor(Color.parseColor("#970705"));
+        tvNotifiedDate.setTextSize(12f);
+        tvNotifiedDate.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        LinearLayout.LayoutParams notifiedDateParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        notifiedDateParams.setMargins(dp(4), 0, 0, dp(6));
+        tvNotifiedDate.setLayoutParams(notifiedDateParams);
+
+        MaterialCardView card = new MaterialCardView(requireContext());
+
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
         );
 
-        // Open details
-        RequestorRequestDetailsFragment fragment = RequestorRequestDetailsFragment.newInstance(requestId);
-        requireActivity().getSupportFragmentManager()
+        card.setLayoutParams(cardParams);
+        card.setCardBackgroundColor(Color.WHITE);
+        card.setRadius(dp(24));
+        card.setCardElevation(dp(6));
+        card.setStrokeWidth(dp(2));
+        card.setStrokeColor(getStatusMainColor(status));
+
+        LinearLayout container = new LinearLayout(requireContext());
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dp(18), dp(18), dp(18), dp(18));
+
+        LinearLayout headerRow = new LinearLayout(requireContext());
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+        MaterialCardView iconCard = new MaterialCardView(requireContext());
+
+        LinearLayout.LayoutParams iconCardParams =
+                new LinearLayout.LayoutParams(dp(46), dp(46));
+
+        iconCard.setLayoutParams(iconCardParams);
+        iconCard.setRadius(dp(15));
+        iconCard.setCardElevation(0);
+        iconCard.setCardBackgroundColor(getStatusMainColor(status));
+
+        ImageView icon = new ImageView(requireContext());
+
+        icon.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+
+        icon.setPadding(dp(10), dp(10), dp(10), dp(10));
+        icon.setImageResource(getStatusIcon(status));
+        icon.setColorFilter(Color.WHITE);
+
+        iconCard.addView(icon);
+
+        LinearLayout titleLayout = new LinearLayout(requireContext());
+        titleLayout.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+        );
+
+        titleParams.setMargins(dp(12), 0, dp(8), 0);
+        titleLayout.setLayoutParams(titleParams);
+
+        TextView tvTitle = new TextView(requireContext());
+
+        tvTitle.setText(!purpose.isEmpty() ? purpose : "Request Update");
+        tvTitle.setTextColor(Color.parseColor("#313131"));
+        tvTitle.setTextSize(16f);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        TextView tvMeta = new TextView(requireContext());
+
+        tvMeta.setText(buildMetaText(
+                facility,
+                startDate,
+                endDate,
+                startTime,
+                endTime
+        ));
+
+        tvMeta.setTextColor(Color.parseColor("#313131"));
+        tvMeta.setTextSize(12f);
+        tvMeta.setAlpha(0.65f);
+
+        titleLayout.addView(tvTitle);
+        titleLayout.addView(tvMeta);
+
+        Chip chipIncoming = new Chip(requireContext());
+
+        chipIncoming.setText("NEW");
+        chipIncoming.setTextColor(Color.WHITE);
+        chipIncoming.setTextSize(11f);
+        chipIncoming.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        chipIncoming.setChipBackgroundColor(
+                ColorStateList.valueOf(Color.parseColor("#970705"))
+        );
+
+        chipIncoming.setChipStrokeWidth(0);
+        chipIncoming.setCheckable(false);
+        chipIncoming.setClickable(false);
+
+        LinearLayout.LayoutParams incomingParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+
+        incomingParams.setMargins(0, 0, dp(6), 0);
+        chipIncoming.setLayoutParams(incomingParams);
+
+        Chip chipStatus = new Chip(requireContext());
+
+        chipStatus.setText(status);
+        chipStatus.setTextColor(getStatusMainColor(status));
+
+        chipStatus.setChipBackgroundColor(
+                ColorStateList.valueOf(getStatusLightColor(status))
+        );
+
+        chipStatus.setChipStrokeWidth(0);
+        chipStatus.setCheckable(false);
+        chipStatus.setClickable(false);
+
+        headerRow.addView(iconCard);
+        headerRow.addView(titleLayout);
+
+        if (isUnseen) {
+            headerRow.addView(chipIncoming);
+        }
+
+        headerRow.addView(chipStatus);
+
+        TextView tvDescription = new TextView(requireContext());
+
+        tvDescription.setText(buildDescriptionText(doc, status));
+        tvDescription.setTextColor(Color.parseColor("#313131"));
+        tvDescription.setTextSize(14f);
+        tvDescription.setLineSpacing(2f, 1f);
+
+        LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+
+        descParams.setMargins(0, dp(12), 0, 0);
+        tvDescription.setLayoutParams(descParams);
+
+        MaterialButton btnViewDetails = new MaterialButton(requireContext());
+
+        btnViewDetails.setText("View Request");
+        btnViewDetails.setAllCaps(false);
+        btnViewDetails.setTextColor(Color.WHITE);
+        btnViewDetails.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        btnViewDetails.setBackgroundTintList(
+                ColorStateList.valueOf(Color.parseColor("#313131"))
+        );
+
+        btnViewDetails.setCornerRadius(dp(16));
+        btnViewDetails.setElevation(0);
+
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(46)
+        );
+
+        btnParams.setMargins(0, dp(14), 0, 0);
+        btnViewDetails.setLayoutParams(btnParams);
+
+        btnViewDetails.setOnClickListener(v -> openRequestDetails(requestId));
+
+        container.addView(headerRow);
+        container.addView(tvDescription);
+        container.addView(btnViewDetails);
+
+        card.addView(container);
+
+        outerLayout.addView(tvNotifiedDate);
+        outerLayout.addView(card);
+
+        return outerLayout;
+    }
+
+    private void openRequestDetails(String requestId) {
+        if (requestId == null || requestId.trim().isEmpty()) {
+            Toast.makeText(requireContext(), "Request ID not found.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        locallySeenNotificationIds.add(requestId);
+
+        db.collection("requests")
+                .document(requestId)
+                .update(
+                        "requestorSeen", true,
+                        "requestorNotificationSeen", true,
+                        "requestorApprovedSeen", true,
+                        "requestorSeenAt", FieldValue.serverTimestamp(),
+                        "requestorNotificationOpenedAt", FieldValue.serverTimestamp()
+                );
+
+        RequestorRequestDetailsFragment fragment =
+                RequestorRequestDetailsFragment.newInstance(requestId);
+
+        requireActivity()
+                .getSupportFragmentManager()
                 .beginTransaction()
                 .replace(R.id.fragment_container, fragment)
                 .addToBackStack(null)
                 .commit();
     }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        if (notificationListener != null) {
-            notificationListener.remove();
+    private void markNotificationsAsSeen(List<DocumentSnapshot> docsToMarkSeen) {
+        if (docsToMarkSeen == null || docsToMarkSeen.isEmpty()) {
+            return;
         }
+
+        WriteBatch batch = db.batch();
+
+        for (DocumentSnapshot doc : docsToMarkSeen) {
+            batch.update(
+                    doc.getReference(),
+                    "requestorSeen", true,
+                    "requestorNotificationSeen", true,
+                    "requestorApprovedSeen", true,
+                    "requestorSeenAt", FieldValue.serverTimestamp(),
+                    "requestorNotificationOpenedAt", FieldValue.serverTimestamp()
+            );
+        }
+
+        batch.commit();
+    }
+
+    private boolean shouldShowNotificationCard(DocumentSnapshot doc) {
+        Boolean notificationForRequestor = doc.getBoolean("notificationForRequestor");
+
+        String title = getStringValue(doc, "requestorNotificationTitle");
+        String message = getStringValue(doc, "requestorNotificationMessage");
+
+        Timestamp notificationUpdatedAt = doc.getTimestamp("notificationUpdatedAt");
+        Timestamp requestorNotifiedAt = doc.getTimestamp("requestorNotifiedAt");
+        Timestamp requestorNotificationOpenedAt = doc.getTimestamp("requestorNotificationOpenedAt");
+
+        boolean hasNotificationText = !title.isEmpty() || !message.isEmpty();
+
+        boolean hasNotificationDate =
+                notificationUpdatedAt != null
+                        || requestorNotifiedAt != null
+                        || requestorNotificationOpenedAt != null;
+
+        return Boolean.TRUE.equals(notificationForRequestor)
+                || RequestDataHelper.isRequestorNotificationUnseen(doc)
+                || hasNotificationText
+                || hasNotificationDate;
+    }
+
+    private boolean shouldCountForBadge(DocumentSnapshot doc) {
+        if (locallySeenNotificationIds.contains(doc.getId())) {
+            return false;
+        }
+
+        Boolean requestorNotificationSeen = doc.getBoolean("requestorNotificationSeen");
+
+        if (Boolean.TRUE.equals(requestorNotificationSeen)) {
+            return false;
+        }
+
+        return shouldShowNotificationCard(doc);
+    }
+
+    private String getDisplayStatus(DocumentSnapshot doc) {
+        String status = getStringValue(doc, "status");
+        String gsoStatus = getStringValue(doc, "gsoStatus");
+        String gsoAvailability = getStringValue(doc, "gsoAvailability");
+        String notificationTarget = getStringValue(doc, "notificationTarget");
+        String workflowStage = getStringValue(doc, "workflowStage");
+
+        boolean isGsoReturned =
+                "Returned".equalsIgnoreCase(gsoStatus)
+                        || "Rejected".equalsIgnoreCase(gsoStatus)
+                        || "Not Available".equalsIgnoreCase(gsoAvailability)
+                        || "Unavailable".equalsIgnoreCase(gsoAvailability)
+                        || (
+                        "Returned".equalsIgnoreCase(status)
+                                && (
+                                "GSO".equalsIgnoreCase(notificationTarget)
+                                        || "GSO_REVIEW".equalsIgnoreCase(workflowStage)
+                                        || "GSO_RETURNED".equalsIgnoreCase(workflowStage)
+                        )
+                );
+
+        if (isGsoReturned) {
+            return "Returned";
+        }
+
+        boolean isApproved =
+                "Approved".equalsIgnoreCase(status)
+                        || "Approved - Available".equalsIgnoreCase(status)
+                        || "Approved".equalsIgnoreCase(gsoStatus)
+                        || "Available".equalsIgnoreCase(gsoAvailability);
+
+        if (isApproved) {
+            return "Approved";
+        }
+
+        return "Pending";
+    }
+
+    private String buildDescriptionText(DocumentSnapshot doc, String status) {
+        String title = getStringValue(doc, "requestorNotificationTitle");
+        String message = getStringValue(doc, "requestorNotificationMessage");
+
+        if (!title.isEmpty() && !message.isEmpty()) {
+            return title + "\n" + message;
+        }
+
+        if (!message.isEmpty()) {
+            return message;
+        }
+
+        String notificationTarget = getStringValue(doc, "notificationTarget");
+        String workflowStage = getStringValue(doc, "workflowStage");
+        String itsoAvailability = getStringValue(doc, "itsoAvailability");
+
+        if ("Approved".equalsIgnoreCase(status)) {
+            return "Your booking request has been approved.";
+        }
+
+        if ("Returned".equalsIgnoreCase(status)) {
+            return "Your booking request has been returned or rejected. Please review the request details.";
+        }
+
+        if ("GSO".equalsIgnoreCase(notificationTarget)
+                || "GSO_REVIEW".equalsIgnoreCase(workflowStage)) {
+
+            if ("Not Available".equalsIgnoreCase(itsoAvailability)) {
+                return "ITSO marked the technical requirements as not available. Your request is now under GSO review.";
+            }
+
+            if ("Available".equalsIgnoreCase(itsoAvailability)) {
+                return "ITSO marked the technical requirements as available. Your request is now under GSO review.";
+            }
+
+            return "Your request is pending review by GSO.";
+        }
+
+        if ("SAC".equalsIgnoreCase(notificationTarget)
+                || "SAC_REVIEW".equalsIgnoreCase(workflowStage)) {
+            return "Your request is pending review by SAC.";
+        }
+
+        if ("ITSO".equalsIgnoreCase(notificationTarget)
+                || "ITSO_REVIEW".equalsIgnoreCase(workflowStage)
+                || "WAITING_ITSO_APPROVAL".equalsIgnoreCase(workflowStage)) {
+            return "Your request is pending review by ITSO.";
+        }
+
+        return "There is an update on your booking request.";
+    }
+
+    private String buildNotifiedDateText(DocumentSnapshot doc) {
+        Timestamp timestamp = getBestNotificationTimestamp(doc);
+
+        if (timestamp == null) {
+            return "Notified date not available";
+        }
+
+        SimpleDateFormat formatter =
+                new SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault());
+
+        return formatter.format(timestamp.toDate());
+    }
+
+    private Timestamp getBestNotificationTimestamp(DocumentSnapshot doc) {
+        Timestamp timestamp = doc.getTimestamp("notificationUpdatedAt");
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("requestorNotifiedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("requestorNotificationOpenedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("updatedAt");
+        }
+
+        if (timestamp == null) {
+            timestamp = doc.getTimestamp("createdAt");
+        }
+
+        return timestamp;
+    }
+
+    private String buildMetaText(
+            String facility,
+            String startDate,
+            String endDate,
+            String startTime,
+            String endTime
+    ) {
+        StringBuilder builder = new StringBuilder();
+
+        if (!facility.isEmpty()) {
+            builder.append(facility);
+        }
+
+        if (!startDate.isEmpty()) {
+            if (builder.length() > 0) builder.append(" • ");
+
+            if (!endDate.isEmpty() && !startDate.equalsIgnoreCase(endDate)) {
+                builder.append(startDate).append(" - ").append(endDate);
+            } else {
+                builder.append(startDate);
+            }
+        }
+
+        if (!startTime.isEmpty()) {
+            if (builder.length() > 0) builder.append(" • ");
+
+            if (!endTime.isEmpty()) {
+                builder.append(startTime).append(" - ").append(endTime);
+            } else {
+                builder.append(startTime);
+            }
+        }
+
+        return builder.length() == 0 ? "No schedule details" : builder.toString();
+    }
+
+    private String getFinalFacility(DocumentSnapshot doc) {
+        String finalFacilityName = getStringValue(doc, "finalFacilityName");
+
+        if (!finalFacilityName.isEmpty()) {
+            return finalFacilityName;
+        }
+
+        String facility = getStringValue(doc, "facility");
+        String otherFacility = getStringValue(doc, "otherFacility");
+
+        if ("Others".equalsIgnoreCase(facility) && !otherFacility.isEmpty()) {
+            return otherFacility;
+        }
+
+        return facility;
+    }
+
+    private int getStatusIcon(String status) {
+        if ("Approved".equalsIgnoreCase(status)) {
+            return android.R.drawable.checkbox_on_background;
+        }
+
+        if ("Returned".equalsIgnoreCase(status)) {
+            return android.R.drawable.ic_menu_revert;
+        }
+
+        return android.R.drawable.ic_dialog_info;
+    }
+
+    private int getStatusMainColor(String status) {
+        if ("Approved".equalsIgnoreCase(status)) {
+            return Color.parseColor("#2E7D32");
+        }
+
+        if ("Returned".equalsIgnoreCase(status)) {
+            return Color.parseColor("#970705");
+        }
+
+        return Color.parseColor("#313131");
+    }
+
+    private int getStatusLightColor(String status) {
+        if ("Approved".equalsIgnoreCase(status)) {
+            return Color.parseColor("#E7F4E8");
+        }
+
+        if ("Returned".equalsIgnoreCase(status)) {
+            return Color.parseColor("#F3D9D9");
+        }
+
+        return Color.parseColor("#EEEEEE");
+    }
+
+    private void showEmptyState() {
+        if (layoutNotificationList != null) {
+            layoutNotificationList.setVisibility(View.GONE);
+        }
+
+        if (layoutEmptyState != null) {
+            layoutEmptyState.setVisibility(View.VISIBLE);
+        }
+
+        if (tvIncomingCount != null) {
+            tvIncomingCount.setText("0 incoming notifications");
+        }
+    }
+
+    private String getStringValue(DocumentSnapshot doc, String field) {
+        Object value = doc.get(field);
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }

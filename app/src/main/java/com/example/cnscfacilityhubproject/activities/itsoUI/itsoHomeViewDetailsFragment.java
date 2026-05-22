@@ -66,8 +66,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     private TextView tvConnectors;
     private TextView tvProposalFile;
     private TextView tvRoute;
-    private TextView tvRemarks;
-    private MaterialCardView cardRemarks;
+
     private LinearLayout layoutProposalFiles;
 
     private final List<DisplayProposalFile> currentProposalFiles = new ArrayList<>();
@@ -138,8 +137,6 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         tvConnectors = view.findViewById(R.id.tvConnectors);
         tvProposalFile = view.findViewById(R.id.tvProposalFile);
         tvRoute = view.findViewById(R.id.tvRoute);
-        tvRemarks = view.findViewById(R.id.tvRemarks);
-        cardRemarks = view.findViewById(R.id.cardRemarks);
         layoutProposalFiles = view.findViewById(R.id.layoutProposalFiles);
     }
 
@@ -162,23 +159,27 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
         setLabeledText(tvSchedule, "Schedule:\n", "");
         setLabeledText(tvFacility, "Facilities: ", "");
+
         tvRequestorInfo.setText(
                 labelValue("Name: ", "") +
                         "\n" + labelValue("Contact: ", "") +
                         "\n" + labelValue("College / Department: ", "") +
                         "\n" + labelValue("Office / Course: ", "")
         );
+
         tvParticipants.setText(
                 labelValue("Participants: ", "") +
                         "\n" + labelValue("Number of Participants: ", "")
         );
+
         setLabeledText(tvPurposeFull, "Purpose: ", "");
         tvAmenities.setText(buildEmptyAmenitiesText());
         setLabeledText(tvTechnicalList, "Technical Requirements:\n", "");
         setLabeledText(tvConnectors, "Connectors / Cables: ", "");
         setLabeledText(tvProposalFile, "Proposal / Supporting Files: ", "");
         setLabeledText(tvRoute, "Route: ", "");
-        setLabeledText(tvRemarks, "Remarks: ", "");
+
+        setItsoRemarksEditable(false);
     }
 
     private void loadRequestDetails() {
@@ -265,33 +266,85 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         setLabeledText(tvConnectors, "Connectors / Cables: ", getStringValue(doc, "connectors"));
         setLabeledText(tvRoute, "Route: ", notificationTarget);
 
-        if (tvRemarks != null) {
-            setLabeledText(tvRemarks, "Remarks: ", getRemarks(doc));
-        }
-
-        if (cardRemarks != null) {
-            cardRemarks.setVisibility(View.VISIBLE);
-        }
-
         if (etItsoRemarks != null) {
-            etItsoRemarks.setText(getStringValue(doc, "itsoRemarks"));
+            etItsoRemarks.setText(getRemarks(doc));
         }
 
         bindProposalFiles(proposalFiles);
-
-        layoutAvailabilityActions.setVisibility(
-                "Pending".equalsIgnoreCase(displayStatus) ? View.VISIBLE : View.GONE
-        );
-
+        updateActionAndRemarksState(doc, displayStatus);
         markReminderSeenIfUpcoming(doc);
+    }
+
+    private void updateActionAndRemarksState(DocumentSnapshot doc, String displayStatus) {
+        boolean showButtons = shouldShowActionButtons(doc);
+
+        if (layoutAvailabilityActions != null) {
+            layoutAvailabilityActions.setVisibility(showButtons ? View.VISIBLE : View.GONE);
+        }
+
+        setActionButtonsEnabled(showButtons);
+        setItsoRemarksEditable(showButtons);
+    }
+
+    private boolean shouldShowActionButtons(DocumentSnapshot doc) {
+        String itsoAvailability = getStringValue(doc, "itsoAvailability");
+        String itsoStatus = getStringValue(doc, "itsoStatus");
+
+        if (hasDisplayValue(itsoAvailability)) {
+            return false;
+        }
+
+        if ("Approved".equalsIgnoreCase(itsoStatus)
+                || "Rejected".equalsIgnoreCase(itsoStatus)
+                || "Available".equalsIgnoreCase(itsoStatus)
+                || "Not Available".equalsIgnoreCase(itsoStatus)
+                || "Unavailable".equalsIgnoreCase(itsoStatus)) {
+            return false;
+        }
+
+        boolean sendToITSO = getBooleanValue(doc, "sendToITSO");
+        String notificationTarget = getStringValue(doc, "notificationTarget");
+        String workflowStage = getStringValue(doc, "workflowStage");
+
+        return sendToITSO
+                || "ITSO".equalsIgnoreCase(notificationTarget)
+                || "ITSO_REVIEW".equalsIgnoreCase(workflowStage)
+                || "Pending".equalsIgnoreCase(itsoStatus);
+    }
+
+    private boolean isMarkedAvailable(DocumentSnapshot doc, String displayStatus) {
+        String itsoAvailability = getStringValue(doc, "itsoAvailability");
+        String itsoStatus = getStringValue(doc, "itsoStatus");
+        String status = getStringValue(doc, "status");
+
+        return "Available".equalsIgnoreCase(itsoAvailability)
+                || "Approved".equalsIgnoreCase(itsoStatus)
+                || "Available".equalsIgnoreCase(itsoStatus)
+                || "Approved - Available".equalsIgnoreCase(status)
+                || "Approved - Available".equalsIgnoreCase(displayStatus)
+                || "Available".equalsIgnoreCase(displayStatus);
+    }
+
+    private void setItsoRemarksEditable(boolean editable) {
+        if (etItsoRemarks == null) return;
+
+        etItsoRemarks.setEnabled(editable);
+        etItsoRemarks.setFocusable(editable);
+        etItsoRemarks.setFocusableInTouchMode(editable);
+        etItsoRemarks.setCursorVisible(editable);
+        etItsoRemarks.setLongClickable(editable);
+        etItsoRemarks.setTextColor(Color.parseColor("#313131"));
+        etItsoRemarks.setHintTextColor(Color.parseColor("#777777"));
     }
 
     private List<DisplayProposalFile> getProposalFilesFromFirestore(DocumentSnapshot doc) {
         List<DisplayProposalFile> files = new ArrayList<>();
 
         Object rawFiles = doc.get("proposalFiles");
+
         if (rawFiles instanceof List<?>) {
             List<?> list = (List<?>) rawFiles;
+
             for (Object item : list) {
                 if (!(item instanceof Map<?, ?>)) continue;
 
@@ -355,15 +408,21 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     private void bindProposalFiles(List<DisplayProposalFile> proposalFiles) {
         currentProposalFiles.clear();
         currentProposalFiles.addAll(proposalFiles);
-        layoutProposalFiles.removeAllViews();
+
+        if (layoutProposalFiles != null) {
+            layoutProposalFiles.removeAllViews();
+        }
 
         if (proposalFiles.isEmpty()) {
-            tvProposalFile.setText("Proposal / Supporting Files: ");
-            tvProposalFile.setTextColor(Color.parseColor("#313131"));
+            if (tvProposalFile != null) {
+                tvProposalFile.setText("Proposal / Supporting Files: ");
+                tvProposalFile.setTextColor(Color.parseColor("#313131"));
+            }
             return;
         }
 
         boolean hasLocalContentUri = false;
+
         for (DisplayProposalFile file : proposalFiles) {
             if (file.fileUrl != null && file.fileUrl.startsWith("content://")) {
                 hasLocalContentUri = true;
@@ -371,13 +430,17 @@ public class itsoHomeViewDetailsFragment extends Fragment {
             }
         }
 
-        if (hasLocalContentUri) {
-            tvProposalFile.setText("Proposal / Supporting Files: Local device URI detected");
-            tvProposalFile.setTextColor(Color.RED);
-        } else {
-            tvProposalFile.setText("Proposal / Supporting Files: " + proposalFiles.size() + " file(s)");
-            tvProposalFile.setTextColor(Color.parseColor("#313131"));
+        if (tvProposalFile != null) {
+            if (hasLocalContentUri) {
+                tvProposalFile.setText("Proposal / Supporting Files: Local device URI detected");
+                tvProposalFile.setTextColor(Color.RED);
+            } else {
+                tvProposalFile.setText("Proposal / Supporting Files: " + proposalFiles.size() + " file(s)");
+                tvProposalFile.setTextColor(Color.parseColor("#313131"));
+            }
         }
+
+        if (layoutProposalFiles == null) return;
 
         for (int i = 0; i < proposalFiles.size(); i++) {
             DisplayProposalFile file = proposalFiles.get(i);
@@ -387,11 +450,13 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
     private View createProposalFileRow(DisplayProposalFile file, int index) {
         MaterialCardView row = new MaterialCardView(requireContext());
+
         LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         );
         rowParams.bottomMargin = dp(8);
+
         row.setLayoutParams(rowParams);
         row.setCardBackgroundColor(Color.parseColor("#FFFFFF"));
         row.setRadius(dp(14));
@@ -411,6 +476,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         String fileTitle = hasDisplayValue(file.fileName)
                 ? index + ". " + file.fileName
                 : String.valueOf(index) + ".";
+
         String fileSubtitle = buildFileSubtitle(file);
 
         TextView details = new TextView(requireContext());
@@ -418,6 +484,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         );
+
         details.setLayoutParams(detailParams);
         details.setTextColor(Color.parseColor("#313131"));
         details.setTextSize(13f);
@@ -435,6 +502,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         container.addView(details);
         container.addView(tapHint);
         row.addView(container);
+
         return row;
     }
 
@@ -466,6 +534,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         try {
             if (file.hasBase64Data()) {
                 File cachedFile = writeBase64FileToCache(file);
+
                 Uri fileUri = FileProvider.getUriForFile(
                         requireContext(),
                         requireContext().getPackageName() + ".fileprovider",
@@ -473,7 +542,10 @@ public class itsoHomeViewDetailsFragment extends Fragment {
                 );
 
                 Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setDataAndType(fileUri, file.mimeType.isEmpty() ? "application/octet-stream" : file.mimeType);
+                intent.setDataAndType(
+                        fileUri,
+                        file.mimeType.isEmpty() ? "application/octet-stream" : file.mimeType
+                );
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 startActivity(Intent.createChooser(intent, "Open file"));
                 return;
@@ -489,7 +561,11 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
             Toast.makeText(requireContext(), "This file has no readable data.", Toast.LENGTH_SHORT).show();
         } catch (IllegalArgumentException e) {
-            Toast.makeText(requireContext(), "FileProvider is missing. Add the manifest provider and file_paths.xml.", Toast.LENGTH_LONG).show();
+            Toast.makeText(
+                    requireContext(),
+                    "FileProvider is missing. Add the manifest provider and file_paths.xml.",
+                    Toast.LENGTH_LONG
+            ).show();
         } catch (ActivityNotFoundException e) {
             Toast.makeText(requireContext(), "No app found to open this file.", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
@@ -502,6 +578,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
         if (base64Data.isEmpty() && file.fileUrl.startsWith("data:")) {
             int commaIndex = file.fileUrl.indexOf(',');
+
             if (commaIndex >= 0 && commaIndex < file.fileUrl.length() - 1) {
                 base64Data = file.fileUrl.substring(commaIndex + 1);
             }
@@ -514,17 +591,20 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         byte[] bytes = Base64.decode(base64Data, Base64.DEFAULT);
 
         File dir = new File(requireContext().getCacheDir(), "proposal_files");
+
         if (!dir.exists() && !dir.mkdirs()) {
             throw new IllegalStateException("Unable to create cache folder.");
         }
 
         String safeName = sanitizeFileName(file.fileName);
+
         if (!hasFileExtension(safeName)) {
             safeName = safeName + extensionForMime(file.mimeType);
         }
 
         File outFile = new File(dir, safeName);
         FileOutputStream outputStream = new FileOutputStream(outFile);
+
         try {
             outputStream.write(bytes);
             outputStream.flush();
@@ -558,6 +638,23 @@ public class itsoHomeViewDetailsFragment extends Fragment {
                 .addOnSuccessListener(doc -> {
                     if (!isAdded()) return;
 
+                    if (doc == null || !doc.exists()) {
+                        setActionButtonsEnabled(true);
+                        Toast.makeText(requireContext(), "Request not found.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    if (!shouldShowActionButtons(doc)) {
+                        setActionButtonsEnabled(false);
+
+                        if (layoutAvailabilityActions != null) {
+                            layoutAvailabilityActions.setVisibility(View.GONE);
+                        }
+
+                        Toast.makeText(requireContext(), "This request is no longer pending.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
                     boolean needsSAC = getBooleanValue(doc, "needsSAC");
                     boolean sacApproved = "Approved".equalsIgnoreCase(getStringValue(doc, "sacStatus"));
                     boolean canSendToGSO = !needsSAC || sacApproved;
@@ -579,13 +676,13 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
                     String notificationTitle = markedAvailable
                             ? "Technical Support Approved"
-                            : "Technical Support Not Available";
+                            : "";
 
                     String typedRemarks = getText(etItsoRemarks);
 
                     String defaultRemarks = markedAvailable
-                            ? "ITSO marked the requested technical support as available."
-                            : "ITSO marked the requested technical support as not available.";
+                            ? ""
+                            : "";
 
                     String itsoRemarks = typedRemarks.isEmpty()
                             ? defaultRemarks
@@ -629,6 +726,16 @@ public class itsoHomeViewDetailsFragment extends Fragment {
                             .addOnSuccessListener(unused -> {
                                 if (!isAdded()) return;
 
+                                if (layoutAvailabilityActions != null) {
+                                    layoutAvailabilityActions.setVisibility(View.GONE);
+                                }
+
+                                setActionButtonsEnabled(false);
+
+                                if (markedAvailable) {
+                                    setItsoRemarksEditable(false);
+                                }
+
                                 Toast.makeText(
                                         requireContext(),
                                         canSendToGSO
@@ -655,8 +762,13 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     }
 
     private void setActionButtonsEnabled(boolean enabled) {
-        btnAvailable.setEnabled(enabled);
-        btnNotAvailable.setEnabled(enabled);
+        if (btnAvailable != null) {
+            btnAvailable.setEnabled(enabled);
+        }
+
+        if (btnNotAvailable != null) {
+            btnNotAvailable.setEnabled(enabled);
+        }
     }
 
     private String getITSODisplayStatus(DocumentSnapshot doc) {
@@ -708,6 +820,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         String otherAmenities = getStringValue(doc, "otherAmenities");
 
         String tablesValue = "";
+
         if (tablesRequested != null) {
             tablesValue = tablesRequested
                     ? "Requested" + (hasDisplayValue(tablesCount) ? " (" + tablesCount + ")" : "")
@@ -715,6 +828,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         }
 
         String chairsValue = "";
+
         if (chairsRequested != null) {
             chairsValue = chairsRequested
                     ? "Requested" + (hasDisplayValue(chairsCount) ? " (" + chairsCount + ")" : "")
@@ -750,6 +864,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         }
 
         StringBuilder builder = new StringBuilder();
+
         for (String item : selected) {
             if (!hasDisplayValue(item)) continue;
 
@@ -823,11 +938,14 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
     private String getStringValue(DocumentSnapshot doc, String field) {
         if (doc == null || field == null) return "";
+
         Object value = doc.get(field);
         return value == null ? "" : String.valueOf(value).trim();
     }
 
     private boolean getBooleanValue(DocumentSnapshot doc, String field) {
+        if (doc == null || field == null) return false;
+
         Boolean value = doc.getBoolean(field);
         return Boolean.TRUE.equals(value);
     }
@@ -854,18 +972,28 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     }
 
     private String getLongString(DocumentSnapshot doc, String field) {
+        if (doc == null || field == null) return "";
+
         Object value = doc.get(field);
         return value == null ? "" : String.valueOf(value).trim();
     }
 
     private String getMapString(Map<?, ?> map, String key) {
+        if (map == null || key == null) return "";
+
         Object value = map.get(key);
         return value != null ? String.valueOf(value).trim() : "";
     }
 
     private long getMapLong(Map<?, ?> map, String key) {
+        if (map == null || key == null) return 0;
+
         Object value = map.get(key);
-        if (value instanceof Number) return ((Number) value).longValue();
+
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+
         if (value != null) {
             try {
                 return Long.parseLong(String.valueOf(value));
@@ -873,12 +1001,19 @@ public class itsoHomeViewDetailsFragment extends Fragment {
                 return 0;
             }
         }
+
         return 0;
     }
 
     private String firstNonEmpty(String first, String second) {
-        if (first != null && !first.trim().isEmpty()) return first.trim();
-        if (second != null && !second.trim().isEmpty()) return second.trim();
+        if (first != null && !first.trim().isEmpty()) {
+            return first.trim();
+        }
+
+        if (second != null && !second.trim().isEmpty()) {
+            return second.trim();
+        }
+
         return "";
     }
 
@@ -886,15 +1021,16 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         if (value == null) return "";
 
         String cleaned = value.trim();
+
         if (cleaned.isEmpty()) return "";
 
         String lower = cleaned.toLowerCase(Locale.US);
+
         if (cleaned.equals("—")
                 || cleaned.equals("-")
                 || lower.equals("null")
                 || lower.equals("none")
                 || lower.equals("n/a")
-                || lower.equals("not available")
                 || lower.equals("not set")
                 || lower.equals("no schedule")
                 || lower.equals("no facility")
@@ -912,16 +1048,19 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     private String guessMimeType(DisplayProposalFile file) {
         if (file.fileUrl != null && file.fileUrl.startsWith("data:")) {
             int semicolonIndex = file.fileUrl.indexOf(';');
+
             if (semicolonIndex > 5) {
                 return file.fileUrl.substring(5, semicolonIndex);
             }
         }
 
         String lower = file.fileName == null ? "" : file.fileName.toLowerCase(Locale.US);
+
         if (lower.endsWith(".pdf")) return "application/pdf";
         if (lower.endsWith(".png")) return "image/png";
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
         if (lower.endsWith(".webp")) return "image/webp";
+
         return "application/octet-stream";
     }
 
@@ -929,27 +1068,39 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         String mime = mimeType == null ? "" : mimeType.toLowerCase(Locale.US);
         String name = fileName == null ? "" : fileName.toLowerCase(Locale.US);
 
-        if (mime.startsWith("image/") || name.endsWith(".jpg") || name.endsWith(".jpeg")
-                || name.endsWith(".png") || name.endsWith(".webp")) {
+        if (mime.startsWith("image/")
+                || name.endsWith(".jpg")
+                || name.endsWith(".jpeg")
+                || name.endsWith(".png")
+                || name.endsWith(".webp")) {
             return "image";
         }
+
         if ("application/pdf".equals(mime) || name.endsWith(".pdf")) {
             return "pdf";
         }
+
         return "file";
     }
 
     private long estimateBytesFromBase64(String base64) {
         if (base64 == null || base64.isEmpty()) return 0;
+
         int commaIndex = base64.indexOf(',');
         String clean = commaIndex >= 0 ? base64.substring(commaIndex + 1) : base64;
+
         return (clean.length() * 3L) / 4L;
     }
 
     private String formatBytes(long bytes) {
         if (bytes < 1024) return bytes + " B";
+
         double kb = bytes / 1024.0;
-        if (kb < 1024) return String.format(Locale.US, "%.1f KB", kb);
+
+        if (kb < 1024) {
+            return String.format(Locale.US, "%.1f KB", kb);
+        }
+
         double mb = kb / 1024.0;
         return String.format(Locale.US, "%.2f MB", mb);
     }
@@ -967,7 +1118,9 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     }
 
     private boolean hasFileExtension(String name) {
-        return name != null && name.lastIndexOf('.') > 0 && name.lastIndexOf('.') < name.length() - 1;
+        return name != null
+                && name.lastIndexOf('.') > 0
+                && name.lastIndexOf('.') < name.length() - 1;
     }
 
     private String extensionForMime(String mimeType) {
@@ -975,6 +1128,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         if ("image/png".equalsIgnoreCase(mimeType)) return ".png";
         if ("image/jpeg".equalsIgnoreCase(mimeType)) return ".jpg";
         if ("image/webp".equalsIgnoreCase(mimeType)) return ".webp";
+
         return ".bin";
     }
 

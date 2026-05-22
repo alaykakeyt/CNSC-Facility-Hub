@@ -2,13 +2,16 @@ package com.example.cnscfacilityhubproject.activities.requestorUI;
 
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
-import android.database.Cursor;
 import android.content.Intent;
+import android.content.res.ColorStateList;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.OpenableColumns;
 import android.text.TextUtils;
 import android.util.Base64;
@@ -21,10 +24,11 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
@@ -41,9 +45,11 @@ import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
@@ -54,20 +60,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import android.graphics.Color;
-
-import android.content.res.ColorStateList;
-
-import android.os.Environment;
-
-import androidx.core.content.FileProvider;
-
-import java.io.File;
-import com.google.firebase.firestore.FieldValue;
 public class RequestorRequestFragment extends Fragment {
 
-    // Firestore has a 1 MiB maximum document size.
-    // Base64 text is larger than the original file bytes, so keep files small.
     private static final int MAX_SINGLE_FILE_BYTES_FOR_FIRESTORE = 350 * 1024;
     private static final int MAX_TOTAL_BASE64_CHARS_FOR_FIRESTORE = 700 * 1024;
     private static final int MAX_IMAGE_DIMENSION_FOR_FIRESTORE = 1280;
@@ -184,8 +178,6 @@ public class RequestorRequestFragment extends Fragment {
         setupSubmit();
         loadRequestorInformation();
         checkActiveAppointment();
-
-
     }
 
     private void bindViews(View view) {
@@ -239,7 +231,6 @@ public class RequestorRequestFragment extends Fragment {
         layoutScheduleDays = view.findViewById(R.id.layoutScheduleDays);
         tvScheduleHint = view.findViewById(R.id.tvScheduleHint);
 
-
         btnSubmitRequest = view.findViewById(R.id.btnSubmitRequest);
         progressSubmit = view.findViewById(R.id.progressSubmit);
         tvSubmitStatus = view.findViewById(R.id.tvSubmitStatus);
@@ -257,6 +248,35 @@ public class RequestorRequestFragment extends Fragment {
         btnCaptureImage = view.findViewById(R.id.btnCaptureImage);
         layoutSelectedFiles = view.findViewById(R.id.layoutSelectedFiles);
         tvSelectedFile = view.findViewById(R.id.tvSelectedFile);
+    }
+
+    private void setupReadOnlyPickers() {
+        setDatePickerField(etStartDate);
+        setDatePickerField(etEndDate);
+        setTimePickerField(etTimeStart);
+        setTimePickerField(etTimeEnd);
+    }
+
+    private void setDatePickerField(TextInputEditText editText) {
+        editText.setFocusable(false);
+        editText.setFocusableInTouchMode(false);
+        editText.setClickable(true);
+        editText.setLongClickable(false);
+        editText.setCursorVisible(false);
+        editText.setKeyListener(null);
+        editText.setTextColor(Color.BLACK);
+        editText.setHintTextColor(Color.GRAY);
+    }
+
+    private void setTimePickerField(TextInputEditText editText) {
+        editText.setFocusable(false);
+        editText.setFocusableInTouchMode(false);
+        editText.setClickable(true);
+        editText.setLongClickable(false);
+        editText.setCursorVisible(false);
+        editText.setKeyListener(null);
+        editText.setTextColor(Color.BLACK);
+        editText.setHintTextColor(Color.GRAY);
     }
 
     private void loadRequestorInformation() {
@@ -285,29 +305,9 @@ public class RequestorRequestFragment extends Fragment {
                 });
     }
 
-    private void setupReadOnlyPickers() {
-        setPickerField(etStartDate);
-        setPickerField(etEndDate);
-        setPickerField(etTimeStart);
-        setPickerField(etTimeEnd);
-    }
-
-    private void setPickerField(TextInputEditText editText) {
-        editText.setFocusable(false);
-        editText.setClickable(true);
-        editText.setLongClickable(false);
-        editText.setCursorVisible(false);
-        editText.setKeyListener(null);
-
-        // Text color kapag may selected/typed time
-        editText.setTextColor(Color.BLACK);
-
-        // Hint color habang wala pang selected time
-        editText.setHintTextColor(Color.GRAY);
-    }
-
     private void setupActivityTypeChips() {
         updateChipStyles(chipInstitutional, chipLocal, chipExternal);
+
         chipGroupActivityType.setOnCheckedStateChangeListener((group, checkedIds) -> {
             selectedActivityType = getSelectedChipText(group);
             updateChipStyles(chipInstitutional, chipLocal, chipExternal);
@@ -316,17 +316,24 @@ public class RequestorRequestFragment extends Fragment {
 
     private void setupFacilityChips() {
         toggleInput(etOtherFacility, false);
+
         Chip[] facilityChips = {
-                chipAmphitheater, chipCoveredCourt, chipEntrancePavilion,
-                chipStudentCenter, chipOthersFacility
+                chipAmphitheater,
+                chipCoveredCourt,
+                chipEntrancePavilion,
+                chipStudentCenter,
+                chipOthersFacility
         };
+
         updateChipStyles(facilityChips);
 
         chipGroupFacility.setOnCheckedStateChangeListener((group, checkedIds) -> {
             toggleInput(etOtherFacility, chipOthersFacility.isChecked());
+
             if (chipOthersFacility.isChecked()) {
                 etOtherFacility.requestFocus();
             }
+
             updateChipStyles(facilityChips);
         });
     }
@@ -352,7 +359,11 @@ public class RequestorRequestFragment extends Fragment {
 
     private String getSelectedChipText(ChipGroup chipGroup) {
         int checkedId = chipGroup.getCheckedChipId();
-        if (checkedId == View.NO_ID) return "";
+
+        if (checkedId == View.NO_ID) {
+            return "";
+        }
+
         Chip chip = chipGroup.findViewById(checkedId);
         return chip != null ? chip.getText().toString().trim() : "";
     }
@@ -366,8 +377,10 @@ public class RequestorRequestFragment extends Fragment {
             if (chip == null) continue;
 
             String label = chip.getText().toString().trim();
+
             if ("Others".equalsIgnoreCase(label)) {
                 String custom = getText(etOtherFacility);
+
                 if (!custom.isEmpty()) {
                     names.add(custom);
                 }
@@ -375,6 +388,7 @@ public class RequestorRequestFragment extends Fragment {
                 names.add(label);
             }
         }
+
         return names;
     }
 
@@ -384,12 +398,18 @@ public class RequestorRequestFragment extends Fragment {
 
         cbTables.setOnCheckedChangeListener((buttonView, isChecked) -> {
             toggleInput(etTablesCount, isChecked);
-            if (isChecked) etTablesCount.requestFocus();
+
+            if (isChecked) {
+                etTablesCount.requestFocus();
+            }
         });
 
         cbChairs.setOnCheckedChangeListener((buttonView, isChecked) -> {
             toggleInput(etChairsCount, isChecked);
-            if (isChecked) etChairsCount.requestFocus();
+
+            if (isChecked) {
+                etChairsCount.requestFocus();
+            }
         });
     }
 
@@ -399,7 +419,10 @@ public class RequestorRequestFragment extends Fragment {
 
         cbNeedsTechnical.setOnCheckedChangeListener((buttonView, isChecked) -> {
             layoutTechnicalOptions.setVisibility(isChecked ? View.VISIBLE : View.GONE);
-            if (!isChecked) clearTechnicalOptions();
+
+            if (!isChecked) {
+                clearTechnicalOptions();
+            }
         });
     }
 
@@ -437,6 +460,7 @@ public class RequestorRequestFragment extends Fragment {
         editText.setFocusableInTouchMode(enabled);
         editText.setClickable(enabled);
         editText.setCursorVisible(enabled);
+
         if (!enabled) {
             editText.setText("");
             editText.setError(null);
@@ -456,8 +480,10 @@ public class RequestorRequestFragment extends Fragment {
                 (datePicker, year, month, dayOfMonth) -> {
                     Calendar selected = Calendar.getInstance();
                     selected.set(year, month, dayOfMonth);
+
                     target.setText(formatDate(selected));
                     target.setError(null);
+
                     if (rebuildSchedule) {
                         rebuildScheduleDayCards();
                     }
@@ -482,6 +508,7 @@ public class RequestorRequestFragment extends Fragment {
                     Calendar selected = Calendar.getInstance();
                     selected.set(Calendar.HOUR_OF_DAY, hourOfDay);
                     selected.set(Calendar.MINUTE, minute);
+
                     target.setText(formatTime(selected));
                     target.setError(null);
                 },
@@ -525,12 +552,14 @@ public class RequestorRequestFragment extends Fragment {
 
         long startMillis = RequestDataHelper.parseDateToMillis(startDateText);
         long endMillis = RequestDataHelper.parseDateToMillis(endDateText);
-        if (startMillis == -1 || endMillis == -1) {
+
+        if (startMillis == -1 || endMillis == -1 || endMillis < startMillis) {
             return;
         }
 
         Calendar cursor = Calendar.getInstance();
         cursor.setTimeInMillis(startMillis);
+
         Calendar end = Calendar.getInstance();
         end.setTimeInMillis(endMillis);
 
@@ -543,11 +572,13 @@ public class RequestorRequestFragment extends Fragment {
 
     private View createScheduleDayCard(String dateText) {
         MaterialCardView card = new MaterialCardView(requireContext());
+
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         );
         cardParams.bottomMargin = dp(10);
+
         card.setLayoutParams(cardParams);
         card.setCardBackgroundColor(requireContext().getColor(R.color.cnsc_surface));
         card.setRadius(dp(16));
@@ -570,21 +601,31 @@ public class RequestorRequestFragment extends Fragment {
         timeRow.setPadding(0, dp(10), 0, 0);
 
         TextInputEditText etStart = new TextInputEditText(requireContext());
-        etStart.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        etStart.setLayoutParams(new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+        ));
         etStart.setHint("Start time");
-        setPickerField(etStart);
+        setTimePickerField(etStart);
         etStart.setOnClickListener(v -> showTimePickerForDay(etStart));
 
         TextInputEditText etEnd = new TextInputEditText(requireContext());
-        LinearLayout.LayoutParams endParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        LinearLayout.LayoutParams endParams = new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+        );
         endParams.setMarginStart(dp(10));
+
         etEnd.setLayoutParams(endParams);
         etEnd.setHint("End time");
-        setPickerField(etEnd);
+        setTimePickerField(etEnd);
         etEnd.setOnClickListener(v -> showTimePickerForDay(etEnd));
 
         timeRow.addView(etStart);
         timeRow.addView(etEnd);
+
         container.addView(timeRow);
         card.addView(container);
 
@@ -603,12 +644,15 @@ public class RequestorRequestFragment extends Fragment {
                     for (Uri uri : uris) {
                         String mimeType = requireContext().getContentResolver().getType(uri);
                         boolean isPdf = "application/pdf".equalsIgnoreCase(mimeType);
-                        boolean isImage = mimeType != null && mimeType.toLowerCase(Locale.ROOT).startsWith("image/");
+                        boolean isImage = mimeType != null
+                                && mimeType.toLowerCase(Locale.ROOT).startsWith("image/");
 
                         if (!isPdf && !isImage) {
-                            Toast.makeText(requireContext(),
+                            Toast.makeText(
+                                    requireContext(),
                                     "Only PDF and image files are allowed.",
-                                    Toast.LENGTH_SHORT).show();
+                                    Toast.LENGTH_SHORT
+                            ).show();
                             continue;
                         }
 
@@ -630,6 +674,7 @@ public class RequestorRequestFragment extends Fragment {
                 }
         );
     }
+
     private void setupCameraLauncher() {
         cameraLauncher = registerForActivityResult(
                 new ActivityResultContracts.TakePicture(),
@@ -643,12 +688,25 @@ public class RequestorRequestFragment extends Fragment {
 
                         refreshSelectedFilesUi();
                     } else {
-                        Toast.makeText(requireContext(), "Image capture cancelled.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(
+                                requireContext(),
+                                "Image capture cancelled.",
+                                Toast.LENGTH_SHORT
+                        ).show();
                     }
 
                     pendingCameraImageUri = null;
                 }
         );
+    }
+
+    private void setupFileActions() {
+        btnChooseFiles.setOnClickListener(v -> filePickerLauncher.launch(new String[]{
+                "application/pdf",
+                "image/*"
+        }));
+
+        btnCaptureImage.setOnClickListener(v -> openCameraCapture());
     }
 
     private void openCameraCapture() {
@@ -659,9 +717,11 @@ public class RequestorRequestFragment extends Fragment {
                 cameraLauncher.launch(pendingCameraImageUri);
             }
         } catch (IOException e) {
-            Toast.makeText(requireContext(),
+            Toast.makeText(
+                    requireContext(),
                     "Unable to open camera: " + e.getMessage(),
-                    Toast.LENGTH_LONG).show();
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
 
@@ -682,15 +742,6 @@ public class RequestorRequestFragment extends Fragment {
         );
     }
 
-    private void setupFileActions() {
-        btnChooseFiles.setOnClickListener(v -> filePickerLauncher.launch(new String[]{
-                "application/pdf",
-                "image/*"
-        }));
-
-        btnCaptureImage.setOnClickListener(v -> openCameraCapture());
-    }
-
     private void refreshSelectedFilesUi() {
         layoutSelectedFiles.removeAllViews();
 
@@ -705,11 +756,13 @@ public class RequestorRequestFragment extends Fragment {
 
         for (Uri uri : new ArrayList<>(selectedProposalFileUris)) {
             MaterialCardView row = new MaterialCardView(requireContext());
+
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
             );
             params.bottomMargin = dp(6);
+
             row.setLayoutParams(params);
             row.setRadius(dp(12));
             row.setCardBackgroundColor(requireContext().getColor(R.color.white));
@@ -722,7 +775,12 @@ public class RequestorRequestFragment extends Fragment {
             inner.setPadding(dp(12), dp(8), dp(12), dp(8));
 
             TextView name = new TextView(requireContext());
-            LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1f
+            );
+
             name.setLayoutParams(nameParams);
             name.setText(getFileName(uri));
             name.setTextColor(requireContext().getColor(R.color.cnsc_text_primary));
@@ -749,6 +807,7 @@ public class RequestorRequestFragment extends Fragment {
 
             inner.addView(name);
             inner.addView(remove);
+
             row.addView(inner);
             layoutSelectedFiles.addView(row);
         }
@@ -757,14 +816,17 @@ public class RequestorRequestFragment extends Fragment {
     private String getFileName(Uri uri) {
         String result = "Selected File";
 
-        Cursor cursor = requireContext().getContentResolver()
+        Cursor cursor = requireContext()
+                .getContentResolver()
                 .query(uri, null, null, null, null);
 
         if (cursor != null) {
             try {
                 int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+
                 if (nameIndex >= 0 && cursor.moveToFirst()) {
                     String displayName = cursor.getString(nameIndex);
+
                     if (!TextUtils.isEmpty(displayName)) {
                         result = displayName;
                     }
@@ -784,7 +846,9 @@ public class RequestorRequestFragment extends Fragment {
         for (Uri uri : selectedProposalFileUris) {
             String fileName = getFileName(uri);
             String mimeType = requireContext().getContentResolver().getType(uri);
-            boolean isImage = mimeType != null && mimeType.toLowerCase(Locale.ROOT).startsWith("image/");
+
+            boolean isImage = mimeType != null
+                    && mimeType.toLowerCase(Locale.ROOT).startsWith("image/");
             boolean isPdf = "application/pdf".equalsIgnoreCase(mimeType);
 
             if (!isImage && !isPdf) {
@@ -799,11 +863,14 @@ public class RequestorRequestFragment extends Fragment {
             totalBase64Chars += base64Data.length();
 
             if (totalBase64Chars > MAX_TOTAL_BASE64_CHARS_FOR_FIRESTORE) {
-                throw new IOException("Selected files are too large for Firestore. Please choose smaller or fewer files.");
+                throw new IOException(
+                        "Selected files are too large for Firestore. Please choose smaller or fewer files."
+                );
             }
 
             String finalMimeType;
             String fileType;
+
             if (isImage) {
                 finalMimeType = "image/jpeg";
                 fileType = "image";
@@ -819,9 +886,6 @@ public class RequestorRequestFragment extends Fragment {
             fileMap.put("storageType", "firestore_base64");
             fileMap.put("sizeBytes", fileBytes.length);
             fileMap.put("fileDataBase64", base64Data);
-
-            // Compatibility field: older screens may already read fileUrl.
-            // This is not an external URL. It is a data URI saved inside Firestore.
             fileMap.put("fileUrl", "data:" + finalMimeType + ";base64," + base64Data);
 
             files.add(fileMap);
@@ -831,9 +895,10 @@ public class RequestorRequestFragment extends Fragment {
     }
 
     private byte[] readBytesFromUri(Uri uri, int maxBytes) throws IOException {
-        try (InputStream inputStream = requireContext().getContentResolver().openInputStream(uri);
-             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-
+        try (
+                InputStream inputStream = requireContext().getContentResolver().openInputStream(uri);
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream()
+        ) {
             if (inputStream == null) {
                 throw new IOException("Unable to read selected file.");
             }
@@ -844,9 +909,13 @@ public class RequestorRequestFragment extends Fragment {
 
             while ((read = inputStream.read(buffer)) != -1) {
                 total += read;
+
                 if (total > maxBytes) {
-                    throw new IOException(getFileName(uri) + " is too large for Firestore. Please choose a smaller file.");
+                    throw new IOException(
+                            getFileName(uri) + " is too large for Firestore. Please choose a smaller file."
+                    );
                 }
+
                 outputStream.write(buffer, 0, read);
             }
 
@@ -862,10 +931,12 @@ public class RequestorRequestFragment extends Fragment {
             if (boundsStream == null) {
                 throw new IOException("Unable to read selected image.");
             }
+
             BitmapFactory.decodeStream(boundsStream, null, boundsOptions);
         }
 
         int sampleSize = 1;
+
         while ((boundsOptions.outWidth / sampleSize) > (MAX_IMAGE_DIMENSION_FOR_FIRESTORE * 2)
                 || (boundsOptions.outHeight / sampleSize) > (MAX_IMAGE_DIMENSION_FOR_FIRESTORE * 2)) {
             sampleSize *= 2;
@@ -875,10 +946,12 @@ public class RequestorRequestFragment extends Fragment {
         decodeOptions.inSampleSize = sampleSize;
 
         Bitmap decodedBitmap;
+
         try (InputStream imageStream = requireContext().getContentResolver().openInputStream(uri)) {
             if (imageStream == null) {
                 throw new IOException("Unable to read selected image.");
             }
+
             decodedBitmap = BitmapFactory.decodeStream(imageStream, null, decodeOptions);
         }
 
@@ -887,12 +960,14 @@ public class RequestorRequestFragment extends Fragment {
         }
 
         Bitmap bitmapToSave = scaleBitmapIfNeeded(decodedBitmap, MAX_IMAGE_DIMENSION_FOR_FIRESTORE);
+
         if (bitmapToSave != decodedBitmap) {
             decodedBitmap.recycle();
         }
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         int quality = IMAGE_JPEG_QUALITY_FOR_FIRESTORE;
+
         bitmapToSave.compress(Bitmap.CompressFormat.JPEG, quality, outputStream);
 
         while (outputStream.size() > MAX_SINGLE_FILE_BYTES_FOR_FIRESTORE && quality > 35) {
@@ -929,15 +1004,18 @@ public class RequestorRequestFragment extends Fragment {
     private void setupSubmit() {
         btnSubmitRequest.setOnClickListener(v -> {
             if (!validateForm()) return;
+
             Log.d("CNSC_RequestSubmit", "Form validation passed");
+
             if (auth.getCurrentUser() == null) {
                 Toast.makeText(requireContext(), "No logged in user found.", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // Re-check active appointment immediately before saving.
             setSubmitting(true, "Verifying active appointments...");
+
             String userId = auth.getCurrentUser().getUid();
+
             db.collection("requests")
                     .whereEqualTo("userId", userId)
                     .get()
@@ -945,6 +1023,7 @@ public class RequestorRequestFragment extends Fragment {
                         if (!isAdded()) return;
 
                         boolean hasActive = false;
+
                         if (snapshot != null) {
                             for (DocumentSnapshot doc : snapshot.getDocuments()) {
                                 if (RequestDataHelper.isActiveAppointment(doc)) {
@@ -956,10 +1035,14 @@ public class RequestorRequestFragment extends Fragment {
 
                         if (hasActive) {
                             setSubmitting(false, "");
-                            Toast.makeText(requireContext(),
+
+                            Toast.makeText(
+                                    requireContext(),
                                     "You already have an active appointment. You can submit a new request after your current appointment has ended.",
-                                    Toast.LENGTH_LONG).show();
-                            checkActiveAppointment(); // Refresh UI
+                                    Toast.LENGTH_LONG
+                            ).show();
+
+                            checkActiveAppointment();
                             return;
                         }
 
@@ -967,8 +1050,14 @@ public class RequestorRequestFragment extends Fragment {
                     })
                     .addOnFailureListener(e -> {
                         if (!isAdded()) return;
+
                         setSubmitting(false, "");
-                        Toast.makeText(requireContext(), "Failed to verify active appointment: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+
+                        Toast.makeText(
+                                requireContext(),
+                                "Failed to verify active appointment: " + e.getMessage(),
+                                Toast.LENGTH_SHORT
+                        ).show();
                     });
         });
     }
@@ -985,6 +1074,7 @@ public class RequestorRequestFragment extends Fragment {
                     if (error != null || snapshot == null) return;
 
                     DocumentSnapshot activeDoc = null;
+
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
                         if (RequestDataHelper.isActiveAppointment(doc)) {
                             activeDoc = doc;
@@ -1004,8 +1094,8 @@ public class RequestorRequestFragment extends Fragment {
         cardActiveAppointment.setVisibility(View.VISIBLE);
         cardRequestForm.setVisibility(View.GONE);
 
-        String status = doc.getString("status");
-        String purpose = doc.getString("purpose");
+        String status = safe(doc.getString("status"));
+        String purpose = safe(doc.getString("purpose"));
         String facility = RequestDataHelper.getFacilitiesDisplay(doc);
         String schedule = RequestDataHelper.getScheduleDisplay(doc);
         String requestId = doc.getId();
@@ -1016,7 +1106,9 @@ public class RequestorRequestFragment extends Fragment {
         tvActiveAppointmentSchedule.setText("Schedule: " + schedule);
 
         btnViewActiveAppointment.setOnClickListener(v -> {
-            RequestorRequestDetailsFragment fragment = RequestorRequestDetailsFragment.newInstance(requestId);
+            RequestorRequestDetailsFragment fragment =
+                    RequestorRequestDetailsFragment.newInstance(requestId);
+
             requireActivity()
                     .getSupportFragmentManager()
                     .beginTransaction()
@@ -1043,15 +1135,23 @@ public class RequestorRequestFragment extends Fragment {
             for (String dateText : perDayStartFields.keySet()) {
                 TextInputEditText startField = perDayStartFields.get(dateText);
                 TextInputEditText endField = perDayEndFields.get(dateText);
+
                 if (startField != null) {
                     dayStarts.put(dateText, getText(startField));
                 }
+
                 if (endField != null) {
                     dayEnds.put(dateText, getText(endField));
                 }
             }
+
             return RequestDataHelper.buildScheduleDaysBetween(
-                    startDateText, endDateText, "", "", dayEnds, dayStarts
+                    startDateText,
+                    endDateText,
+                    "",
+                    "",
+                    dayEnds,
+                    dayStarts
             );
         }
 
@@ -1077,13 +1177,14 @@ public class RequestorRequestFragment extends Fragment {
                 .addOnSuccessListener(snapshot -> {
                     if (!isAdded()) return;
 
-                    String conflict = (snapshot != null)
+                    String conflict = snapshot != null
                             ? ScheduleConflictChecker.findConflictMessage(
                             facilityNames,
                             facilityKeys,
                             scheduleDays,
                             snapshot
-                    ) : "";
+                    )
+                            : "";
 
                     if (!conflict.isEmpty()) {
                         setSubmitting(false, "");
@@ -1095,10 +1196,14 @@ public class RequestorRequestFragment extends Fragment {
                 })
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
+
                     setSubmitting(false, "");
-                    Toast.makeText(requireContext(),
+
+                    Toast.makeText(
+                            requireContext(),
                             "Failed to check availability: " + e.getMessage(),
-                            Toast.LENGTH_LONG).show();
+                            Toast.LENGTH_LONG
+                    ).show();
                 });
     }
 
@@ -1107,12 +1212,20 @@ public class RequestorRequestFragment extends Fragment {
             List<String> facilityKeys,
             List<ScheduleDayItem> scheduleDays
     ) {
-        String TAG = "CNSC_RequestSubmit";
-        Log.d(TAG, "Preparing request map for submission...");
+        String tag = "CNSC_RequestSubmit";
+        Log.d(tag, "Preparing request map for submission...");
+
         setSubmitting(true, "Preparing files for Firestore...");
+
+        if (auth.getCurrentUser() == null) {
+            setSubmitting(false, "");
+            Toast.makeText(requireContext(), "No logged in user found.", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         String requestId = db.collection("requests").document().getId();
         String userId = auth.getCurrentUser().getUid();
+
         String finalFacilityName = RequestDataHelper.buildFinalFacilityName(facilityNames);
         String facilityKeyLegacy = facilityKeys.isEmpty() ? "" : facilityKeys.get(0);
         String facilityLegacy = facilityNames.isEmpty() ? "" : facilityNames.get(0);
@@ -1131,9 +1244,16 @@ public class RequestorRequestFragment extends Fragment {
         boolean multimediaProjector = technicalNeeded && cbProjector.isChecked();
 
         boolean needsITSO = technicalNeeded && (
-                soundSystemSetup || microphones || portableSpeaker || lights
-                        || livestreamingServices || zoomHosting || gmeetHosting
-                        || webCamera || tripod || multimediaProjector
+                soundSystemSetup
+                        || microphones
+                        || portableSpeaker
+                        || lights
+                        || livestreamingServices
+                        || zoomHosting
+                        || gmeetHosting
+                        || webCamera
+                        || tripod
+                        || multimediaProjector
                         || !getText(etConnectors).isEmpty()
         );
 
@@ -1142,6 +1262,7 @@ public class RequestorRequestFragment extends Fragment {
         boolean sendToSAC = false;
         boolean sendToITSO = false;
         boolean sendToGSO = false;
+
         String notificationTarget;
         String workflowStage;
 
@@ -1164,6 +1285,7 @@ public class RequestorRequestFragment extends Fragment {
         long chairsCount = 0;
 
         String participantsCountText = getText(etNumberOfParticipants);
+
         if (!participantsCountText.isEmpty()) {
             numberOfParticipants = Long.parseLong(participantsCountText);
         }
@@ -1177,11 +1299,14 @@ public class RequestorRequestFragment extends Fragment {
         }
 
         List<Map<String, Object>> firestoreProposalFiles;
+
         try {
             firestoreProposalFiles = buildFirestoreProposalFiles();
         } catch (IOException e) {
-            Log.e(TAG, "Failed to prepare files for Firestore: " + e.getMessage());
+            Log.e(tag, "Failed to prepare files for Firestore: " + e.getMessage());
+
             setSubmitting(false, "");
+
             Toast.makeText(requireContext(), e.getMessage(), Toast.LENGTH_LONG).show();
             return;
         }
@@ -1248,7 +1373,10 @@ public class RequestorRequestFragment extends Fragment {
             requestMap.put("notificationUpdatedAt", FieldValue.serverTimestamp());
 
             requestMap.put("sacNotificationTitle", "New Student Center Booking");
-            requestMap.put("sacNotificationMessage", "A new Student Center booking request is waiting for SAC review.");
+            requestMap.put(
+                    "sacNotificationMessage",
+                    "A new Student Center booking request is waiting for SAC review."
+            );
         } else {
             requestMap.put("sendToSAC", false);
             requestMap.put("needsSAC", false);
@@ -1258,7 +1386,7 @@ public class RequestorRequestFragment extends Fragment {
             requestMap.put("sacStatus", "");
         }
 
-        Log.d(TAG, "Saving request document with ID: " + requestId);
+        Log.d(tag, "Saving request document with ID: " + requestId);
 
         setSubmitting(true, "Submitting request...");
 
@@ -1268,7 +1396,8 @@ public class RequestorRequestFragment extends Fragment {
                 .addOnSuccessListener(unused -> {
                     if (!isAdded()) return;
 
-                    Log.d(TAG, "Firestore document created with ID: " + requestId);
+                    Log.d(tag, "Firestore document created with ID: " + requestId);
+
                     setSubmitting(false, "");
                     showSuccessToast(needsSAC, needsITSO);
                     clearForm();
@@ -1276,7 +1405,8 @@ public class RequestorRequestFragment extends Fragment {
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
 
-                    Log.e(TAG, "Failed to create Firestore document: " + e.getMessage());
+                    Log.e(tag, "Failed to create Firestore document: " + e.getMessage());
+
                     setSubmitting(false, "");
 
                     Toast.makeText(
@@ -1297,8 +1427,7 @@ public class RequestorRequestFragment extends Fragment {
 
             String normalized = facility.trim().toLowerCase(Locale.ROOT);
 
-            if ("student center".equals(normalized)
-                    || normalized.contains("student center")) {
+            if ("student center".equals(normalized) || normalized.contains("student center")) {
                 return true;
             }
         }
@@ -1307,9 +1436,11 @@ public class RequestorRequestFragment extends Fragment {
     }
 
     private void showSuccessToast(boolean needsSAC, boolean needsITSO) {
-        Toast.makeText(requireContext(),
+        Toast.makeText(
+                requireContext(),
                 "Request submitted successfully.",
-                Toast.LENGTH_LONG).show();
+                Toast.LENGTH_LONG
+        ).show();
     }
 
     private void setSubmitting(boolean submitting, String statusText) {
@@ -1332,8 +1463,10 @@ public class RequestorRequestFragment extends Fragment {
             return false;
         }
 
-        if (isEmpty(etRequestorName) || isEmpty(etContactNumber)
-                || isEmpty(etCollegeDepartment) || isEmpty(etOfficeCourse)) {
+        if (isEmpty(etRequestorName)
+                || isEmpty(etContactNumber)
+                || isEmpty(etCollegeDepartment)
+                || isEmpty(etOfficeCourse)) {
             Toast.makeText(requireContext(), "Requester information is incomplete.", Toast.LENGTH_SHORT).show();
             return false;
         }
@@ -1349,6 +1482,7 @@ public class RequestorRequestFragment extends Fragment {
         }
 
         List<ScheduleDayItem> scheduleDays = buildScheduleDaysForSubmit();
+
         if (scheduleDays.isEmpty()) {
             Toast.makeText(requireContext(), "Please complete the schedule.", Toast.LENGTH_SHORT).show();
             return false;
@@ -1356,18 +1490,23 @@ public class RequestorRequestFragment extends Fragment {
 
         for (ScheduleDayItem day : scheduleDays) {
             if (day.getStartTimeText().isEmpty() || day.getEndTimeText().isEmpty()) {
-                Toast.makeText(requireContext(),
+                Toast.makeText(
+                        requireContext(),
                         "Please set start and end time for " + day.getDateText() + ".",
-                        Toast.LENGTH_SHORT).show();
+                        Toast.LENGTH_SHORT
+                ).show();
                 return false;
             }
 
             long start = RequestDataHelper.parseTimeToMillis(day.getStartTimeText());
             long end = RequestDataHelper.parseTimeToMillis(day.getEndTimeText());
+
             if (start == -1 || end == -1 || end <= start) {
-                Toast.makeText(requireContext(),
+                Toast.makeText(
+                        requireContext(),
                         "End time must be later than start time for " + day.getDateText() + ".",
-                        Toast.LENGTH_SHORT).show();
+                        Toast.LENGTH_SHORT
+                ).show();
                 return false;
             }
         }
@@ -1378,6 +1517,7 @@ public class RequestorRequestFragment extends Fragment {
         }
 
         List<String> facilities = getSelectedFacilityNames();
+
         if (facilities.isEmpty()) {
             Toast.makeText(requireContext(), "Please select at least one facility.", Toast.LENGTH_SHORT).show();
             return false;
@@ -1420,6 +1560,7 @@ public class RequestorRequestFragment extends Fragment {
     private boolean isValidDateRange() {
         long start = RequestDataHelper.parseDateToMillis(getText(etStartDate));
         long end = RequestDataHelper.parseDateToMillis(getText(etEndDate));
+
         return start != -1 && end != -1 && end >= start;
     }
 
@@ -1441,6 +1582,7 @@ public class RequestorRequestFragment extends Fragment {
         cbChairs.setChecked(false);
         cbAgreement.setChecked(false);
         cbNeedsTechnical.setChecked(false);
+
         layoutTechnicalOptions.setVisibility(View.GONE);
         clearTechnicalOptions();
 
@@ -1450,6 +1592,7 @@ public class RequestorRequestFragment extends Fragment {
 
         selectedProposalFileUris.clear();
         refreshSelectedFilesUi();
+
         rebuildScheduleDayCards();
 
         toggleInput(etOtherFacility, false);
@@ -1460,11 +1603,14 @@ public class RequestorRequestFragment extends Fragment {
     }
 
     private boolean isEmpty(TextInputEditText editText) {
-        return editText.getText() == null || TextUtils.isEmpty(editText.getText().toString().trim());
+        return editText.getText() == null
+                || TextUtils.isEmpty(editText.getText().toString().trim());
     }
 
     private String getText(TextInputEditText editText) {
-        return editText.getText() != null ? editText.getText().toString().trim() : "";
+        return editText.getText() != null
+                ? editText.getText().toString().trim()
+                : "";
     }
 
     private String safe(String value) {
@@ -1472,11 +1618,17 @@ public class RequestorRequestFragment extends Fragment {
     }
 
     private String formatDate(Calendar calendar) {
-        return new SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault()).format(calendar.getTime());
+        return new SimpleDateFormat(
+                "MMMM dd, yyyy",
+                Locale.getDefault()
+        ).format(calendar.getTime());
     }
 
     private String formatTime(Calendar calendar) {
-        return new SimpleDateFormat("hh:mm a", Locale.getDefault()).format(calendar.getTime());
+        return new SimpleDateFormat(
+                "hh:mm a",
+                Locale.getDefault()
+        ).format(calendar.getTime());
     }
 
     private int dp(int value) {

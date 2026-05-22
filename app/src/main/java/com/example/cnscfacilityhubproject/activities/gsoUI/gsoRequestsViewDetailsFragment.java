@@ -37,6 +37,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Source;
+
 public class gsoRequestsViewDetailsFragment extends Fragment {
 
     private static final String ARG_REQUEST_ID = "requestId";
@@ -44,7 +47,7 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
     private FirebaseFirestore db;
     private String requestId = "";
 
-    private MaterialButton btnBack;
+
     private MaterialButton btnApprove;
     private MaterialButton btnReturn;
 
@@ -69,6 +72,8 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
 
     private TextInputEditText etReturnReason;
     private boolean isReturnReasonBoxShown = false;
+
+    private ListenerRegistration requestListener;
 
     private final List<DisplayProposalFile> currentProposalFiles = new ArrayList<>();
 
@@ -96,18 +101,15 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
 
         bindViews(view);
         setupButtons();
+        clearFirebaseBoundTexts();
 
-        if (TextUtils.isEmpty(requestId)) {
-            Toast.makeText(requireContext(), "Request ID not found.", Toast.LENGTH_SHORT).show();
-            goBack();
-            return;
-        }
+
 
         loadRequestDetails();
     }
 
     private void bindViews(View view) {
-        btnBack = view.findViewById(R.id.btnBack);
+
         btnApprove = view.findViewById(R.id.btnApprove);
         btnReturn = view.findViewById(R.id.btnReturn);
         layoutActionButtons = view.findViewById(R.id.layoutActionButtons);
@@ -131,32 +133,65 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
     }
 
     private void setupButtons() {
-        btnBack.setOnClickListener(v -> goBack());
         btnApprove.setOnClickListener(v -> approveRequest());
         btnReturn.setOnClickListener(v -> handleReturnButtonClick());
+    }
 
+    private void clearFirebaseBoundTexts() {
+        // These views are filled only after the request document is loaded from Firestore.
+        chipStatus.setText("");
+        tvPurpose.setText("");
+        tvActivityType.setText("");
+        tvSchedule.setText("");
+        tvFacility.setText("");
+        tvRequestorInfo.setText("");
+        tvParticipants.setText("");
+        tvPurposeFull.setText("");
+        tvAmenities.setText("");
+        tvTechnicalList.setText("");
+        tvConnectors.setText("");
+        tvProposalFile.setText("");
+        tvRoute.setText("");
+        tvRemarks.setText("");
+        layoutProposalFiles.removeAllViews();
     }
 
     private void loadRequestDetails() {
         db.collection("requests")
                 .document(requestId)
-                .get()
+                .get(Source.CACHE)
                 .addOnSuccessListener(doc -> {
                     if (!isAdded()) return;
 
-                    if (!doc.exists()) {
-                        Toast.makeText(requireContext(), "Request not found.", Toast.LENGTH_SHORT).show();
-                        goBack();
+                    if (doc.exists()) {
+                        displayRequest(doc);
+                    }
+                });
+
+        requestListener = db.collection("requests")
+                .document(requestId)
+                .addSnapshotListener((doc, e) -> {
+                    if (!isAdded()) return;
+
+                    if (e != null) {
+                        Toast.makeText(requireContext(), "Failed to load request details.", Toast.LENGTH_SHORT).show();
                         return;
                     }
 
+
+
                     displayRequest(doc);
-                })
-                .addOnFailureListener(e -> {
-                    if (!isAdded()) return;
-                    Toast.makeText(requireContext(), "Failed to load request details.", Toast.LENGTH_SHORT).show();
-                    goBack();
                 });
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+
+        if (requestListener != null) {
+            requestListener.remove();
+            requestListener = null;
+        }
     }
 
     private void displayRequest(DocumentSnapshot doc) {
@@ -170,41 +205,48 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         String course = firstNonEmpty(getStringValue(doc, "officeCourse"), getStringValue(doc, "course"));
 
         String participants = getStringValue(doc, "participants");
-        String numberOfParticipants = getLongString(doc, "numberOfParticipants");
-        String notificationTarget = getStringValue(doc, "notificationTarget");
+        String numberOfParticipants = firstNonEmpty(
+                getLongString(doc, "numberOfParticipants"),
+                getStringValue(doc, "numberOfParticipants")
+        );
+        String notificationTarget = firstNonEmpty(
+                getStringValue(doc, "notificationTarget"),
+                getStringValue(doc, "route")
+        );
 
         List<DisplayProposalFile> proposalFiles = getProposalFilesFromFirestore(doc);
 
-        chipStatus.setText(displayStatus);
+        chipStatus.setText(valueOrDash(displayStatus));
         styleStatusChip(displayStatus);
 
-        tvPurpose.setText(!purpose.isEmpty() ? purpose : "Request Details");
-        tvActivityType.setText(!activityType.isEmpty() ? activityType : "Facility booking request");
-        tvSchedule.setText("Schedule:\n" + RequestDataHelper.getScheduleDisplay(doc));
-        tvFacility.setText("Facilities: " + RequestDataHelper.getFacilitiesDisplay(doc));
+        // Values below come from the Firestore document. Labels are intentionally kept.
+        tvPurpose.setText(valueOrDash(purpose));
+        tvActivityType.setText(valueOrDash(activityType));
+        tvSchedule.setText("Schedule:\n" + valueOrDash(RequestDataHelper.getScheduleDisplay(doc)));
+        tvFacility.setText("Facilities: " + valueOrDash(RequestDataHelper.getFacilitiesDisplay(doc)));
 
         tvRequestorInfo.setText(
-                "Name: " + fallback(requestorName) +
-                        "\nContact: " + fallback(contactNumber) +
-                        "\nCollege / Department: " + fallback(department) +
-                        "\nOffice / Course: " + fallback(course)
+                "Name: " + valueOrDash(requestorName) +
+                        "\nContact: " + valueOrDash(contactNumber) +
+                        "\nCollege / Department: " + valueOrDash(department) +
+                        "\nOffice / Course: " + valueOrDash(course)
         );
 
         tvParticipants.setText(
-                "Participants: " + fallback(participants) +
-                        "\nNumber of Participants: " + fallback(numberOfParticipants)
+                "Participants: " + valueOrDash(participants) +
+                        "\nNumber of Participants: " + valueOrDash(numberOfParticipants)
         );
 
-        tvPurposeFull.setText("Purpose: " + fallback(purpose));
+        tvPurposeFull.setText("Purpose: " + valueOrDash(purpose));
         tvAmenities.setText(buildAmenities(doc));
         tvTechnicalList.setText("Technical Requirements:\n" + buildTechnicalList(doc));
-        tvConnectors.setText("Connectors / Cables: " + fallback(getStringValue(doc, "connectors")));
-        tvRoute.setText("Route: " + fallback(notificationTarget));
-        tvRemarks.setText("Remarks: " + fallback(getRemarks(doc)));
+        tvConnectors.setText("Connectors / Cables: " + valueOrDash(getStringValue(doc, "connectors")));
+        tvRoute.setText("Route: " + valueOrDash(notificationTarget));
+        tvRemarks.setText("Remarks: " + valueOrDash(getRemarks(doc)));
 
         bindProposalFiles(proposalFiles);
 
-        if ("Pending".equalsIgnoreCase(displayStatus)) {
+        if (isPendingStatus(displayStatus)) {
             layoutActionButtons.setVisibility(View.VISIBLE);
             resetReturnReasonBox();
         } else {
@@ -237,7 +279,7 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
                 file.sizeBytes = getMapLong(map, "sizeBytes");
 
                 if (file.fileName.isEmpty()) {
-                    file.fileName = "Proposal File " + (files.size() + 1);
+                    file.fileName = "File " + (files.size() + 1);
                 }
                 if (file.mimeType.isEmpty()) {
                     file.mimeType = guessMimeType(file);
@@ -258,7 +300,8 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
             String legacyUrl = getStringValue(doc, "proposalFileUrl");
             if (!legacyUrl.isEmpty()) {
                 DisplayProposalFile legacy = new DisplayProposalFile();
-                legacy.fileName = firstNonEmpty(getStringValue(doc, "proposalFileName"), "Proposal File");
+                legacy.fileName = firstNonEmpty(getStringValue(doc, "proposalFileName"), getStringValue(doc, "fileName"));
+                if (legacy.fileName.isEmpty()) legacy.fileName = "File";
                 legacy.fileUrl = legacyUrl;
                 legacy.mimeType = guessMimeType(legacy);
                 legacy.fileType = guessFileType(legacy.mimeType, legacy.fileName);
@@ -275,7 +318,7 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         layoutProposalFiles.removeAllViews();
 
         if (proposalFiles.isEmpty()) {
-            tvProposalFile.setText("Proposal / Supporting Files: none");
+            tvProposalFile.setText("Proposal / Supporting Files: " + valueOrDash(""));
             tvProposalFile.setTextColor(Color.parseColor("#313131"));
             return;
         }
@@ -289,13 +332,12 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         }
 
         if (hasLocalContentUri) {
-            tvProposalFile.setText("Warning: This request contains local device URIs. Ask the requestor to resubmit using the updated Firestore-only upload.");
+            tvProposalFile.setText("Proposal / Supporting Files: " + proposalFiles.size());
             tvProposalFile.setTextColor(Color.RED);
         } else {
-            tvProposalFile.setText("Proposal / Supporting Files: " + proposalFiles.size() + " file(s)");
+            tvProposalFile.setText("Proposal / Supporting Files: " + proposalFiles.size());
             tvProposalFile.setTextColor(Color.parseColor("#313131"));
         }
-
 
         for (int i = 0; i < proposalFiles.size(); i++) {
             DisplayProposalFile file = proposalFiles.get(i);
@@ -337,7 +379,7 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         details.setTextSize(13f);
         details.setSingleLine(false);
         details.setText(
-                index + ". " + file.fileName +
+                index + ". " + valueOrDash(file.fileName) +
                         "\n" + buildFileSubtitle(file)
         );
         details.setOnClickListener(v -> openProposalFile(file));
@@ -356,7 +398,7 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         else if (file.hasBase64Data()) parts.add("firestore_base64");
         else if (!file.fileUrl.isEmpty()) parts.add("link/url");
 
-        if (parts.isEmpty()) return "File attached";
+        if (parts.isEmpty()) return valueOrDash("");
         return TextUtils.join(" • ", parts);
     }
 
@@ -609,41 +651,114 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
     private String getGSODisplayStatus(DocumentSnapshot doc) {
         String gsoStatus = getStringValue(doc, "gsoStatus");
         String status = getStringValue(doc, "status");
-        if ("Approved".equalsIgnoreCase(gsoStatus) || "Approved".equalsIgnoreCase(status)) return "Approved";
-        if ("Returned".equalsIgnoreCase(gsoStatus) || "Returned".equalsIgnoreCase(status)) return "Returned";
-        return "Pending";
+        String bookingStatus = getStringValue(doc, "bookingStatus");
+        String workflowStage = toReadableWorkflowStage(getStringValue(doc, "workflowStage"));
+
+        return firstNonEmpty(gsoStatus, status, bookingStatus, workflowStage);
+    }
+
+    private boolean isPendingStatus(String status) {
+        return "Pending".equalsIgnoreCase(status)
+                || "GSO Pending".equalsIgnoreCase(status)
+                || "For GSO".equalsIgnoreCase(status)
+                || "FOR_GSO".equalsIgnoreCase(status);
+    }
+
+    private String toReadableWorkflowStage(String workflowStage) {
+        if (workflowStage == null || workflowStage.trim().isEmpty()) return "";
+
+        String cleaned = workflowStage.trim().replace("_", " ").toLowerCase(Locale.US);
+        String[] words = cleaned.split("\\s+");
+        StringBuilder builder = new StringBuilder();
+
+        for (String word : words) {
+            if (word.isEmpty()) continue;
+            if (builder.length() > 0) builder.append(" ");
+            builder.append(word.substring(0, 1).toUpperCase(Locale.US));
+            if (word.length() > 1) builder.append(word.substring(1));
+        }
+
+        return builder.toString();
     }
 
     private String buildAmenities(DocumentSnapshot doc) {
         boolean tablesRequested = getBooleanValue(doc, "tablesRequested");
         boolean chairsRequested = getBooleanValue(doc, "chairsRequested");
-        String tablesCount = getLongString(doc, "tablesCount");
-        String chairsCount = getLongString(doc, "chairsCount");
+        String tablesCount = firstNonEmpty(getLongString(doc, "tablesCount"), getStringValue(doc, "tablesCount"));
+        String chairsCount = firstNonEmpty(getLongString(doc, "chairsCount"), getStringValue(doc, "chairsCount"));
         String otherAmenities = getStringValue(doc, "otherAmenities");
 
-        return "Tables: " + (tablesRequested ? "Requested (" + fallback(tablesCount) + ")" : "Not requested") +
-                "\nChairs: " + (chairsRequested ? "Requested (" + fallback(chairsCount) + ")" : "Not requested") +
-                "\nOther Amenities: " + fallback(otherAmenities);
+        String tableValue = tablesRequested
+                ? firstNonEmpty(tablesCount, "Requested")
+                : "Not requested";
+
+        String chairValue = chairsRequested
+                ? firstNonEmpty(chairsCount, "Requested")
+                : "Not requested";
+
+        return "Tables: " + valueOrDash(tableValue) +
+                "\nChairs: " + valueOrDash(chairValue) +
+                "\nOther Amenities: " + valueOrDash(otherAmenities);
     }
 
     private String buildTechnicalList(DocumentSnapshot doc) {
+        // Prefer array/string fields when your Firestore document already stores the selected labels.
+        String savedTechnicalText = firstNonEmpty(
+                getListOrStringValue(doc, "technicalRequirements"),
+                getListOrStringValue(doc, "technicals"),
+                getListOrStringValue(doc, "selectedTechnicalRequirements"),
+                getListOrStringValue(doc, "technicalNeeds")
+        );
+
+        if (!savedTechnicalText.isEmpty()) return savedTechnicalText;
+
+        // Fallback for older documents that only store boolean fields.
         List<String> selected = new ArrayList<>();
-        if (getBooleanValue(doc, "soundSystemSetup")) selected.add("Sound System Setup");
-        if (getBooleanValue(doc, "microphones")) selected.add("Microphones");
-        if (getBooleanValue(doc, "portableSpeaker")) selected.add("Portable Speaker");
-        if (getBooleanValue(doc, "lights")) selected.add("Lights");
-        if (getBooleanValue(doc, "livestreamingServices")) selected.add("Livestreaming Services");
-        if (getBooleanValue(doc, "zoomHosting")) selected.add("Zoom Hosting");
-        if (getBooleanValue(doc, "gmeetHosting")) selected.add("GMeet Hosting");
-        if (getBooleanValue(doc, "webCamera")) selected.add("Web Camera");
-        if (getBooleanValue(doc, "tripod")) selected.add("Tripod");
-        if (getBooleanValue(doc, "multimediaProjector")) selected.add("Multimedia Projector");
+        addIfTrue(selected, doc, "soundSystemSetup", "Sound System Setup");
+        addIfTrue(selected, doc, "microphones", "Microphones");
+        addIfTrue(selected, doc, "portableSpeaker", "Portable Speaker");
+        addIfTrue(selected, doc, "lights", "Lights");
+        addIfTrue(selected, doc, "livestreamingServices", "Livestreaming Services");
+        addIfTrue(selected, doc, "zoomHosting", "Zoom Hosting");
+        addIfTrue(selected, doc, "gmeetHosting", "GMeet Hosting");
+        addIfTrue(selected, doc, "webCamera", "Web Camera");
+        addIfTrue(selected, doc, "tripod", "Tripod");
+        addIfTrue(selected, doc, "multimediaProjector", "Multimedia Projector");
 
-        if (selected.isEmpty()) return "None";
+        if (selected.isEmpty()) return valueOrDash("");
+        return buildBulletList(selected);
+    }
 
+    private void addIfTrue(List<String> list, DocumentSnapshot doc, String field, String label) {
+        if (getBooleanValue(doc, field)) list.add(label);
+    }
+
+    private String buildBulletList(List<String> items) {
         StringBuilder builder = new StringBuilder();
-        for (String item : selected) builder.append("• ").append(item).append("\n");
-        return builder.toString().trim();
+        for (String item : items) {
+            if (item == null || item.trim().isEmpty()) continue;
+            if (builder.length() > 0) builder.append("\n");
+            builder.append("• ").append(item.trim());
+        }
+        return builder.toString();
+    }
+
+    private String getListOrStringValue(DocumentSnapshot doc, String field) {
+        Object raw = doc.get(field);
+        if (raw == null) return "";
+
+        if (raw instanceof List<?>) {
+            List<?> list = (List<?>) raw;
+            List<String> values = new ArrayList<>();
+            for (Object item : list) {
+                if (item == null) continue;
+                String value = String.valueOf(item).trim();
+                if (!value.isEmpty()) values.add(value);
+            }
+            return buildBulletList(values);
+        }
+
+        return String.valueOf(raw).trim();
     }
 
     private String getRemarks(DocumentSnapshot doc) {
@@ -659,10 +774,10 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
     }
 
     private void styleStatusChip(String status) {
-        if ("Approved".equalsIgnoreCase(status)) {
+        if ("Approved".equalsIgnoreCase(status) || "Booked".equalsIgnoreCase(status)) {
             chipStatus.setTextColor(Color.parseColor("#2E7D32"));
             chipStatus.setChipBackgroundColor(ColorStateList.valueOf(Color.parseColor("#E7F4E8")));
-        } else if ("Returned".equalsIgnoreCase(status)) {
+        } else if ("Returned".equalsIgnoreCase(status) || "Not Available".equalsIgnoreCase(status)) {
             chipStatus.setTextColor(Color.parseColor("#970705"));
             chipStatus.setChipBackgroundColor(ColorStateList.valueOf(Color.parseColor("#F3D9D9")));
         } else {
@@ -672,8 +787,8 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
     }
 
     private String getStringValue(DocumentSnapshot doc, String field) {
-        String value = doc.getString(field);
-        return value != null ? value.trim() : "";
+        Object value = doc.get(field);
+        return value != null ? String.valueOf(value).trim() : "";
     }
 
     private boolean getBooleanValue(DocumentSnapshot doc, String field) {
@@ -704,13 +819,15 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         return 0;
     }
 
-    private String firstNonEmpty(String first, String second) {
-        if (first != null && !first.trim().isEmpty()) return first.trim();
-        if (second != null && !second.trim().isEmpty()) return second.trim();
+    private String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) return value.trim();
+        }
         return "";
     }
 
-    private String fallback(String value) {
+    private String valueOrDash(String value) {
         return value != null && !value.trim().isEmpty() ? value.trim() : "—";
     }
 
@@ -780,10 +897,7 @@ public class gsoRequestsViewDetailsFragment extends Fragment {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private void goBack() {
-        if (!isAdded()) return;
-        requireActivity().getSupportFragmentManager().popBackStack();
-    }
+
 
     private static class DisplayProposalFile {
         String fileName = "";
