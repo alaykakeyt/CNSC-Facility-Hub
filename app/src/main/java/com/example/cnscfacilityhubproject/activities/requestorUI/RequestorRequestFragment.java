@@ -1259,24 +1259,44 @@ public class RequestorRequestFragment extends Fragment {
 
         boolean needsSAC = isStudentCenterSelected(facilityNames);
 
-        boolean sendToSAC = false;
-        boolean sendToITSO = false;
-        boolean sendToGSO = false;
+        boolean sendToSAC;
+        boolean sendToITSO;
+        boolean sendToGSO;
 
         String notificationTarget;
         String workflowStage;
 
+        /*
+         * Correct request routing:
+         *
+         * 1. If Student Center is selected, SAC must review first.
+         * 2. If not Student Center but has technicals, ITSO reviews first.
+         * 3. If not Student Center and no technicals, GSO reviews first.
+         *
+         * Note:
+         * needsITSO can still be true for Student Center requests.
+         * But sendToITSO must be false at first because SAC must approve first.
+         */
         if (needsSAC) {
             notificationTarget = "SAC";
             workflowStage = "SAC_REVIEW";
+
             sendToSAC = true;
+            sendToITSO = false;
+            sendToGSO = false;
         } else if (needsITSO) {
             notificationTarget = "ITSO";
             workflowStage = "ITSO_REVIEW";
+
+            sendToSAC = false;
             sendToITSO = true;
+            sendToGSO = false;
         } else {
             notificationTarget = "GSO";
             workflowStage = "GSO_REVIEW";
+
+            sendToSAC = false;
+            sendToITSO = false;
             sendToGSO = true;
         }
 
@@ -1359,24 +1379,38 @@ public class RequestorRequestFragment extends Fragment {
         requestMap.put("proposalFiles", firestoreProposalFiles);
         requestMap.put("proposalFileStorage", "firestore_base64");
 
+        requestMap.put("status", "Pending");
+        requestMap.put("notificationTarget", notificationTarget);
+        requestMap.put("workflowStage", workflowStage);
+        requestMap.put("notificationUpdatedAt", FieldValue.serverTimestamp());
+
         if (needsSAC) {
             requestMap.put("sendToSAC", true);
+            requestMap.put("sendToITSO", false);
+            requestMap.put("sendToGSO", false);
+
             requestMap.put("needsSAC", true);
             requestMap.put("notificationForSAC", true);
-            requestMap.put("notificationTarget", "SAC");
-            requestMap.put("workflowStage", "SAC_REVIEW");
+            requestMap.put("notificationForITSO", false);
+            requestMap.put("notificationForGSO", false);
 
             requestMap.put("sacStatus", "Pending");
             requestMap.put("sacSeen", false);
             requestMap.put("sacNotificationSeen", false);
             requestMap.put("sacNotifiedAt", FieldValue.serverTimestamp());
-            requestMap.put("notificationUpdatedAt", FieldValue.serverTimestamp());
 
             requestMap.put("sacNotificationTitle", "New Student Center Booking");
             requestMap.put(
                     "sacNotificationMessage",
                     "A new Student Center booking request is waiting for SAC review."
             );
+
+            /*
+             * Keep needsITSO as true if technicals were selected,
+             * so after SAC approval, the SAC side can forward it to ITSO.
+             */
+            requestMap.put("needsITSO", needsITSO);
+
         } else {
             requestMap.put("sendToSAC", false);
             requestMap.put("needsSAC", false);
@@ -1384,6 +1418,42 @@ public class RequestorRequestFragment extends Fragment {
             requestMap.put("sacNotificationSeen", true);
             requestMap.put("sacSeen", true);
             requestMap.put("sacStatus", "");
+
+            if (needsITSO) {
+                requestMap.put("sendToITSO", true);
+                requestMap.put("sendToGSO", false);
+
+                requestMap.put("notificationForITSO", true);
+                requestMap.put("notificationForGSO", false);
+
+                requestMap.put("itsoStatus", "Pending");
+                requestMap.put("itsoSeen", false);
+                requestMap.put("itsoNotificationSeen", false);
+                requestMap.put("itsoNotifiedAt", FieldValue.serverTimestamp());
+
+                requestMap.put("itsoNotificationTitle", "New Technical Request");
+                requestMap.put(
+                        "itsoNotificationMessage",
+                        "A new facility request with technical requirements is waiting for ITSO review."
+                );
+            } else {
+                requestMap.put("sendToITSO", false);
+                requestMap.put("sendToGSO", true);
+
+                requestMap.put("notificationForITSO", false);
+                requestMap.put("notificationForGSO", true);
+
+                requestMap.put("gsoStatus", "Pending");
+                requestMap.put("gsoSeen", false);
+                requestMap.put("gsoNotificationSeen", false);
+                requestMap.put("gsoNotifiedAt", FieldValue.serverTimestamp());
+
+                requestMap.put("gsoNotificationTitle", "New Facility Request");
+                requestMap.put(
+                        "gsoNotificationMessage",
+                        "A new facility request is waiting for GSO review."
+                );
+            }
         }
 
         Log.d(tag, "Saving request document with ID: " + requestId);
@@ -1436,9 +1506,19 @@ public class RequestorRequestFragment extends Fragment {
     }
 
     private void showSuccessToast(boolean needsSAC, boolean needsITSO) {
+        String message;
+
+        if (needsSAC) {
+            message = "Request submitted successfully. Waiting for SAC review.";
+        } else if (needsITSO) {
+            message = "Request submitted successfully. Waiting for ITSO review.";
+        } else {
+            message = "Request submitted successfully. Waiting for GSO review.";
+        }
+
         Toast.makeText(
                 requireContext(),
-                "Request submitted successfully.",
+                message,
                 Toast.LENGTH_LONG
         ).show();
     }

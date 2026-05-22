@@ -23,6 +23,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
 import com.example.cnscfacilityhubproject.activities.LoginActivity;
+import com.example.cnscfacilityhubproject.utils.ChangePasswordBottomSheetHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputEditText;
@@ -245,20 +246,7 @@ public class RequestorProfileFragment extends Fragment {
         layoutLogout.setOnClickListener(v -> logoutUser());
 
         layoutChangePassword.setOnClickListener(v -> {
-            if (currentUser == null || currentUser.getEmail() == null) {
-                Toast.makeText(getContext(), "Email address not found", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            auth.sendPasswordResetEmail(currentUser.getEmail())
-                    .addOnSuccessListener(unused -> {
-                        if (!isAdded()) return;
-                        Toast.makeText(getContext(), "Password reset email sent", Toast.LENGTH_SHORT).show();
-                    })
-                    .addOnFailureListener(e -> {
-                        if (!isAdded()) return;
-                        Toast.makeText(getContext(), "Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    });
+            ChangePasswordBottomSheetHelper.show(requireActivity());
         });
     }
     private void logoutUser() {

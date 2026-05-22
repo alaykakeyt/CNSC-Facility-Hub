@@ -1,5 +1,6 @@
 package com.example.cnscfacilityhubproject.activities.itsoUI;
 
+import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -8,6 +9,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
+import android.widget.Filter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -34,8 +36,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
-import android.widget.Filter;
-
 public class itsoNotificationFragment extends Fragment {
 
     private static final String KEY_SELECTED_FILTER = "selectedFilter";
@@ -50,7 +50,6 @@ public class itsoNotificationFragment extends Fragment {
     private final List<DocumentSnapshot> notificationList = new ArrayList<>();
 
     private String selectedFilter = "All";
-    private boolean filterAlreadyInitialized = false;
 
     public itsoNotificationFragment() {
         super(R.layout.fragment_itso_notification);
@@ -66,16 +65,9 @@ public class itsoNotificationFragment extends Fragment {
         db = FirebaseFirestore.getInstance();
 
         if (savedInstanceState != null) {
-            selectedFilter = normalizeFilter(savedInstanceState.getString(KEY_SELECTED_FILTER, selectedFilter));
-            filterAlreadyInitialized = true;
-        } else if (!filterAlreadyInitialized) {
-            if (getArguments() != null) {
-                selectedFilter = normalizeFilter(getArguments().getString("filter", "All"));
-            } else {
-                selectedFilter = normalizeFilter(selectedFilter);
-            }
-
-            filterAlreadyInitialized = true;
+            selectedFilter = normalizeFilter(savedInstanceState.getString(KEY_SELECTED_FILTER, "All"));
+        } else if (getArguments() != null) {
+            selectedFilter = normalizeFilter(getArguments().getString("filter", "All"));
         } else {
             selectedFilter = normalizeFilter(selectedFilter);
         }
@@ -122,10 +114,23 @@ public class itsoNotificationFragment extends Fragment {
 
         if (actvNotificationFilter != null) {
             actvNotificationFilter.setAdapter(adapter);
+            actvNotificationFilter.setThreshold(0);
             actvNotificationFilter.setText(selectedFilter, false);
 
+            actvNotificationFilter.setOnClickListener(v -> {
+                actvNotificationFilter.post(() -> actvNotificationFilter.showDropDown());
+            });
+
+            actvNotificationFilter.setOnFocusChangeListener((v, hasFocus) -> {
+                if (hasFocus) {
+                    actvNotificationFilter.post(() -> actvNotificationFilter.showDropDown());
+                }
+            });
+
             actvNotificationFilter.setOnItemClickListener((parent, view, position, id) -> {
-                selectedFilter = normalizeFilter(filterOptions[position]);
+                Object selectedItem = parent.getItemAtPosition(position);
+                selectedFilter = normalizeFilter(selectedItem == null ? "All" : selectedItem.toString());
+                actvNotificationFilter.setText(selectedFilter, false);
                 renderNotifications();
             });
         }
@@ -457,37 +462,6 @@ public class itsoNotificationFragment extends Fragment {
         return Boolean.TRUE.equals(value);
     }
 
-    private boolean isITSORelatedRequest(DocumentSnapshot doc) {
-        Boolean sendToITSO = doc.getBoolean("sendToITSO");
-        Boolean needsITSO = doc.getBoolean("needsITSO");
-        Boolean notificationForITSO = doc.getBoolean("notificationForITSO");
-        Boolean notificationForItso = doc.getBoolean("notificationForItso");
-
-        if (Boolean.TRUE.equals(sendToITSO)
-                || Boolean.TRUE.equals(needsITSO)
-                || Boolean.TRUE.equals(notificationForITSO)
-                || Boolean.TRUE.equals(notificationForItso)) {
-            return true;
-        }
-
-        String notificationTarget = getStringValue(doc, "notificationTarget");
-
-        if ("ITSO".equalsIgnoreCase(notificationTarget)) {
-            return true;
-        }
-
-        String workflowStage = getStringValue(doc, "workflowStage");
-
-        if ("ITSO_REVIEW".equalsIgnoreCase(workflowStage)
-                || "WAITING_ITSO_APPROVAL".equalsIgnoreCase(workflowStage)) {
-            return true;
-        }
-
-        String itsoStatus = getStringValue(doc, "itsoStatus");
-
-        return !itsoStatus.isEmpty();
-    }
-
     private String getDisplayStatus(DocumentSnapshot doc) {
         String status = getStringValue(doc, "status");
         String itsoStatus = getStringValue(doc, "itsoStatus");
@@ -749,5 +723,53 @@ public class itsoNotificationFragment extends Fragment {
         return Math.round(
                 value * getResources().getDisplayMetrics().density
         );
+    }
+
+    private static class NoFilterArrayAdapter extends ArrayAdapter<String> {
+
+        private final String[] items;
+
+        public NoFilterArrayAdapter(
+                @NonNull Context context,
+                int resource,
+                @NonNull String[] objects
+        ) {
+            super(context, resource, objects);
+            this.items = objects;
+        }
+
+        @NonNull
+        @Override
+        public Filter getFilter() {
+            return new Filter() {
+                @Override
+                protected FilterResults performFiltering(CharSequence constraint) {
+                    FilterResults results = new FilterResults();
+                    results.values = items;
+                    results.count = items.length;
+                    return results;
+                }
+
+                @Override
+                protected void publishResults(CharSequence constraint, FilterResults results) {
+                    clear();
+
+                    if (results != null && results.values instanceof String[]) {
+                        String[] values = (String[]) results.values;
+
+                        for (String item : values) {
+                            add(item);
+                        }
+                    }
+
+                    notifyDataSetChanged();
+                }
+
+                @Override
+                public CharSequence convertResultToString(Object resultValue) {
+                    return resultValue == null ? "" : resultValue.toString();
+                }
+            };
+        }
     }
 }

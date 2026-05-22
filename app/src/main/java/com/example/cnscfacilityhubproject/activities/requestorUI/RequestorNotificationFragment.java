@@ -1,40 +1,12 @@
 package com.example.cnscfacilityhubproject.activities.requestorUI;
 
-import android.content.res.ColorStateList;
-import android.graphics.Color;
-import android.os.Bundle;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.Toast;
+import android.content.res.ColorStateList;import android.graphics.Color;import android.os.Bundle;import android.view.View;import android.view.ViewGroup;import android.widget.ImageView;import android.widget.LinearLayout;import android.widget.TextView;import android.widget.Toast;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
+import androidx.annotation.NonNull;import androidx.annotation.Nullable;import androidx.fragment.app.Fragment;
 
-import com.example.cnscfacilityhubproject.R;
-import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.card.MaterialCardView;
-import com.google.android.material.chip.Chip;
-import com.google.firebase.Timestamp;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FieldValue;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.ListenerRegistration;
-import com.google.firebase.firestore.WriteBatch;
+import com.example.cnscfacilityhubproject.R;import com.example.cnscfacilityhubproject.utils.RequestDataHelper;import com.google.android.material.button.MaterialButton;import com.google.android.material.card.MaterialCardView;import com.google.android.material.chip.Chip;import com.google.firebase.Timestamp;import com.google.firebase.auth.FirebaseAuth;import com.google.firebase.firestore.DocumentSnapshot;import com.google.firebase.firestore.FieldValue;import com.google.firebase.firestore.FirebaseFirestore;import com.google.firebase.firestore.ListenerRegistration;import com.google.firebase.firestore.WriteBatch;
 
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.text.SimpleDateFormat;import java.util.ArrayList;import java.util.Collections;import java.util.Comparator;import java.util.HashSet;import java.util.List;import java.util.Locale;import java.util.Set;
 
 public class RequestorNotificationFragment extends Fragment {
 
@@ -489,37 +461,29 @@ public class RequestorNotificationFragment extends Fragment {
 
     private String getDisplayStatus(DocumentSnapshot doc) {
         String status = getStringValue(doc, "status");
+        String sacStatus = getStringValue(doc, "sacStatus");
+        String itsoStatus = getStringValue(doc, "itsoStatus");
         String gsoStatus = getStringValue(doc, "gsoStatus");
-        String gsoAvailability = getStringValue(doc, "gsoAvailability");
-        String notificationTarget = getStringValue(doc, "notificationTarget");
-        String workflowStage = getStringValue(doc, "workflowStage");
 
-        boolean isGsoReturned =
-                "Returned".equalsIgnoreCase(gsoStatus)
-                        || "Rejected".equalsIgnoreCase(gsoStatus)
-                        || "Not Available".equalsIgnoreCase(gsoAvailability)
-                        || "Unavailable".equalsIgnoreCase(gsoAvailability)
-                        || (
-                        "Returned".equalsIgnoreCase(status)
-                                && (
-                                "GSO".equalsIgnoreCase(notificationTarget)
-                                        || "GSO_REVIEW".equalsIgnoreCase(workflowStage)
-                                        || "GSO_RETURNED".equalsIgnoreCase(workflowStage)
-                        )
-                );
-
-        if (isGsoReturned) {
+        if ("Rejected".equalsIgnoreCase(status)
+                || "Rejected".equalsIgnoreCase(sacStatus)
+                || "Rejected".equalsIgnoreCase(itsoStatus)
+                || "Rejected".equalsIgnoreCase(gsoStatus)) {
             return "Returned";
         }
 
-        boolean isApproved =
-                "Approved".equalsIgnoreCase(status)
-                        || "Approved - Available".equalsIgnoreCase(status)
-                        || "Approved".equalsIgnoreCase(gsoStatus)
-                        || "Available".equalsIgnoreCase(gsoAvailability);
+        if ("Returned".equalsIgnoreCase(status)
+                || "Returned".equalsIgnoreCase(gsoStatus)) {
+            return "Returned";
+        }
 
-        if (isApproved) {
+        if ("Approved".equalsIgnoreCase(status)
+                || "Approved".equalsIgnoreCase(gsoStatus)) {
             return "Approved";
+        }
+
+        if ("Approved".equalsIgnoreCase(sacStatus)) {
+            return "Pending";
         }
 
         return "Pending";
@@ -723,4 +687,5 @@ public class RequestorNotificationFragment extends Fragment {
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
+
 }
