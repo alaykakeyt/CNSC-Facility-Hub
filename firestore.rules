@@ -64,6 +64,11 @@ service cloud.firestore {
         );
 
       allow delete: if isGSO();
+
+      // FCM tokens subcollection - users can only read/write their own tokens
+      match /fcmTokens/{tokenId} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
+      }
     }
 
     match /requests/{requestId} {

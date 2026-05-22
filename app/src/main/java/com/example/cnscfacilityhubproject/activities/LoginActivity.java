@@ -21,6 +21,9 @@ import com.example.cnscfacilityhubproject.activities.gsoUI.gsoNavBarActivity;
 import com.example.cnscfacilityhubproject.activities.itsoUI.itsoNavBarActivity;
 import com.example.cnscfacilityhubproject.activities.sacUI.sacNavBarActivity;
 import com.example.cnscfacilityhubproject.models.Booking;
+import com.example.cnscfacilityhubproject.utils.AppNotificationHelper;
+import com.example.cnscfacilityhubproject.utils.FcmTokenHelper;
+import com.example.cnscfacilityhubproject.utils.NotificationPermissionHelper;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -81,6 +84,9 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_login);
+
+        // Initialize notification channels
+        AppNotificationHelper.createNotificationChannels(this);
 
         FirebaseAuth auth = FirebaseAuth.getInstance();
         FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -171,86 +177,6 @@ public class LoginActivity extends AppCompatActivity {
 
 
 
-//        loginBtn ORIGINAL LOGIC IS HERE
-//
-//        loginBtn.setOnClickListener(v -> {
-//
-//            String userEmail = email.getText().toString();
-//            String userPass = password.getText().toString();
-//
-//
-//            if (userEmail.isEmpty()){
-//                Toast.makeText(LoginActivity.this, "Please enter your email.", Toast.LENGTH_SHORT).show();
-//                return;
-//            }
-//            if (userPass.isEmpty()){
-//                Toast.makeText(LoginActivity.this, "Please enter your password.", Toast.LENGTH_SHORT).show();
-//                return;
-//            }
-//
-//            auth.signInWithEmailAndPassword(userEmail, userPass)
-//                    .addOnCompleteListener(task -> {
-//                        if (task.isSuccessful()) {
-//
-//                            db.collection("users")
-//                                    .document(auth.getCurrentUser().getUid())
-//                                            .get()
-//                                                    .addOnSuccessListener(documentSnapshot -> {
-////                                                        Toast.makeText(LoginActivity.this, "Login Success", Toast.LENGTH_SHORT).show();
-//                                                        if (documentSnapshot.exists()){
-//                                                            Intent intent;
-//                                                            String userType = documentSnapshot.getString("userType").toLowerCase();
-//
-//                                                            if (userType.equals("requestor")) {
-//
-//                                                                startActivity(new Intent(
-//                                                                        LoginActivity.this,
-//                                                                        RequestorNavBarActivity.class
-//                                                                ));
-//                                                                finish();
-//
-//                                                            } else if (userType.equals("itso")) {
-//
-//                                                                startActivity(new Intent(
-//                                                                        LoginActivity.this,
-//                                                                        itsoNavBarActivity.class
-//                                                                ));
-//                                                                finish();
-//
-//                                                            } else if (userType.equals("sac")) {
-//
-//                                                                startActivity(new Intent(
-//                                                                        LoginActivity.this,
-//                                                                        sacNavBarActivity.class
-//                                                                ));
-//                                                                finish();
-//
-//                                                            } else if (userType.equals("gso")) {
-//
-//                                                                startActivity(new Intent(
-//                                                                        LoginActivity.this,
-//                                                                        gsoNavBarActivity.class
-//                                                                ));
-//                                                                finish();
-//
-//                                                            } else {
-//
-//                                                                Toast.makeText(
-//                                                                        LoginActivity.this,
-//                                                                        "Unknown user role.",
-//                                                                        Toast.LENGTH_SHORT
-//                                                                ).show();
-//                                                            }
-//                                                        }
-//                                                    });
-//
-//                        } else {
-//                            Toast.makeText(LoginActivity.this, "Login Failed", Toast.LENGTH_SHORT).show();
-//                        }
-//                    });
-//        });
-//
-
 
         signUpTxt.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -272,6 +198,12 @@ public class LoginActivity extends AppCompatActivity {
 
     private void routeUserByRole(String userType, FirebaseAuth auth) {
         Intent intent;
+
+        // Save FCM token for this user
+        FcmTokenHelper.saveCurrentUserToken();
+
+        // Request notification permission on Android 13+
+        NotificationPermissionHelper.requestNotificationPermission(this);
 
         switch (userType) {
             case "requestor":
