@@ -270,6 +270,105 @@ public final class RequestDataHelper {
         return -1;
     }
 
+    public static Calendar getTodayStartCalendar() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal;
+    }
+
+    public static Calendar parseDateTextToCalendar(String dateText) {
+        try {
+            if (dateText == null || dateText.trim().isEmpty()) return null;
+            Date date = DATE_FORMAT.parse(dateText.trim());
+            if (date == null) return null;
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(date);
+            return cal;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public static boolean isDateBeforeToday(String dateText) {
+        Calendar selected = parseDateTextToCalendar(dateText);
+        if (selected == null) return false;
+        return selected.before(getTodayStartCalendar());
+    }
+
+    /**
+     * Checks if a specific schedule (date + start time) is in the past compared to current time.
+     */
+    public static boolean isSchedulePast(String dateText, String startTimeText) {
+        Calendar dateCal = parseDateTextToCalendar(dateText);
+        if (dateCal == null) return false;
+
+        // If the date is strictly before today, it's in the past
+        if (dateCal.before(getTodayStartCalendar())) return true;
+
+        // If the date is strictly after today, it's not in the past
+        Calendar tomorrowStart = getTodayStartCalendar();
+        tomorrowStart.add(Calendar.DAY_OF_YEAR, 1);
+        if (!dateCal.before(tomorrowStart)) return false;
+
+        // If the date is exactly today, check the time
+        try {
+            SimpleDateFormat timeFormat = new SimpleDateFormat("hh:mm a", Locale.getDefault());
+            Date time = timeFormat.parse(startTimeText);
+            if (time == null) return false;
+
+            Calendar timeCal = Calendar.getInstance();
+            timeCal.setTime(time);
+
+            Calendar combined = Calendar.getInstance();
+            combined.setTime(dateCal.getTime());
+            combined.set(Calendar.HOUR_OF_DAY, timeCal.get(Calendar.HOUR_OF_DAY));
+            combined.set(Calendar.MINUTE, timeCal.get(Calendar.MINUTE));
+            combined.set(Calendar.SECOND, 0);
+            combined.set(Calendar.MILLISECOND, 0);
+
+            return combined.before(Calendar.getInstance());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Checks if a schedule has already completely finished (lapsed).
+     */
+    public static boolean hasScheduleLapsed(String dateText, String endTimeText) {
+        Calendar dateCal = parseDateTextToCalendar(dateText);
+        if (dateCal == null) return false;
+
+        if (dateCal.before(getTodayStartCalendar())) return true;
+
+        Calendar tomorrowStart = getTodayStartCalendar();
+        tomorrowStart.add(Calendar.DAY_OF_YEAR, 1);
+        if (!dateCal.before(tomorrowStart)) return false;
+
+        try {
+            SimpleDateFormat timeFormat = new SimpleDateFormat("hh:mm a", Locale.getDefault());
+            Date time = timeFormat.parse(endTimeText);
+            if (time == null) return false;
+
+            Calendar timeCal = Calendar.getInstance();
+            timeCal.setTime(time);
+
+            Calendar combined = Calendar.getInstance();
+            combined.setTime(dateCal.getTime());
+            combined.set(Calendar.HOUR_OF_DAY, timeCal.get(Calendar.HOUR_OF_DAY));
+            combined.set(Calendar.MINUTE, timeCal.get(Calendar.MINUTE));
+            combined.set(Calendar.SECOND, 59);
+            combined.set(Calendar.MILLISECOND, 999);
+
+            return combined.before(Calendar.getInstance());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public static Timestamp parseDateToTimestamp(String dateText) {
         try {
             java.util.Date date = DATE_FORMAT.parse(dateText);

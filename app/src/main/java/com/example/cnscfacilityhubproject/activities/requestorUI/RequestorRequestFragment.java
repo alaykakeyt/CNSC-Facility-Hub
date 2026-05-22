@@ -475,14 +475,36 @@ public class RequestorRequestFragment extends Fragment {
     private void showDatePicker(TextInputEditText target, boolean rebuildSchedule) {
         Calendar calendar = Calendar.getInstance();
 
-        new DatePickerDialog(
+        // If picking End Date, and Start Date is already selected, default the picker to Start Date
+        if (target == etEndDate && !getText(etStartDate).isEmpty()) {
+            Calendar startCal = RequestDataHelper.parseDateTextToCalendar(getText(etStartDate));
+            if (startCal != null && startCal.after(calendar)) {
+                calendar.setTime(startCal.getTime());
+            }
+        }
+
+        DatePickerDialog dialog = new DatePickerDialog(
                 requireContext(),
                 (datePicker, year, month, dayOfMonth) -> {
                     Calendar selected = Calendar.getInstance();
                     selected.set(year, month, dayOfMonth);
+                    selected.set(Calendar.HOUR_OF_DAY, 0);
+                    selected.set(Calendar.MINUTE, 0);
+                    selected.set(Calendar.SECOND, 0);
+                    selected.set(Calendar.MILLISECOND, 0);
 
-                    target.setText(formatDate(selected));
+                    String dateStr = formatDate(selected);
+                    target.setText(dateStr);
                     target.setError(null);
+
+                    // If Start Date was changed, validate if End Date is now before it
+                    if (target == etStartDate && !getText(etEndDate).isEmpty()) {
+                        Calendar endCal = RequestDataHelper.parseDateTextToCalendar(getText(etEndDate));
+                        if (endCal != null && endCal.before(selected)) {
+                            etEndDate.setText("");
+                            Toast.makeText(requireContext(), "End date cleared because it was before the new start date.", Toast.LENGTH_SHORT).show();
+                        }
+                    }
 
                     if (rebuildSchedule) {
                         rebuildScheduleDayCards();
@@ -491,7 +513,20 @@ public class RequestorRequestFragment extends Fragment {
                 calendar.get(Calendar.YEAR),
                 calendar.get(Calendar.MONTH),
                 calendar.get(Calendar.DAY_OF_MONTH)
-        ).show();
+        );
+
+        // Always prevent selecting dates before today
+        dialog.getDatePicker().setMinDate(RequestDataHelper.getTodayStartCalendar().getTimeInMillis());
+
+        // If target is End Date, ensure it cannot be before Start Date
+        if (target == etEndDate && !getText(etStartDate).isEmpty()) {
+            Calendar startCal = RequestDataHelper.parseDateTextToCalendar(getText(etStartDate));
+            if (startCal != null) {
+                dialog.getDatePicker().setMinDate(startCal.getTimeInMillis());
+            }
+        }
+
+        dialog.show();
     }
 
     private void setupTimePickers() {
@@ -1458,6 +1493,8 @@ public class RequestorRequestFragment extends Fragment {
     }
 
     private boolean validateForm() {
+        String logTag = "CNSC_DateValidation";
+
         if (TextUtils.isEmpty(selectedActivityType)) {
             Toast.makeText(requireContext(), "Please select an activity type.", Toast.LENGTH_SHORT).show();
             return false;
@@ -1471,12 +1508,31 @@ public class RequestorRequestFragment extends Fragment {
             return false;
         }
 
-        if (isEmpty(etStartDate) || isEmpty(etEndDate)) {
+        String startDateText = getText(etStartDate);
+        String endDateText = getText(etEndDate);
+
+        if (startDateText.isEmpty() || endDateText.isEmpty()) {
             Toast.makeText(requireContext(), "Please select start and end dates.", Toast.LENGTH_SHORT).show();
             return false;
         }
 
-        if (!isValidDateRange()) {
+        // Validate Date Range
+        if (RequestDataHelper.isDateBeforeToday(startDateText)) {
+            Log.w(logTag, "Validation failed: Start date in past: " + startDateText);
+            Toast.makeText(requireContext(), "Start date cannot be in the past.", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        if (RequestDataHelper.isDateBeforeToday(endDateText)) {
+            Log.w(logTag, "Validation failed: End date in past: " + endDateText);
+            Toast.makeText(requireContext(), "End date cannot be in the past.", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        Calendar startCal = RequestDataHelper.parseDateTextToCalendar(startDateText);
+        Calendar endCal = RequestDataHelper.parseDateTextToCalendar(endDateText);
+        if (startCal != null && endCal != null && endCal.before(startCal)) {
+            Log.w(logTag, "Validation failed: End date " + endDateText + " before start date " + startDateText);
             Toast.makeText(requireContext(), "End date cannot be earlier than start date.", Toast.LENGTH_SHORT).show();
             return false;
         }
@@ -1488,27 +1544,51 @@ public class RequestorRequestFragment extends Fragment {
             return false;
         }
 
+        boolean allLapsed = true;
         for (ScheduleDayItem day : scheduleDays) {
-            if (day.getStartTimeText().isEmpty() || day.getEndTimeText().isEmpty()) {
-                Toast.makeText(
-                        requireContext(),
-                        "Please set start and end time for " + day.getDateText() + ".",
-                        Toast.LENGTH_SHORT
-                ).show();
+            String dateText = day.getDateText();
+            String startTimeText = day.getStartTimeText();
+            String endTimeText = day.getEndTimeText();
+
+            if (startTimeText.isEmpty() || endTimeText.isEmpty()) {
+                Toast.makeText(requireContext(), "Please set start and end time for " + dateText + ".", Toast.LENGTH_SHORT).show();
                 return false;
             }
 
-            long start = RequestDataHelper.parseTimeToMillis(day.getStartTimeText());
-            long end = RequestDataHelper.parseTimeToMillis(day.getEndTimeText());
+            // Check if end time is after start time
+            long startMs = RequestDataHelper.parseTimeToMillis(startTimeText);
+            long endMs = RequestDataHelper.parseTimeToMillis(endTimeText);
 
-            if (start == -1 || end == -1 || end <= start) {
-                Toast.makeText(
-                        requireContext(),
-                        "End time must be later than start time for " + day.getDateText() + ".",
-                        Toast.LENGTH_SHORT
-                ).show();
+            if (startMs == -1 || endMs == -1 || endMs <= startMs) {
+                Toast.makeText(requireContext(), "End time must be later than start time for " + dateText + ".", Toast.LENGTH_SHORT).show();
                 return false;
             }
+
+            // Check if schedule is in the past (Today logic)
+            if (RequestDataHelper.isSchedulePast(dateText, startTimeText)) {
+                Log.w(logTag, "Validation failed: Schedule start is in the past: " + dateText + " " + startTimeText);
+                
+                Calendar dCal = RequestDataHelper.parseDateTextToCalendar(dateText);
+                Calendar today = RequestDataHelper.getTodayStartCalendar();
+                
+                if (dCal != null && dCal.getTimeInMillis() == today.getTimeInMillis()) {
+                    Toast.makeText(requireContext(), "Start time for today cannot be in the past.", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(requireContext(), "The schedule for " + dateText + " is in the past.", Toast.LENGTH_LONG).show();
+                }
+                return false;
+            }
+
+            // If any schedule day has NOT lapsed, then the whole appointment hasn't lapsed.
+            if (!RequestDataHelper.hasScheduleLapsed(dateText, endTimeText)) {
+                allLapsed = false;
+            }
+        }
+
+        if (allLapsed) {
+            Log.w(logTag, "Validation failed: All schedule days have lapsed.");
+            Toast.makeText(requireContext(), "This schedule has already lapsed. Please select a future date and time.", Toast.LENGTH_LONG).show();
+            return false;
         }
 
         if (isEmpty(etParticipants) || isEmpty(etNumberOfParticipants) || isEmpty(etPurpose)) {
@@ -1555,13 +1635,6 @@ public class RequestorRequestFragment extends Fragment {
         }
 
         return true;
-    }
-
-    private boolean isValidDateRange() {
-        long start = RequestDataHelper.parseDateToMillis(getText(etStartDate));
-        long end = RequestDataHelper.parseDateToMillis(getText(etEndDate));
-
-        return start != -1 && end != -1 && end >= start;
     }
 
     private void clearForm() {
