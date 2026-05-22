@@ -456,7 +456,8 @@ public class gsoRequestsFragment extends Fragment {
 
         if ("GSO_REVIEW".equalsIgnoreCase(workflowStage)
                 || "WAITING_GSO_APPROVAL".equalsIgnoreCase(workflowStage)
-                || "REJECTED_BY_GSO".equalsIgnoreCase(workflowStage)) {
+                || "REJECTED_BY_GSO".equalsIgnoreCase(workflowStage)
+                || "COMPLETED".equalsIgnoreCase(workflowStage)) {
             return true;
         }
 
@@ -467,20 +468,25 @@ public class gsoRequestsFragment extends Fragment {
         }
 
         Boolean sendToGSO = doc.getBoolean("sendToGSO");
-        Boolean needsGSO = doc.getBoolean("needsGSO");
         Boolean notificationForGSO = doc.getBoolean("notificationForGSO");
         Boolean notificationForGso = doc.getBoolean("notificationForGso");
 
         if (Boolean.TRUE.equals(sendToGSO)
-                || Boolean.TRUE.equals(needsGSO)
                 || Boolean.TRUE.equals(notificationForGSO)
                 || Boolean.TRUE.equals(notificationForGso)) {
             return true;
         }
 
+        /*
+         * Do not show requests in GSO while they are only waiting for SAC or ITSO.
+         * Examples: "Waiting for SAC Approval", "Waiting for ITSO Approval".
+         */
         String gsoStatus = getStringValue(doc, "gsoStatus");
 
-        return !gsoStatus.isEmpty();
+        return "Pending".equalsIgnoreCase(gsoStatus)
+                || "Approved".equalsIgnoreCase(gsoStatus)
+                || "Returned".equalsIgnoreCase(gsoStatus)
+                || "Rejected".equalsIgnoreCase(gsoStatus);
     }
 
     private String getDisplayStatus(DocumentSnapshot doc) {

@@ -418,6 +418,15 @@ public class itsoNotificationFragment extends Fragment {
             return;
         }
 
+        if (requireActivity().findViewById(R.id.itso_fragment_container) == null) {
+            Toast.makeText(
+                    requireContext(),
+                    "ITSO container not found. Check activity layout.",
+                    Toast.LENGTH_LONG
+            ).show();
+            return;
+        }
+
         itsoHomeViewDetailsFragment fragment =
                 itsoHomeViewDetailsFragment.newInstance(requestId);
 
@@ -433,7 +442,71 @@ public class itsoNotificationFragment extends Fragment {
     }
 
     private boolean shouldShowITSONotificationCard(DocumentSnapshot doc) {
-        return hasAnyTechnicalRequest(doc);
+        if (!hasAnyTechnicalRequest(doc)) {
+            return false;
+        }
+
+        /*
+         * ITSO must only see requests when the request is already routed to ITSO.
+         * This prevents Student Center + technical requests from appearing in ITSO
+         * before SAC approval.
+         */
+        String workflowStage = getStringValue(doc, "workflowStage");
+        String notificationTarget = getStringValue(doc, "notificationTarget");
+        String itsoStatus = getStringValue(doc, "itsoStatus");
+
+        if (isWaitingForSACApproval(doc)) {
+            return false;
+        }
+
+        Boolean sendToITSO = doc.getBoolean("sendToITSO");
+        Boolean notificationForITSO = doc.getBoolean("notificationForITSO");
+        Boolean notificationForItso = doc.getBoolean("notificationForItso");
+
+        if (Boolean.TRUE.equals(sendToITSO)
+                || Boolean.TRUE.equals(notificationForITSO)
+                || Boolean.TRUE.equals(notificationForItso)) {
+            return true;
+        }
+
+        if ("ITSO".equalsIgnoreCase(notificationTarget)) {
+            return true;
+        }
+
+        if ("ITSO_REVIEW".equalsIgnoreCase(workflowStage)
+                || "WAITING_ITSO_APPROVAL".equalsIgnoreCase(workflowStage)
+                || "REJECTED_BY_ITSO".equalsIgnoreCase(workflowStage)) {
+            return true;
+        }
+
+        return "Pending".equalsIgnoreCase(itsoStatus)
+                || "Available".equalsIgnoreCase(itsoStatus)
+                || "Approved".equalsIgnoreCase(itsoStatus)
+                || "Approved - Available".equalsIgnoreCase(itsoStatus)
+                || "Not Available".equalsIgnoreCase(itsoStatus)
+                || "Unavailable".equalsIgnoreCase(itsoStatus)
+                || "Rejected".equalsIgnoreCase(itsoStatus)
+                || "Returned".equalsIgnoreCase(itsoStatus);
+    }
+
+    private boolean isWaitingForSACApproval(DocumentSnapshot doc) {
+        String workflowStage = getStringValue(doc, "workflowStage");
+        String notificationTarget = getStringValue(doc, "notificationTarget");
+        String sacStatus = getStringValue(doc, "sacStatus");
+        String itsoStatus = getStringValue(doc, "itsoStatus");
+
+        if ("SAC_REVIEW".equalsIgnoreCase(workflowStage)
+                || "SAC".equalsIgnoreCase(notificationTarget)) {
+            return true;
+        }
+
+        if (itsoStatus.toLowerCase(Locale.ROOT).contains("waiting for sac")) {
+            return true;
+        }
+
+        return "Pending".equalsIgnoreCase(sacStatus)
+                && !"ITSO_REVIEW".equalsIgnoreCase(workflowStage)
+                && !"ITSO".equalsIgnoreCase(notificationTarget);
     }
 
     private boolean hasAnyTechnicalRequest(DocumentSnapshot doc) {

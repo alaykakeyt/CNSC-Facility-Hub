@@ -16,6 +16,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 
 import com.example.cnscfacilityhubproject.R;
 import com.example.cnscfacilityhubproject.activities.LoginActivity;
@@ -46,6 +47,8 @@ public class itsoNavBarActivity extends AppCompatActivity {
 
     private final List<String> unseenNotificationIds = new ArrayList<>();
 
+    private Tab currentTab = Tab.HOME;
+
     private static final int COLOR_PRIMARY = Color.rgb(151, 7, 5);
     private static final int COLOR_DARK = Color.rgb(49, 49, 49);
     private static final int COLOR_WHITE = Color.WHITE;
@@ -74,8 +77,7 @@ public class itsoNavBarActivity extends AppCompatActivity {
             @Override
             public void onSuccess() {
                 if (savedInstanceState == null) {
-                    loadFragment(new itsoHomeFragment());
-                    setSelectedTab(Tab.HOME);
+                    openHomeTab();
                 }
             }
 
@@ -94,6 +96,24 @@ public class itsoNavBarActivity extends AppCompatActivity {
             notificationBadgeListener.remove();
             notificationBadgeListener = null;
         }
+    }
+
+    @Override
+    public void onBackPressed() {
+        Fragment currentFragment = getSupportFragmentManager()
+                .findFragmentById(R.id.itso_fragment_container);
+
+        if (currentFragment instanceof itsoHomeViewDetailsFragment) {
+            openNotificationTab();
+            return;
+        }
+
+        if (currentTab == Tab.NOTIFICATION || currentTab == Tab.PROFILE) {
+            openHomeTab();
+            return;
+        }
+
+        super.onBackPressed();
     }
 
     private void bindViews() {
@@ -130,26 +150,42 @@ public class itsoNavBarActivity extends AppCompatActivity {
 
     private void setupNavigation() {
         if (navHome != null) {
-            navHome.setOnClickListener(v -> {
-                loadFragment(new itsoHomeFragment());
-                setSelectedTab(Tab.HOME);
-            });
+            navHome.setOnClickListener(v -> openHomeTab());
         }
 
         if (navNotification != null) {
-            navNotification.setOnClickListener(v -> {
-                clearNotificationBadgeAndMarkSeen();
-                loadFragment(new itsoNotificationFragment());
-                setSelectedTab(Tab.NOTIFICATION);
-            });
+            navNotification.setOnClickListener(v -> openNotificationTab());
         }
 
         if (navProfile != null) {
-            navProfile.setOnClickListener(v -> {
-                loadFragment(new itsoProfileFragment());
-                setSelectedTab(Tab.PROFILE);
-            });
+            navProfile.setOnClickListener(v -> openProfileTab());
         }
+    }
+
+    public void openHomeTab() {
+        clearBackStack();
+        loadFragment(new itsoHomeFragment());
+        setSelectedTab(Tab.HOME);
+    }
+
+    public void openNotificationTab() {
+        clearNotificationBadgeAndMarkSeen();
+        clearBackStack();
+        loadFragment(new itsoNotificationFragment());
+        setSelectedTab(Tab.NOTIFICATION);
+    }
+
+    public void openProfileTab() {
+        clearBackStack();
+        loadFragment(new itsoProfileFragment());
+        setSelectedTab(Tab.PROFILE);
+    }
+
+    private void clearBackStack() {
+        getSupportFragmentManager().popBackStack(
+                null,
+                FragmentManager.POP_BACK_STACK_INCLUSIVE
+        );
     }
 
     private void loadFragment(Fragment fragment) {
@@ -160,6 +196,7 @@ public class itsoNavBarActivity extends AppCompatActivity {
     }
 
     private void setSelectedTab(Tab selectedTab) {
+        currentTab = selectedTab;
         resetTabs();
 
         switch (selectedTab) {
@@ -302,6 +339,8 @@ public class itsoNavBarActivity extends AppCompatActivity {
     }
 
     private String getStringValue(DocumentSnapshot doc, String field) {
+        if (doc == null || field == null) return "";
+
         Object value = doc.get(field);
         return value == null ? "" : String.valueOf(value).trim();
     }

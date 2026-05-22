@@ -22,23 +22,9 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnBack"
-                android:layout_width="46dp"
-                android:layout_height="46dp"
-                android:text="‹"
-                android:textColor="#313131"
-                android:textSize="28sp"
-                app:backgroundTint="#FFFFFF"
-                app:cornerRadius="18dp"
-                app:elevation="0dp"
-                app:strokeColor="#313131"
-                app:strokeWidth="1dp" />
-
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -50,14 +36,6 @@
                     android:textSize="26sp"
                     android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:alpha="0.72"
-                    android:text="Check technical availability and request details"
-                    android:textColor="#313131"
-                    android:textSize="13sp" />
             </LinearLayout>
         </LinearLayout>
 

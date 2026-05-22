@@ -46,7 +46,6 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     private String requestId = "";
     private ListenerRegistration requestListener;
 
-    private MaterialButton btnBack;
     private MaterialButton btnAvailable;
     private MaterialButton btnNotAvailable;
 
@@ -117,7 +116,6 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     }
 
     private void bindViews(View view) {
-        btnBack = view.findViewById(R.id.btnBack);
         btnAvailable = view.findViewById(R.id.btnAvailable);
         btnNotAvailable = view.findViewById(R.id.btnNotAvailable);
 
@@ -141,15 +139,17 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     }
 
     private void setupButtons() {
-        btnBack.setOnClickListener(v -> goBack());
+        if (btnAvailable != null) {
+            btnAvailable.setOnClickListener(v ->
+                    markTechnicalStatusAndRoute("Approved", "Available")
+            );
+        }
 
-        btnAvailable.setOnClickListener(v ->
-                markTechnicalStatusAndRoute("Approved", "Available")
-        );
-
-        btnNotAvailable.setOnClickListener(v ->
-                markTechnicalStatusAndRoute("Rejected", "Not Available")
-        );
+        if (btnNotAvailable != null) {
+            btnNotAvailable.setOnClickListener(v ->
+                    markTechnicalStatusAndRoute("Rejected", "Not Available")
+            );
+        }
     }
 
     private void setInitialLabels() {
@@ -744,7 +744,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
                                         Toast.LENGTH_SHORT
                                 ).show();
 
-                                goBack();
+                                openNotificationTabAfterUpdate();
                             })
                             .addOnFailureListener(e -> {
                                 if (!isAdded()) return;
@@ -1136,9 +1136,28 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    private void openNotificationTabAfterUpdate() {
+        if (!isAdded()) return;
+
+        if (requireActivity() instanceof itsoNavBarActivity) {
+            ((itsoNavBarActivity) requireActivity()).openNotificationTab();
+            return;
+        }
+
+        requireActivity().getSupportFragmentManager().popBackStack();
+    }
+
     private void goBack() {
         if (!isAdded()) return;
-        requireActivity().getSupportFragmentManager().popBackStack();
+
+        if (requireActivity().getSupportFragmentManager().getBackStackEntryCount() > 0) {
+            requireActivity().getSupportFragmentManager().popBackStack();
+            return;
+        }
+
+        if (requireActivity() instanceof itsoNavBarActivity) {
+            ((itsoNavBarActivity) requireActivity()).openHomeTab();
+        }
     }
 
     private static class DisplayProposalFile {
