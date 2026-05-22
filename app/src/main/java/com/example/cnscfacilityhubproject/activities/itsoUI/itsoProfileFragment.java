@@ -23,6 +23,7 @@ import androidx.fragment.app.Fragment;
 import com.example.cnscfacilityhubproject.R;
 import com.example.cnscfacilityhubproject.activities.LoginActivity;
 import com.example.cnscfacilityhubproject.utils.ChangePasswordBottomSheetHelper;
+import com.example.cnscfacilityhubproject.utils.FcmTokenHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputEditText;
@@ -436,6 +437,9 @@ public class itsoProfileFragment extends Fragment {
     private void logoutUser() {
         isLoggingOut = true;
         removeProfileListener();
+
+        // Remove FCM token before logout
+        FcmTokenHelper.removeCurrentUserToken();
 
         if (auth != null) {
             auth.signOut();
