@@ -21,7 +21,6 @@ import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
 import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
-import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -36,6 +35,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
+import java.util.ArrayList;
+import java.util.List;
+import android.text.TextUtils;
+
+import android.graphics.Typeface;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.StyleSpan;
 
 public class RequestorRequestDetailsFragment extends Fragment {
 
@@ -52,8 +60,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
     private final List<FirestoreProposalFile> proposalFilesToOpen = new ArrayList<>();
 
-    private MaterialButton btnBack;
-
     private TextView tvDetailPurpose;
     private TextView tvDetailActivityType;
     private Chip chipDetailStatus;
@@ -69,8 +75,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
     private TextView tvDetailTimeRange;
     private TextView tvDetailFacility;
 
-    private TextView tvDetailParticipants;
-    private TextView tvDetailNumberOfParticipants;
+
     private TextView tvDetailPurposeFull;
 
     private TextView tvDetailTables;
@@ -82,9 +87,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
     private TextView tvDetailTechnicalList;
     private TextView tvDetailConnectors;
 
-    private TextView tvDetailProposalFileName;
-    private TextView tvDetailNotificationTarget;
-    private TextView tvDetailAgreement;
     private LinearLayout layoutProposalFiles;
     private MaterialCardView cardRequestorInformation;
     private MaterialCardView cardProposalFiles;
@@ -129,7 +131,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
         }
 
         bindViews(view);
-        setupButtons();
         clearDynamicFields();
         applyDetailsVisibilityMode();
 
@@ -143,7 +144,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
     }
 
     private void bindViews(View view) {
-        btnBack = view.findViewById(R.id.btnBack);
         cardRequestorInformation = view.findViewById(R.id.cardRequestorInformation);
         cardProposalFiles = view.findViewById(R.id.cardProposalFiles);
 
@@ -162,8 +162,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         tvDetailTimeRange = view.findViewById(R.id.tvDetailTimeRange);
         tvDetailFacility = view.findViewById(R.id.tvDetailFacility);
 
-        tvDetailParticipants = view.findViewById(R.id.tvDetailParticipants);
-        tvDetailNumberOfParticipants = view.findViewById(R.id.tvDetailNumberOfParticipants);
+
         tvDetailPurposeFull = view.findViewById(R.id.tvDetailPurposeFull);
 
         tvDetailTables = view.findViewById(R.id.tvDetailTables);
@@ -175,7 +174,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
         tvDetailTechnicalList = view.findViewById(R.id.tvDetailTechnicalList);
         tvDetailConnectors = view.findViewById(R.id.tvDetailConnectors);
 
-
         layoutProposalFiles = view.findViewById(R.id.layoutProposalFiles);
 
         cardAdminRemarks = view.findViewById(R.id.cardAdminRemarks);
@@ -183,12 +181,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
         tvDetailSacRemarks = view.findViewById(R.id.tvDetailSacRemarks);
         tvDetailGsoRemarks = view.findViewById(R.id.tvDetailGsoRemarks);
 
-    }
-
-    private void setupButtons() {
-        if (btnBack != null) {
-            btnBack.setOnClickListener(v -> goBack());
-        }
     }
 
     private void clearDynamicFields() {
@@ -215,8 +207,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         }
         setLabelOnly(tvDetailFacility, "Facilities: ");
 
-        setLabelOnly(tvDetailParticipants, "Participants: ");
-        setLabelOnly(tvDetailNumberOfParticipants, "Number of Participants: ");
+
         setLabelOnly(tvDetailPurposeFull, "Purpose: ");
 
         setLabelOnly(tvDetailTables, "Tables: ");
@@ -229,10 +220,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
         setLabelOnly(tvDetailNeedsTechnical, "Technical Needed: ");
         setLabelOnly(tvDetailTechnicalList, "Selected Technicals: ");
         setLabelOnly(tvDetailConnectors, "Connectors / Cables: ");
-
-        setLabelOnly(tvDetailProposalFileName, "Proposal / Supporting Files: ");
-        setLabelOnly(tvDetailNotificationTarget, "Sent To: ");
-        setLabelOnly(tvDetailAgreement, "Agreement Accepted: ");
 
         if (layoutProposalFiles != null) {
             layoutProposalFiles.removeAllViews();
@@ -341,8 +328,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
                 getStringValue(doc, "course")
         );
 
-        String participants = getStringValue(doc, "participants");
-        String numberOfParticipants = getLongString(doc, "numberOfParticipants");
 
         Boolean tablesRequested = getNullableBooleanValue(doc, "tablesRequested");
         Boolean chairsRequested = getNullableBooleanValue(doc, "chairsRequested");
@@ -350,22 +335,29 @@ public class RequestorRequestDetailsFragment extends Fragment {
         String chairsCount = getLongString(doc, "chairsCount");
         String otherAmenities = getStringValue(doc, "otherAmenities");
 
+        String selectedTechnicals = getTechnicalRequirementsFromFirestore(doc);
+        String connectors = getConnectorsFromFirestore(doc);
+
         Boolean technicalNeeded = firstNonNull(
                 getNullableBooleanValue(doc, "technicalNeeded"),
                 getNullableBooleanValue(doc, "needsITSO")
         );
 
-        String selectedTechnicals = getTechnicalRequirementsFromFirestore(doc);
-        String connectors = getStringValue(doc, "connectors");
+        if (technicalNeeded == null) {
+            technicalNeeded = firstNonNull(
+                    getNullableBooleanValue(doc, "hasTechnical"),
+                    getNullableBooleanValue(doc, "hasTechnicals")
+            );
+        }
+
+        if (technicalNeeded == null && (hasDisplayValue(selectedTechnicals) || hasDisplayValue(connectors))) {
+            technicalNeeded = true;
+        }
 
         List<FirestoreProposalFile> proposalFiles = getFirestoreProposalFiles(doc);
 
-        String notificationTarget = getStringValue(doc, "notificationTarget");
-        Boolean agreementAccepted = getNullableBooleanValue(doc, "agreementAccepted");
-
         String scheduleDisplay = cleanDisplayValue(RequestDataHelper.getScheduleDisplay(doc));
         String facilitiesDisplay = cleanDisplayValue(RequestDataHelper.getFacilitiesDisplay(doc));
-
 
         setPlainTextOrHide(tvDetailPurpose, purpose);
         setPlainTextOrHide(tvDetailActivityType, activityType);
@@ -385,8 +377,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         tvDetailTimeRange.setVisibility(View.GONE);
         setLabeledTextOrHide(tvDetailFacility, "Facilities: ", facilitiesDisplay);
 
-        setLabeledTextOrHide(tvDetailParticipants, "Participants: ", participants);
-        setLabeledTextOrHide(tvDetailNumberOfParticipants, "Number of Participants: ", numberOfParticipants);
+
         setLabeledTextOrHide(tvDetailPurposeFull, "Purpose: ", purpose);
 
         if (tablesRequested == null) {
@@ -411,10 +402,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
         setLabeledTextOrHide(tvDetailOtherAmenities, "Other Amenities: ", otherAmenities);
 
-        boolean hasTechnicalData = technicalNeeded != null
-                || hasDisplayValue(selectedTechnicals)
-                || hasDisplayValue(connectors);
-
         if (cardTechnicalDetails != null) {
             cardTechnicalDetails.setVisibility(View.VISIBLE);
         }
@@ -425,16 +412,8 @@ public class RequestorRequestDetailsFragment extends Fragment {
             setLabeledTextOrHide(tvDetailNeedsTechnical, "Technical Needed: ", yesNo(technicalNeeded));
         }
 
-        setLabeledTextOrHide(tvDetailTechnicalList, "Selected Technicals: ", selectedTechnicals);
+        setLabeledTextOrHide(tvDetailTechnicalList, "Selected Technicals:\n", selectedTechnicals);
         setLabeledTextOrHide(tvDetailConnectors, "Connectors / Cables: ", connectors);
-
-        setLabeledTextOrHide(tvDetailNotificationTarget, "Sent To: ", notificationTarget);
-
-        if (agreementAccepted == null) {
-            setLabelOnly(tvDetailAgreement, "Agreement Accepted: ");
-        } else {
-            setLabeledTextOrHide(tvDetailAgreement, "Agreement Accepted: ", yesNo(agreementAccepted));
-        }
 
         if (!hideProposalSection) {
             bindProposalFiles(proposalFiles);
@@ -461,7 +440,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
         if (cardAdminRemarks != null) {
             cardAdminRemarks.setVisibility(View.VISIBLE);
         }
-
 
 
         setOfficeRemarksRow(
@@ -589,17 +567,34 @@ public class RequestorRequestDetailsFragment extends Fragment {
         if (textView == null) return;
 
         String cleaned = cleanDisplayValue(value);
-        textView.setText(label + cleaned);
+        String fullText = label + cleaned;
+
+        SpannableString spannableString = new SpannableString(fullText);
+        spannableString.setSpan(
+                new StyleSpan(Typeface.BOLD),
+                0,
+                label.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        );
+
+        textView.setText(spannableString);
         textView.setVisibility(View.VISIBLE);
     }
 
     private void setLabelOnly(TextView textView, String label) {
         if (textView == null) return;
 
-        textView.setText(label);
+        SpannableString spannableString = new SpannableString(label);
+        spannableString.setSpan(
+                new StyleSpan(Typeface.BOLD),
+                0,
+                label.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        );
+
+        textView.setText(spannableString);
         textView.setVisibility(View.VISIBLE);
     }
-
 
     private String buildBooleanCountValue(Boolean requested, String count) {
         if (requested == null) {
@@ -616,40 +611,77 @@ public class RequestorRequestDetailsFragment extends Fragment {
     private String getTechnicalRequirementsFromFirestore(DocumentSnapshot doc) {
         String directValue = firstNonEmpty(
                 getStringValue(doc, "selectedTechnicals"),
-                getStringValue(doc, "technicalRequirements")
-        );
-
-        directValue = firstNonEmpty(
-                directValue,
-                getStringValue(doc, "selectedTechnicalRequirements")
+                getStringValue(doc, "selectedTechnical"),
+                getStringValue(doc, "technicalRequirements"),
+                getStringValue(doc, "selectedTechnicalRequirements"),
+                getStringValue(doc, "technicalRequirement"),
+                getStringValue(doc, "technicalNeeds"),
+                getStringValue(doc, "technicalEquipment"),
+                getStringValue(doc, "selectedEquipment"),
+                getStringValue(doc, "selectedEquipments")
         );
 
         if (hasDisplayValue(directValue)) {
             return directValue;
         }
 
-        Object selectedTechnicalsList = doc.get("selectedTechnicalsList");
-        String listValue = stringifyFirestoreValue(selectedTechnicalsList);
+        String listValue = firstNonEmpty(
+                stringifyFirestoreValue(doc.get("selectedTechnicalsList")),
+                stringifyFirestoreValue(doc.get("technicalRequirementsList")),
+                stringifyFirestoreValue(doc.get("selectedTechnicalRequirementsList")),
+                stringifyFirestoreValue(doc.get("technicals")),
+                stringifyFirestoreValue(doc.get("technicalItems")),
+                stringifyFirestoreValue(doc.get("selectedTechnicalItems")),
+                stringifyFirestoreValue(doc.get("technicalServices")),
+                stringifyFirestoreValue(doc.get("equipment")),
+                stringifyFirestoreValue(doc.get("equipments"))
+        );
 
         if (hasDisplayValue(listValue)) {
             return listValue;
         }
 
-        Object technicalRequirementsList = doc.get("technicalRequirementsList");
-        listValue = stringifyFirestoreValue(technicalRequirementsList);
+        List<String> selected = new ArrayList<>();
 
-        if (hasDisplayValue(listValue)) {
-            return listValue;
+        addTechnicalIfTrue(selected, doc, "soundSystemSetup", "Sound System Setup");
+        addTechnicalIfTrue(selected, doc, "microphones", "Microphones");
+        addTechnicalIfTrue(selected, doc, "portableSpeaker", "Portable Speaker");
+        addTechnicalIfTrue(selected, doc, "lights", "Lights");
+        addTechnicalIfTrue(selected, doc, "livestreamingServices", "Livestreaming Services");
+        addTechnicalIfTrue(selected, doc, "zoomHosting", "Zoom Hosting");
+        addTechnicalIfTrue(selected, doc, "gmeetHosting", "GMeet Hosting");
+        addTechnicalIfTrue(selected, doc, "webCamera", "Web Camera");
+        addTechnicalIfTrue(selected, doc, "tripod", "Tripod");
+        addTechnicalIfTrue(selected, doc, "multimediaProjector", "Multimedia Projector");
+
+        return TextUtils.join(", ", selected);
+    }
+
+    private void addTechnicalIfTrue(
+            List<String> selected,
+            DocumentSnapshot doc,
+            String field,
+            String label
+    ) {
+        Boolean value = getNullableBooleanValue(doc, field);
+
+        if (value != null && value) {
+            selected.add(label);
         }
+    }
 
-        Object technicals = doc.get("technicals");
-        listValue = stringifyFirestoreValue(technicals);
-
-        if (hasDisplayValue(listValue)) {
-            return listValue;
-        }
-
-        return "";
+    private String getConnectorsFromFirestore(DocumentSnapshot doc) {
+        return firstNonEmpty(
+                getStringValue(doc, "connectors"),
+                getStringValue(doc, "connector"),
+                getStringValue(doc, "selectedConnectors"),
+                getStringValue(doc, "connectorCables"),
+                getStringValue(doc, "cables"),
+                stringifyFirestoreValue(doc.get("connectorsList")),
+                stringifyFirestoreValue(doc.get("selectedConnectorsList")),
+                stringifyFirestoreValue(doc.get("connectorCablesList")),
+                stringifyFirestoreValue(doc.get("cablesList"))
+        );
     }
 
     private String stringifyFirestoreValue(Object value) {
@@ -664,8 +696,15 @@ public class RequestorRequestDetailsFragment extends Fragment {
             for (Object item : list) {
                 if (item == null) continue;
 
-                String text = String.valueOf(item).trim();
-                if (text.isEmpty()) continue;
+                String text;
+
+                if (item instanceof Map<?, ?> || item instanceof List<?>) {
+                    text = stringifyFirestoreValue(item);
+                } else {
+                    text = String.valueOf(item).trim();
+                }
+
+                if (!hasDisplayValue(text)) continue;
 
                 if (builder.length() > 0) {
                     builder.append(", ");
@@ -684,14 +723,36 @@ public class RequestorRequestDetailsFragment extends Fragment {
             for (Map.Entry<?, ?> entry : map.entrySet()) {
                 if (entry.getKey() == null || entry.getValue() == null) continue;
 
-                String mapValue = String.valueOf(entry.getValue()).trim();
-                if (mapValue.isEmpty()) continue;
+                String keyText = String.valueOf(entry.getKey()).trim();
+                Object rawValue = entry.getValue();
+
+                if (!hasDisplayValue(keyText)) continue;
+
+                String text = "";
+
+                if (rawValue instanceof Boolean) {
+                    if ((Boolean) rawValue) {
+                        text = keyText;
+                    }
+                } else if (rawValue instanceof Map<?, ?> || rawValue instanceof List<?>) {
+                    text = stringifyFirestoreValue(rawValue);
+                } else {
+                    String valueText = String.valueOf(rawValue).trim();
+
+                    if ("true".equalsIgnoreCase(valueText)) {
+                        text = keyText;
+                    } else if (!"false".equalsIgnoreCase(valueText)) {
+                        text = valueText;
+                    }
+                }
+
+                if (!hasDisplayValue(text)) continue;
 
                 if (builder.length() > 0) {
                     builder.append(", ");
                 }
 
-                builder.append(mapValue);
+                builder.append(text);
             }
 
             return builder.toString();
@@ -774,16 +835,12 @@ public class RequestorRequestDetailsFragment extends Fragment {
             layoutProposalFiles.removeAllViews();
         }
 
-        setLabelOnly(tvDetailProposalFileName, "Proposal / Supporting Files: ");
-
         if (files.isEmpty()) {
             if (layoutProposalFiles != null) {
                 layoutProposalFiles.setVisibility(View.GONE);
             }
             return;
         }
-
-        setLabeledTextOrHide(tvDetailProposalFileName, "Proposal / Supporting Files: ", files.size() + " file(s)");
 
         if (layoutProposalFiles != null) {
             layoutProposalFiles.setVisibility(View.VISIBLE);

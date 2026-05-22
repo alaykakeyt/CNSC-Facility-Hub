@@ -83,7 +83,7 @@
                     android:layout_marginTop="8dp"
                     android:alpha="0.78"
                     android:lineSpacingExtra="3dp"
-                    android:text="Submit requests, check facility and equipment availability, and monitor approval updates."
+                    android:text="Submit requests, check facility, and monitor approval updates."
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
