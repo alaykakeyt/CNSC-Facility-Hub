@@ -217,52 +217,13 @@ public class sacNavBarActivity extends AppCompatActivity {
 
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
                         if (RequestDataHelper.shouldShowInRequestList(doc)
-                                && isIncomingSACRequest(doc)) {
+                                && RequestDataHelper.isSACUnseenNotification(doc)) {
                             unseenNotificationIds.add(doc.getId());
                         }
                     }
 
                     updateNotificationBadge(unseenNotificationIds.size());
                 });
-    }
-
-    private boolean isIncomingSACRequest(DocumentSnapshot doc) {
-        if (!isSACRequest(doc)) {
-            return false;
-        }
-
-        String status = getStringValue(doc, "status");
-        String sacStatus = getStringValue(doc, "sacStatus");
-
-        if ("Rejected".equalsIgnoreCase(status)
-                || "Approved".equalsIgnoreCase(sacStatus)
-                || "Rejected".equalsIgnoreCase(sacStatus)) {
-            return false;
-        }
-
-        Boolean sacNotificationSeen = doc.getBoolean("sacNotificationSeen");
-        Boolean sacSeen = doc.getBoolean("sacSeen");
-
-        return !Boolean.TRUE.equals(sacNotificationSeen)
-                && !Boolean.TRUE.equals(sacSeen);
-    }
-
-    private boolean isSACRequest(DocumentSnapshot doc) {
-        Boolean sendToSAC = doc.getBoolean("sendToSAC");
-
-        if (Boolean.TRUE.equals(sendToSAC)) {
-            return true;
-        }
-
-        String notificationTarget = getStringValue(doc, "notificationTarget");
-
-        if ("SAC".equalsIgnoreCase(notificationTarget)) {
-            return true;
-        }
-
-        String workflowStage = getStringValue(doc, "workflowStage");
-
-        return "SAC_REVIEW".equalsIgnoreCase(workflowStage);
     }
 
     private void updateNotificationBadge(int count) {
@@ -294,13 +255,14 @@ public class sacNavBarActivity extends AppCompatActivity {
                     .update(
                             "sacNotificationSeen", true,
                             "sacSeen", true,
+                            "sacNotificationOpenedAt", FieldValue.serverTimestamp(),
                             "updatedAt", FieldValue.serverTimestamp()
                     );
         }
     }
 
     private boolean ensureUserLoggedIn() {
-        if (auth.getCurrentUser() != null) {
+        if (auth != null && auth.getCurrentUser() != null) {
             return true;
         }
 
@@ -316,10 +278,5 @@ public class sacNavBarActivity extends AppCompatActivity {
 
         startActivity(intent);
         finish();
-    }
-
-    private String getStringValue(DocumentSnapshot doc, String field) {
-        Object value = doc.get(field);
-        return value == null ? "" : String.valueOf(value).trim();
     }
 }

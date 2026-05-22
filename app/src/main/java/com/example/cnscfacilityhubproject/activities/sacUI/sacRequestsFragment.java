@@ -131,73 +131,14 @@ public class sacRequestsFragment extends Fragment {
                     sacRequestList.clear();
 
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (isSACRequest(doc) && RequestDataHelper.shouldShowInRequestList(doc)) {
+                        if (RequestDataHelper.isSACRelevantRequest(doc) 
+                                && RequestDataHelper.shouldShowInRequestList(doc)) {
                             sacRequestList.add(doc);
                         }
                     }
 
                     renderRequestList();
                 });
-    }
-
-    private boolean isSACRequest(DocumentSnapshot doc) {
-        if (!isStudentCenterFacility(doc)) {
-            return false;
-        }
-
-        Boolean sendToSAC = doc.getBoolean("sendToSAC");
-
-        if (Boolean.TRUE.equals(sendToSAC)) {
-            return true;
-        }
-
-        Boolean notificationForSAC = doc.getBoolean("notificationForSAC");
-
-        if (Boolean.TRUE.equals(notificationForSAC)) {
-            return true;
-        }
-
-        String notificationTarget = getStringValue(doc, "notificationTarget");
-
-        if ("SAC".equalsIgnoreCase(notificationTarget)) {
-            return true;
-        }
-
-        String workflowStage = getStringValue(doc, "workflowStage");
-
-        if ("SAC_REVIEW".equalsIgnoreCase(workflowStage)
-                || "REJECTED_BY_SAC".equalsIgnoreCase(workflowStage)) {
-            return true;
-        }
-
-        String sacStatus = getStringValue(doc, "sacStatus");
-
-        return "Pending".equalsIgnoreCase(sacStatus)
-                || "Approved".equalsIgnoreCase(sacStatus)
-                || "Rejected".equalsIgnoreCase(sacStatus);
-    }
-
-    private boolean isStudentCenterFacility(DocumentSnapshot doc) {
-        String finalFacilityName = getStringValue(doc, "finalFacilityName");
-        String facility = getStringValue(doc, "facility");
-        String selectedFacility = getStringValue(doc, "selectedFacility");
-        String facilityName = getStringValue(doc, "facilityName");
-
-        return isStudentCenterText(finalFacilityName)
-                || isStudentCenterText(facility)
-                || isStudentCenterText(selectedFacility)
-                || isStudentCenterText(facilityName);
-    }
-
-    private boolean isStudentCenterText(String value) {
-        if (value == null) {
-            return false;
-        }
-
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-
-        return "student center".equals(normalized)
-                || normalized.contains("student center");
     }
 
     private void renderRequestList() {
@@ -430,7 +371,9 @@ public class sacRequestsFragment extends Fragment {
         String status = getStringValue(doc, "status");
 
         if ("Rejected".equalsIgnoreCase(sacStatus)
-                || "Rejected".equalsIgnoreCase(status)) {
+                || "Rejected".equalsIgnoreCase(status)
+                || "Returned".equalsIgnoreCase(sacStatus)
+                || "Returned".equalsIgnoreCase(status)) {
             return "Rejected";
         }
 

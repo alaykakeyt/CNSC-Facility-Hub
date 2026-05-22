@@ -16,6 +16,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
@@ -47,7 +48,6 @@ public class sacNotificationFragment extends Fragment {
     private ListenerRegistration notificationListener;
 
     private final List<DocumentSnapshot> notificationList = new ArrayList<>();
-    private final Set<String> locallySeenNotificationIds = new HashSet<>();
 
     private int incomingRequestCount = 0;
     private int unseenNotificationCount = 0;
@@ -156,17 +156,18 @@ public class sacNotificationFragment extends Fragment {
                             unseenNotificationCount = 0;
 
                             for (DocumentSnapshot doc : docs) {
-                                if (!shouldShowSACNotificationCard(doc)) {
+                                if (!RequestDataHelper.isSACRelevantRequest(doc)
+                                        || !RequestDataHelper.shouldShowInRequestList(doc)) {
                                     continue;
                                 }
 
                                 notificationList.add(doc);
 
-                                if (isIncomingSACRequest(doc)) {
+                                if (RequestDataHelper.isSACPendingAction(doc)) {
                                     incomingRequestCount++;
                                 }
 
-                                if (shouldCountForNewChip(doc)) {
+                                if (RequestDataHelper.isSACUnseenNotification(doc)) {
                                     unseenNotificationCount++;
                                 }
                             }
@@ -183,6 +184,7 @@ public class sacNotificationFragment extends Fragment {
         layoutNotificationList.removeAllViews();
 
         List<DocumentSnapshot> filtered = new ArrayList<>();
+        List<DocumentSnapshot> toMarkSeen = new ArrayList<>();
 
         for (DocumentSnapshot doc : notificationList) {
             String status = getDisplayStatus(doc);
@@ -190,15 +192,19 @@ public class sacNotificationFragment extends Fragment {
             if ("All".equalsIgnoreCase(selectedFilter)
                     || selectedFilter.equalsIgnoreCase(status)) {
                 filtered.add(doc);
+                
+                if (RequestDataHelper.isSACUnseenNotification(doc)) {
+                    toMarkSeen.add(doc);
+                }
             }
         }
 
         if (tvIncomingCount != null) {
             tvIncomingCount.setText(
-                    incomingRequestCount + " incoming booking request" +
+                    incomingRequestCount + " pending SAC action" +
                             (incomingRequestCount == 1 ? "" : "s") +
                             " • " +
-                            filtered.size() + " shown notification" +
+                            filtered.size() + " total notification" +
                             (filtered.size() == 1 ? "" : "s")
             );
         }
@@ -213,6 +219,23 @@ public class sacNotificationFragment extends Fragment {
 
         for (DocumentSnapshot doc : filtered) {
             layoutNotificationList.addView(createNotificationCard(doc));
+        }
+
+        if (!toMarkSeen.isEmpty()) {
+            markNotificationsAsSeen(toMarkSeen);
+        }
+    }
+
+    private void markNotificationsAsSeen(List<DocumentSnapshot> docs) {
+        for (DocumentSnapshot doc : docs) {
+            db.collection("requests")
+                    .document(doc.getId())
+                    .update(
+                            "sacNotificationSeen", true,
+                            "sacSeen", true,
+                            "sacNotificationOpenedAt", FieldValue.serverTimestamp(),
+                            "updatedAt", FieldValue.serverTimestamp()
+                    );
         }
     }
 
@@ -420,8 +443,6 @@ public class sacNotificationFragment extends Fragment {
             return;
         }
 
-        locallySeenNotificationIds.add(requestId);
-
         db.collection("requests")
                 .document(requestId)
                 .update(
@@ -440,121 +461,6 @@ public class sacNotificationFragment extends Fragment {
                 )
                 .addToBackStack(null)
                 .commit();
-    }
-
-    private boolean shouldShowSACNotificationCard(DocumentSnapshot doc) {
-        return isStudentCenterFacility(doc) && isSACRelatedRequest(doc);
-    }
-
-    private boolean shouldCountForNewChip(DocumentSnapshot doc) {
-        if (locallySeenNotificationIds.contains(doc.getId())) {
-            return false;
-        }
-
-        Boolean sacNotificationSeen = doc.getBoolean("sacNotificationSeen");
-
-        if (Boolean.TRUE.equals(sacNotificationSeen)) {
-            return false;
-        }
-
-        return shouldShowSACNotificationCard(doc);
-    }
-
-    private boolean isIncomingSACRequest(DocumentSnapshot doc) {
-        if (!isStudentCenterFacility(doc)) {
-            return false;
-        }
-
-        if (!isSACRelatedRequest(doc)) {
-            return false;
-        }
-
-        String status = getStringValue(doc, "status");
-        String sacStatus = getStringValue(doc, "sacStatus");
-
-        if ("Rejected".equalsIgnoreCase(status)
-                || "Rejected".equalsIgnoreCase(sacStatus)
-                || "Returned".equalsIgnoreCase(status)
-                || "Returned".equalsIgnoreCase(sacStatus)
-                || "Cancelled".equalsIgnoreCase(status)
-                || "Canceled".equalsIgnoreCase(status)) {
-            return false;
-        }
-
-        if ("Approved".equalsIgnoreCase(sacStatus)) {
-            return false;
-        }
-
-        return "Pending".equalsIgnoreCase(status)
-                || "Pending".equalsIgnoreCase(sacStatus)
-                || status.isEmpty()
-                || sacStatus.isEmpty();
-    }
-
-    private boolean isSACRelatedRequest(DocumentSnapshot doc) {
-        if (!isStudentCenterFacility(doc)) {
-            return false;
-        }
-
-        Boolean sendToSAC = doc.getBoolean("sendToSAC");
-
-        if (Boolean.TRUE.equals(sendToSAC)) {
-            return true;
-        }
-
-        Boolean notificationForSAC = doc.getBoolean("notificationForSAC");
-
-        if (Boolean.TRUE.equals(notificationForSAC)) {
-            return true;
-        }
-
-        Boolean notificationForSac = doc.getBoolean("notificationForSac");
-
-        if (Boolean.TRUE.equals(notificationForSac)) {
-            return true;
-        }
-
-        String notificationTarget = getStringValue(doc, "notificationTarget");
-
-        if ("SAC".equalsIgnoreCase(notificationTarget)) {
-            return true;
-        }
-
-        String workflowStage = getStringValue(doc, "workflowStage");
-
-        if ("SAC_REVIEW".equalsIgnoreCase(workflowStage)
-                || "REJECTED_BY_SAC".equalsIgnoreCase(workflowStage)) {
-            return true;
-        }
-
-        String sacStatus = getStringValue(doc, "sacStatus");
-
-        return "Pending".equalsIgnoreCase(sacStatus)
-                || "Approved".equalsIgnoreCase(sacStatus)
-                || "Rejected".equalsIgnoreCase(sacStatus);
-    }
-
-    private boolean isStudentCenterFacility(DocumentSnapshot doc) {
-        String finalFacilityName = getStringValue(doc, "finalFacilityName");
-        String facility = getStringValue(doc, "facility");
-        String selectedFacility = getStringValue(doc, "selectedFacility");
-        String facilityName = getStringValue(doc, "facilityName");
-
-        return isStudentCenterText(finalFacilityName)
-                || isStudentCenterText(facility)
-                || isStudentCenterText(selectedFacility)
-                || isStudentCenterText(facilityName);
-    }
-
-    private boolean isStudentCenterText(String value) {
-        if (value == null) {
-            return false;
-        }
-
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-
-        return "student center".equals(normalized)
-                || normalized.contains("student center");
     }
 
     private String getDisplayStatus(DocumentSnapshot doc) {

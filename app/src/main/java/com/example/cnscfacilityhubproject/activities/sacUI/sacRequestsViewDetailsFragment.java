@@ -530,6 +530,15 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     }
 
     private void approveAndForwardRequest() {
+        new android.app.AlertDialog.Builder(requireContext())
+                .setTitle("Approve Request")
+                .setMessage("Are you sure you want to approve this Student Center request and forward it to the next office?")
+                .setPositiveButton("Yes, Approve", (dialog, which) -> executeApprove())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void executeApprove() {
         setActionButtonsEnabled(false);
 
         String remarks = getText(etSacRemarks);
@@ -540,7 +549,7 @@ public class sacRequestsViewDetailsFragment extends Fragment {
                 .addOnSuccessListener(doc -> {
                     if (!isAdded()) return;
 
-                    boolean needsITSO = getBooleanValue(doc, "needsITSO") || needsITSO(doc);
+                    boolean needsITSO = RequestDataHelper.needsITSO(doc);
                     boolean itsoApproved = "Approved".equalsIgnoreCase(getStringValue(doc, "itsoStatus"));
                     boolean canSendToGSO = !needsITSO || itsoApproved;
 
@@ -590,6 +599,7 @@ public class sacRequestsViewDetailsFragment extends Fragment {
                                     "requestorNotificationSeen", false,
                                     "requestorNotificationType", "SAC Approved",
                                     "requestorNotificationTitle", "SAC Approved Your Request",
+                                    "requestorNotificationMessage", remarks.isEmpty() ? "Your request was approved by SAC." : remarks,
                                     "notificationForRequestor", true,
                                     "notificationUpdatedAt", FieldValue.serverTimestamp(),
 
@@ -638,9 +648,24 @@ public class sacRequestsViewDetailsFragment extends Fragment {
     }
 
     private void rejectRequest() {
+        String remarks = getText(etSacRemarks);
+        if (remarks.isEmpty()) {
+            etSacRemarks.setError("Please provide a reason for rejection in the remarks.");
+            Toast.makeText(requireContext(), "Remarks/Reason for rejection is required.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new android.app.AlertDialog.Builder(requireContext())
+                .setTitle("Reject Request")
+                .setMessage("Are you sure you want to reject this request? The requestor will be notified of your remarks.")
+                .setPositiveButton("Yes, Reject", (dialog, which) -> executeReject(remarks))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void executeReject(String remarks) {
         setActionButtonsEnabled(false);
 
-        String remarks = getText(etSacRemarks);
         String finalRemarks = remarks.isEmpty() ? "Rejected by SAC." : remarks;
 
         db.collection("requests")
@@ -695,24 +720,6 @@ public class sacRequestsViewDetailsFragment extends Fragment {
                             Toast.LENGTH_SHORT
                     ).show();
                 });
-    }
-
-    private boolean needsITSO(DocumentSnapshot doc) {
-        Boolean technicalNeeded = doc.getBoolean("technicalNeeded");
-
-        return Boolean.TRUE.equals(technicalNeeded) && (
-                Boolean.TRUE.equals(doc.getBoolean("soundSystemSetup"))
-                        || Boolean.TRUE.equals(doc.getBoolean("microphones"))
-                        || Boolean.TRUE.equals(doc.getBoolean("portableSpeaker"))
-                        || Boolean.TRUE.equals(doc.getBoolean("lights"))
-                        || Boolean.TRUE.equals(doc.getBoolean("livestreamingServices"))
-                        || Boolean.TRUE.equals(doc.getBoolean("zoomHosting"))
-                        || Boolean.TRUE.equals(doc.getBoolean("gmeetHosting"))
-                        || Boolean.TRUE.equals(doc.getBoolean("webCamera"))
-                        || Boolean.TRUE.equals(doc.getBoolean("tripod"))
-                        || Boolean.TRUE.equals(doc.getBoolean("multimediaProjector"))
-                        || !getStringValue(doc, "connectors").isEmpty()
-        );
     }
 
     private void setActionButtonsEnabled(boolean enabled) {

@@ -195,7 +195,7 @@ public class sacHomeFragment extends Fragment {
                     layoutRecentRequests.removeAllViews();
 
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (!RequestDataHelper.shouldShowInRequestList(doc) || !isSACRelatedRequest(doc)) {
+                        if (!RequestDataHelper.shouldShowInRequestList(doc) || !RequestDataHelper.isSACRelevantRequest(doc)) {
                             continue;
                         }
 
@@ -247,56 +247,11 @@ public class sacHomeFragment extends Fragment {
                 .commit();
     }
 
-    private boolean isSACRelatedRequest(DocumentSnapshot doc) {
-        String facility = getFinalFacility(doc);
-
-        if (!"Student Center".equalsIgnoreCase(facility)) {
-            return false;
-        }
-
-        if (Boolean.TRUE.equals(doc.getBoolean("needsSAC"))) {
-            return true;
-        }
-
-        if (Boolean.TRUE.equals(doc.getBoolean("sendToSAC"))) {
-            return true;
-        }
-
-        String notificationTarget = getStringValue(doc, "notificationTarget");
-        if ("SAC".equalsIgnoreCase(notificationTarget)) {
-            return true;
-        }
-
-        String workflowStage = getStringValue(doc, "workflowStage");
-        if ("SAC_REVIEW".equalsIgnoreCase(workflowStage)) {
-            return true;
-        }
-
-        String sacStatus = getStringValue(doc, "sacStatus");
-        return !sacStatus.isEmpty();
-    }
-
-    private String getFinalFacility(DocumentSnapshot doc) {
-        String finalFacilityName = getStringValue(doc, "finalFacilityName");
-        if (!finalFacilityName.isEmpty()) {
-            return finalFacilityName;
-        }
-
-        String facility = getStringValue(doc, "facility");
-        String otherFacility = getStringValue(doc, "otherFacility");
-
-        if ("Others".equalsIgnoreCase(facility) && !otherFacility.isEmpty()) {
-            return otherFacility;
-        }
-
-        return facility;
-    }
-
     private String getDisplayStatus(DocumentSnapshot doc) {
         String sacStatus = getStringValue(doc, "sacStatus");
         String status = getStringValue(doc, "status");
 
-        if ("Rejected".equalsIgnoreCase(sacStatus) || "Rejected".equalsIgnoreCase(status)) {
+        if ("Rejected".equalsIgnoreCase(sacStatus) || "Rejected".equalsIgnoreCase(status) || "Returned".equalsIgnoreCase(sacStatus) || "Returned".equalsIgnoreCase(status)) {
             return "Rejected";
         }
 

@@ -547,6 +547,83 @@ public final class RequestDataHelper {
                 && !Boolean.TRUE.equals(requestorApprovedSeen);
     }
 
+    public static boolean isSACRelevantRequest(DocumentSnapshot doc) {
+        if (doc == null) return false;
+
+        // Check explicit routing fields
+        if (Boolean.TRUE.equals(doc.getBoolean("sendToSAC"))) return true;
+        if (Boolean.TRUE.equals(doc.getBoolean("notificationForSAC"))) return true;
+        if (Boolean.TRUE.equals(doc.getBoolean("notificationForSac"))) return true;
+
+        String target = safeString(doc.getString("notificationTarget"));
+        if ("SAC".equalsIgnoreCase(target)) return true;
+
+        String stage = safeString(doc.getString("workflowStage"));
+        if (stage.startsWith("SAC_") || stage.contains("_SAC_")) return true;
+
+        String sacStatus = safeString(doc.getString("sacStatus"));
+        if (!sacStatus.isEmpty()) return true;
+
+        // Check if Student Center is among requested facilities
+        List<String> facilities = getFacilityNames(doc);
+        for (String f : facilities) {
+            String lower = f.toLowerCase(Locale.ROOT);
+            if (lower.contains("student center")) return true;
+        }
+
+        return false;
+    }
+
+    public static boolean isSACPendingAction(DocumentSnapshot doc) {
+        if (!isSACRelevantRequest(doc)) return false;
+        if (!shouldShowInRequestList(doc)) return false;
+
+        String status = safeString(doc.getString("status"));
+        if (status.equalsIgnoreCase("Rejected") ||
+                status.equalsIgnoreCase("Returned") ||
+                status.equalsIgnoreCase("Cancelled") ||
+                status.equalsIgnoreCase("Completed")) {
+            return false;
+        }
+
+        String sacStatus = safeString(doc.getString("sacStatus"));
+        if (sacStatus.equalsIgnoreCase("Approved") || sacStatus.equalsIgnoreCase("Rejected")) {
+            return false;
+        }
+
+        // It is relevant, not terminal, and SAC hasn't approved/rejected yet.
+        return true;
+    }
+
+    public static boolean isSACUnseenNotification(DocumentSnapshot doc) {
+        if (!isSACRelevantRequest(doc)) return false;
+
+        Boolean sacNotificationSeen = doc.getBoolean("sacNotificationSeen");
+        Boolean sacSeen = doc.getBoolean("sacSeen");
+
+        return !Boolean.TRUE.equals(sacNotificationSeen) && !Boolean.TRUE.equals(sacSeen);
+    }
+
+    public static boolean needsITSO(DocumentSnapshot doc) {
+        if (doc == null) return false;
+
+        Boolean technicalNeeded = doc.getBoolean("technicalNeeded");
+        if (Boolean.FALSE.equals(technicalNeeded)) return false;
+
+        // If technicalNeeded is null or true, check the specific flags
+        return Boolean.TRUE.equals(doc.getBoolean("soundSystemSetup"))
+                || Boolean.TRUE.equals(doc.getBoolean("microphones"))
+                || Boolean.TRUE.equals(doc.getBoolean("portableSpeaker"))
+                || Boolean.TRUE.equals(doc.getBoolean("lights"))
+                || Boolean.TRUE.equals(doc.getBoolean("livestreamingServices"))
+                || Boolean.TRUE.equals(doc.getBoolean("zoomHosting"))
+                || Boolean.TRUE.equals(doc.getBoolean("gmeetHosting"))
+                || Boolean.TRUE.equals(doc.getBoolean("webCamera"))
+                || Boolean.TRUE.equals(doc.getBoolean("tripod"))
+                || Boolean.TRUE.equals(doc.getBoolean("multimediaProjector"))
+                || !safeString(doc.getString("connectors")).isEmpty();
+    }
+
     /** Tiny helper to avoid importing android.text.TextUtils in a util used widely. */
     public static final class TextJoin {
         public static String join(List<String> items, String separator) {
