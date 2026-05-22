@@ -121,7 +121,34 @@ public class gsoNavBarActivity extends AppCompatActivity {
                 .commit();
     }
 
-    private void setSelectedTab(Tab selectedTab) {
+    private void loadFragmentWithBackStack(Fragment fragment) {
+        getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.gso_fragment_container, fragment)
+                .addToBackStack(null)
+                .commit();
+    }
+
+    public void navigateToRequests(String filter) {
+        Bundle bundle = new Bundle();
+        bundle.putString("filter", filter);
+        gsoRequestsFragment fragment = new gsoRequestsFragment();
+        fragment.setArguments(bundle);
+        loadFragmentWithBackStack(fragment);
+        setSelectedTab(Tab.NOTIFICATION);
+    }
+
+    public void navigateToReports() {
+        loadFragmentWithBackStack(new gsoReportsFragment());
+        setSelectedTab(Tab.REPORTS);
+    }
+
+    public void navigateToUsers() {
+        loadFragmentWithBackStack(new gsoUsersFragment());
+        setSelectedTab(Tab.USERS);
+    }
+
+    public void setSelectedTab(Tab selectedTab) {
         resetTabs();
 
         int active = Color.parseColor(ACTIVE_COLOR);
@@ -189,7 +216,7 @@ public class gsoNavBarActivity extends AppCompatActivity {
         finish();
     }
 
-    private enum Tab {
+    public enum Tab {
         HOME,
         REPORTS,
         USERS,

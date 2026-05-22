@@ -54,6 +54,8 @@ public class gsoHomeFragment extends Fragment {
 
     private TextView tvPendingCount;
     private TextView tvApprovedCount;
+    private TextView tvReturnedCount;
+    private TextView tvTotalCount;
     private TextView tvUsersCount;
     private TextView tvReportsCount;
 
@@ -66,10 +68,12 @@ public class gsoHomeFragment extends Fragment {
     private MaterialButton btnGenerateReport;
 
 
-    private View gsoPendingReq;
-    private View gsoApprovedReq;
-    private View gsoUsers;
-    private View gsoReports;
+    private MaterialCardView cardPending;
+    private MaterialCardView cardApproved;
+    private MaterialCardView cardReturned;
+    private MaterialCardView cardTotal;
+    private MaterialCardView cardUsers;
+    private MaterialCardView cardReports;
 
     private LinearLayout schedsContainer;
 
@@ -116,6 +120,7 @@ public class gsoHomeFragment extends Fragment {
         listenForUsersCount();
         listenForReportsCount();
 
+        setupActions();
     }
 
     @Override
@@ -143,6 +148,8 @@ public class gsoHomeFragment extends Fragment {
 
         tvPendingCount = view.findViewById(R.id.tvPendingCount);
         tvApprovedCount = view.findViewById(R.id.tvApprovedCount);
+        tvReturnedCount = view.findViewById(R.id.tvReturnedCount);
+        tvTotalCount = view.findViewById(R.id.tvTotalCount);
         tvUsersCount = view.findViewById(R.id.tvUsersCount);
         tvReportsCount = view.findViewById(R.id.tvReportsCount);
 
@@ -154,12 +161,90 @@ public class gsoHomeFragment extends Fragment {
         btnViewRequests = view.findViewById(R.id.btnViewRequests);
         btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
 
-        gsoPendingReq = view.findViewById(R.id.gsoPendingReq);
-        gsoApprovedReq = view.findViewById(R.id.gsoApprovedReq);
-        gsoUsers = view.findViewById(R.id.gsoUsers);
-        gsoReports = view.findViewById(R.id.gsoReports);
+        cardPending = view.findViewById(R.id.cardPending);
+        cardApproved = view.findViewById(R.id.cardApproved);
+        cardReturned = view.findViewById(R.id.cardReturned);
+        cardTotal = view.findViewById(R.id.cardTotal);
+        cardUsers = view.findViewById(R.id.cardUsers);
+        cardReports = view.findViewById(R.id.cardReports);
+
+        android.util.Log.d("CNSC_GSO_Dashboard", "Dashboard cards bound to views.");
 
         schedsContainer = view.findViewById(R.id.Scheds);
+    }
+
+    private void setupActions() {
+        if (btnViewRequests != null) {
+            btnViewRequests.setOnClickListener(v -> {
+                android.util.Log.d("CNSC_GSO_Dashboard", "View Requests button clicked.");
+                if (requireActivity() instanceof gsoNavBarActivity) {
+                    ((gsoNavBarActivity) requireActivity()).navigateToRequests("All");
+                }
+            });
+        }
+
+        if (btnGenerateReport != null) {
+            btnGenerateReport.setOnClickListener(v -> {
+                android.util.Log.d("CNSC_GSO_Dashboard", "Reports button clicked.");
+                if (requireActivity() instanceof gsoNavBarActivity) {
+                    ((gsoNavBarActivity) requireActivity()).navigateToReports();
+                }
+            });
+        }
+
+        if (cardPending != null) {
+            cardPending.setOnClickListener(v -> {
+                android.util.Log.d("CNSC_GSO_Dashboard", "Pending card clicked. Opening requests filter=Pending");
+                if (requireActivity() instanceof gsoNavBarActivity) {
+                    ((gsoNavBarActivity) requireActivity()).navigateToRequests("Pending");
+                }
+            });
+        }
+
+        if (cardApproved != null) {
+            cardApproved.setOnClickListener(v -> {
+                android.util.Log.d("CNSC_GSO_Dashboard", "Approved card clicked. Opening requests filter=Approved");
+                if (requireActivity() instanceof gsoNavBarActivity) {
+                    ((gsoNavBarActivity) requireActivity()).navigateToRequests("Approved");
+                }
+            });
+        }
+
+        if (cardReturned != null) {
+            cardReturned.setOnClickListener(v -> {
+                android.util.Log.d("CNSC_GSO_Dashboard", "Returned card clicked. Opening requests filter=Returned");
+                if (requireActivity() instanceof gsoNavBarActivity) {
+                    ((gsoNavBarActivity) requireActivity()).navigateToRequests("Returned");
+                }
+            });
+        }
+
+        if (cardTotal != null) {
+            cardTotal.setOnClickListener(v -> {
+                android.util.Log.d("CNSC_GSO_Dashboard", "Total card clicked. Opening requests filter=All");
+                if (requireActivity() instanceof gsoNavBarActivity) {
+                    ((gsoNavBarActivity) requireActivity()).navigateToRequests("All");
+                }
+            });
+        }
+
+        if (cardUsers != null) {
+            cardUsers.setOnClickListener(v -> {
+                android.util.Log.d("CNSC_GSO_Dashboard", "Users card clicked. Opening Users tab.");
+                if (requireActivity() instanceof gsoNavBarActivity) {
+                    ((gsoNavBarActivity) requireActivity()).navigateToUsers();
+                }
+            });
+        }
+
+        if (cardReports != null) {
+            cardReports.setOnClickListener(v -> {
+                android.util.Log.d("CNSC_GSO_Dashboard", "Reports card clicked. Opening Reports tab.");
+                if (requireActivity() instanceof gsoNavBarActivity) {
+                    ((gsoNavBarActivity) requireActivity()).navigateToReports();
+                }
+            });
+        }
     }
 
     private void setDefaultTexts() {
@@ -168,6 +253,8 @@ public class gsoHomeFragment extends Fragment {
         if (gsoHomeWelcome != null) gsoHomeWelcome.setText("Hello,");
         if (tvPendingCount != null) tvPendingCount.setText("");
         if (tvApprovedCount != null) tvApprovedCount.setText("");
+        if (tvReturnedCount != null) tvReturnedCount.setText("");
+        if (tvTotalCount != null) tvTotalCount.setText("");
         if (tvUsersCount != null) tvUsersCount.setText("");
         if (tvReportsCount != null) tvReportsCount.setText("");
         if (tvCalendarMonth != null) tvCalendarMonth.setText("");
@@ -316,6 +403,8 @@ public class gsoHomeFragment extends Fragment {
 
                     int pendingCount = 0;
                     int approvedCount = 0;
+                    int returnedCount = 0;
+                    int totalCount = 0;
 
                     bookedDatesMap.clear();
                     schedulesByDateMap.clear();
@@ -326,14 +415,15 @@ public class gsoHomeFragment extends Fragment {
                         if (!isGSORequest(doc)) continue;
                         if (!RequestDataHelper.shouldShowInRequestList(doc)) continue;
 
+                        totalCount++;
                         String status = getDisplayStatus(doc);
 
                         if ("Pending".equalsIgnoreCase(status)) {
                             pendingCount++;
-                        }
-
-                        if ("Approved".equalsIgnoreCase(status)) {
+                        } else if ("Approved".equalsIgnoreCase(status)) {
                             approvedCount++;
+                        } else if ("Returned".equalsIgnoreCase(status)) {
+                            returnedCount++;
                         }
 
                         if (shouldShowOnCalendar(doc)) {
@@ -370,6 +460,14 @@ public class gsoHomeFragment extends Fragment {
 
                     if (tvApprovedCount != null) {
                         tvApprovedCount.setText(formatCount(approvedCount));
+                    }
+
+                    if (tvReturnedCount != null) {
+                        tvReturnedCount.setText(formatCount(returnedCount));
+                    }
+
+                    if (tvTotalCount != null) {
+                        tvTotalCount.setText(formatCount(totalCount));
                     }
 
                     renderCalendar();
