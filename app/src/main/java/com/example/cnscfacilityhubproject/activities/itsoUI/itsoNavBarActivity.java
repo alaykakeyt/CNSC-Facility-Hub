@@ -1,6 +1,6 @@
-// itsoNavBarActivity.java
 package com.example.cnscfacilityhubproject.activities.itsoUI;
 
+import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -10,15 +10,19 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
+import com.example.cnscfacilityhubproject.activities.LoginActivity;
 import com.example.cnscfacilityhubproject.utils.ItsoReminderHelper;
 import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.example.cnscfacilityhubproject.utils.RoleGuardHelper;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -26,19 +30,13 @@ import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.ArrayList;
 import java.util.List;
-import android.content.Intent;
-import android.widget.ProgressBar;
-import android.widget.Toast;
-
-import com.example.cnscfacilityhubproject.activities.LoginActivity;
-import com.google.firebase.auth.FirebaseAuth;
 
 public class itsoNavBarActivity extends AppCompatActivity {
 
-    private LinearLayout navHome, navRequest, navNotification, navProfile;
+    private LinearLayout navHome, navNotification, navProfile;
 
-    private TextView textHome, textRequest, textNotification, textProfile;
-    private ImageView iconHome, iconRequest, iconNotification, iconProfile;
+    private TextView textHome, textNotification, textProfile;
+    private ImageView iconHome, iconNotification, iconProfile;
 
     private TextView badgeNotifications;
 
@@ -69,14 +67,12 @@ public class itsoNavBarActivity extends AppCompatActivity {
         setupNavigation();
         listenForIncomingITSONotifications();
 
-        // Use RoleGuardHelper to verify role before loading fragments
         ProgressBar progressBar = findViewById(R.id.roleVerificationProgress);
         RoleGuardHelper roleGuard = new RoleGuardHelper(this, progressBar);
-        
+
         roleGuard.verifyAndProceed("ITSO", new RoleGuardHelper.OnRoleVerified() {
             @Override
             public void onSuccess() {
-                // Role verified! Now safe to load fragments
                 if (savedInstanceState == null) {
                     loadFragment(new itsoHomeFragment());
                     setSelectedTab(Tab.HOME);
@@ -85,7 +81,7 @@ public class itsoNavBarActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(String message) {
-                // Already handled by RoleGuardHelper (redirected to login)
+                // Already handled by RoleGuardHelper.
             }
         });
     }
@@ -102,17 +98,14 @@ public class itsoNavBarActivity extends AppCompatActivity {
 
     private void bindViews() {
         navHome = findViewById(R.id.itsonavHome);
-        navRequest = findViewById(R.id.itsonavRequests);
         navNotification = findViewById(R.id.itsonavNotifications);
         navProfile = findViewById(R.id.itsonavProfile);
 
         textHome = findViewById(R.id.itsotextHome);
-        textRequest = findViewById(R.id.itsotextRequests);
         textNotification = findViewById(R.id.itsotextNotifications);
         textProfile = findViewById(R.id.itsotextProfile);
 
         iconHome = findViewById(R.id.iconHome);
-        iconRequest = findViewById(R.id.iconRequests);
         iconNotification = findViewById(R.id.iconNotifications);
         iconProfile = findViewById(R.id.iconProfile);
 
@@ -136,26 +129,27 @@ public class itsoNavBarActivity extends AppCompatActivity {
     }
 
     private void setupNavigation() {
-        navHome.setOnClickListener(v -> {
-            loadFragment(new itsoHomeFragment());
-            setSelectedTab(Tab.HOME);
-        });
+        if (navHome != null) {
+            navHome.setOnClickListener(v -> {
+                loadFragment(new itsoHomeFragment());
+                setSelectedTab(Tab.HOME);
+            });
+        }
 
-        navRequest.setOnClickListener(v -> {
-            loadFragment(new itsoRequestsFragment());
-            setSelectedTab(Tab.REQUEST);
-        });
+        if (navNotification != null) {
+            navNotification.setOnClickListener(v -> {
+                clearNotificationBadgeAndMarkSeen();
+                loadFragment(new itsoNotificationFragment());
+                setSelectedTab(Tab.NOTIFICATION);
+            });
+        }
 
-        navNotification.setOnClickListener(v -> {
-            clearNotificationBadgeAndMarkSeen();
-            loadFragment(new itsoNotificationFragment());
-            setSelectedTab(Tab.NOTIFICATION);
-        });
-
-        navProfile.setOnClickListener(v -> {
-            loadFragment(new itsoProfileFragment());
-            setSelectedTab(Tab.PROFILE);
-        });
+        if (navProfile != null) {
+            navProfile.setOnClickListener(v -> {
+                loadFragment(new itsoProfileFragment());
+                setSelectedTab(Tab.PROFILE);
+            });
+        }
     }
 
     private void loadFragment(Fragment fragment) {
@@ -173,10 +167,6 @@ public class itsoNavBarActivity extends AppCompatActivity {
                 selectTab(textHome, iconHome);
                 break;
 
-            case REQUEST:
-                selectTab(textRequest, iconRequest);
-                break;
-
             case NOTIFICATION:
                 selectTab(textNotification, iconNotification);
                 break;
@@ -189,7 +179,6 @@ public class itsoNavBarActivity extends AppCompatActivity {
 
     private void resetTabs() {
         resetTab(textHome, iconHome);
-        resetTab(textRequest, iconRequest);
         resetTab(textNotification, iconNotification);
         resetTab(textProfile, iconProfile);
     }
@@ -317,7 +306,6 @@ public class itsoNavBarActivity extends AppCompatActivity {
         return value == null ? "" : String.valueOf(value).trim();
     }
 
-
     private boolean ensureUserLoggedIn() {
         if (auth.getCurrentUser() != null) {
             return true;
@@ -339,7 +327,6 @@ public class itsoNavBarActivity extends AppCompatActivity {
 
     private enum Tab {
         HOME,
-        REQUEST,
         NOTIFICATION,
         PROFILE
     }

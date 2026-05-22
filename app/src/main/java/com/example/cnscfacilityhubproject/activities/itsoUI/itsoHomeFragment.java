@@ -33,6 +33,9 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
+import java.util.Collections;
+import java.util.Comparator;
+
 public class itsoHomeFragment extends Fragment {
 
     private TextView tvGreeting, tvITSOName;
@@ -169,7 +172,7 @@ public class itsoHomeFragment extends Fragment {
         }
 
         if (itsoApprovedReq != null) {
-            itsoApprovedReq.setOnClickListener(v -> openNotificationList("Available"));
+            itsoApprovedReq.setOnClickListener(v -> openNotificationList("Approved - Available"));
         }
     }
 
@@ -227,9 +230,12 @@ public class itsoHomeFragment extends Fragment {
                         }
                     }
 
-                    todayRecentRequests.sort((doc1, doc2) ->
-                            Long.compare(getSortTime(doc2), getSortTime(doc1))
-                    );
+                    Collections.sort(todayRecentRequests, new Comparator<DocumentSnapshot>() {
+                        @Override
+                        public int compare(DocumentSnapshot doc1, DocumentSnapshot doc2) {
+                            return Long.compare(getSortTime(doc2), getSortTime(doc1));
+                        }
+                    });
 
                     if (tvPendingCount != null) tvPendingCount.setText(formatCount(pending));
                     if (tvApprovedCount != null) tvApprovedCount.setText(formatCount(approvedAvailable));
@@ -742,7 +748,6 @@ public class itsoHomeFragment extends Fragment {
         ImageView iconProfile = requireActivity().findViewById(R.id.iconProfile);
 
         TextView textHome = requireActivity().findViewById(R.id.itsotextHome);
-        TextView textRequests = requireActivity().findViewById(R.id.itsotextRequests);
         TextView textNotifications = requireActivity().findViewById(R.id.itsotextNotifications);
         TextView textProfile = requireActivity().findViewById(R.id.itsotextProfile);
 
@@ -752,7 +757,6 @@ public class itsoHomeFragment extends Fragment {
         if (iconProfile != null) iconProfile.setColorFilter(inactiveColor);
 
         if (textHome != null) textHome.setTextColor(inactiveColor);
-        if (textRequests != null) textRequests.setTextColor(inactiveColor);
         if (textNotifications != null) textNotifications.setTextColor(activeColor);
         if (textProfile != null) textProfile.setTextColor(inactiveColor);
     }

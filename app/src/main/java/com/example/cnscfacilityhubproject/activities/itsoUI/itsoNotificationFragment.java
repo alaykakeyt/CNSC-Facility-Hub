@@ -18,7 +18,6 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.cnscfacilityhubproject.R;
-import com.example.cnscfacilityhubproject.utils.ItsoReminderHelper;
 import com.example.cnscfacilityhubproject.utils.RequestDataHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -34,8 +33,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-
-
 
 public class itsoNotificationFragment extends Fragment {
 
@@ -55,8 +52,10 @@ public class itsoNotificationFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view,
-                              @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(
+            @NonNull View view,
+            @Nullable Bundle savedInstanceState
+    ) {
         super.onViewCreated(view, savedInstanceState);
 
         db = FirebaseFirestore.getInstance();
@@ -112,56 +111,53 @@ public class itsoNotificationFragment extends Fragment {
             notificationListener = null;
         }
 
-        notificationListener =
-                db.collection("requests")
-                        .addSnapshotListener((snapshot, error) -> {
-                            if (!isAdded()) return;
+        notificationListener = db.collection("requests")
+                .addSnapshotListener((snapshot, error) -> {
+                    if (!isAdded()) return;
 
-                            if (error != null || snapshot == null) {
-                                Toast.makeText(
-                                        requireContext(),
-                                        "Failed to load notifications.",
-                                        Toast.LENGTH_SHORT
-                                ).show();
+                    if (error != null || snapshot == null) {
+                        Toast.makeText(
+                                requireContext(),
+                                "Failed to load notifications.",
+                                Toast.LENGTH_SHORT
+                        ).show();
 
-                                showEmptyState();
-                                return;
-                            }
+                        showEmptyState();
+                        return;
+                    }
 
-                            List<DocumentSnapshot> docs =
-                                    new ArrayList<>(snapshot.getDocuments());
+                    List<DocumentSnapshot> docs = new ArrayList<>(snapshot.getDocuments());
 
-                            Collections.sort(docs, new Comparator<DocumentSnapshot>() {
-                                @Override
-                                public int compare(DocumentSnapshot a,
-                                                   DocumentSnapshot b) {
-                                    Timestamp timeA = getBestNotificationTimestamp(a);
-                                    Timestamp timeB = getBestNotificationTimestamp(b);
+                    Collections.sort(docs, new Comparator<DocumentSnapshot>() {
+                        @Override
+                        public int compare(DocumentSnapshot a, DocumentSnapshot b) {
+                            Timestamp timeA = getBestNotificationTimestamp(a);
+                            Timestamp timeB = getBestNotificationTimestamp(b);
 
-                                    if (timeA == null && timeB == null) return 0;
-                                    if (timeA == null) return 1;
-                                    if (timeB == null) return -1;
+                            if (timeA == null && timeB == null) return 0;
+                            if (timeA == null) return 1;
+                            if (timeB == null) return -1;
 
-                                    return timeB.compareTo(timeA);
-                                }
-                            });
+                            return timeB.compareTo(timeA);
+                        }
+                    });
 
-                            notificationList.clear();
+                    notificationList.clear();
 
-                            for (DocumentSnapshot doc : docs) {
-                                if (!RequestDataHelper.shouldShowInRequestList(doc)) {
-                                    continue;
-                                }
+                    for (DocumentSnapshot doc : docs) {
+                        if (!RequestDataHelper.shouldShowInRequestList(doc)) {
+                            continue;
+                        }
 
-                                if (!shouldShowITSONotificationCard(doc)) {
-                                    continue;
-                                }
+                        if (!shouldShowITSONotificationCard(doc)) {
+                            continue;
+                        }
 
-                                notificationList.add(doc);
-                            }
+                        notificationList.add(doc);
+                    }
 
-                            renderNotifications();
-                        });
+                    renderNotifications();
+                });
     }
 
     private void renderNotifications() {
@@ -212,11 +208,10 @@ public class itsoNotificationFragment extends Fragment {
         LinearLayout outerLayout = new LinearLayout(requireContext());
         outerLayout.setOrientation(LinearLayout.VERTICAL);
 
-        LinearLayout.LayoutParams outerParams =
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                );
+        LinearLayout.LayoutParams outerParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
         outerParams.setMargins(0, 0, 0, dp(12));
         outerLayout.setLayoutParams(outerParams);
 
@@ -226,21 +221,19 @@ public class itsoNotificationFragment extends Fragment {
         tvNotifiedDate.setTextSize(12f);
         tvNotifiedDate.setTypeface(null, android.graphics.Typeface.BOLD);
 
-        LinearLayout.LayoutParams notifiedDateParams =
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                );
+        LinearLayout.LayoutParams notifiedDateParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
         notifiedDateParams.setMargins(dp(4), 0, 0, dp(6));
         tvNotifiedDate.setLayoutParams(notifiedDateParams);
 
         MaterialCardView card = new MaterialCardView(requireContext());
 
-        LinearLayout.LayoutParams cardParams =
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                );
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
 
         card.setLayoutParams(cardParams);
         card.setCardBackgroundColor(Color.WHITE);
@@ -259,8 +252,10 @@ public class itsoNotificationFragment extends Fragment {
 
         MaterialCardView iconCard = new MaterialCardView(requireContext());
 
-        LinearLayout.LayoutParams iconCardParams =
-                new LinearLayout.LayoutParams(dp(46), dp(46));
+        LinearLayout.LayoutParams iconCardParams = new LinearLayout.LayoutParams(
+                dp(46),
+                dp(46)
+        );
 
         iconCard.setLayoutParams(iconCardParams);
         iconCard.setRadius(dp(15));
@@ -281,12 +276,11 @@ public class itsoNotificationFragment extends Fragment {
         LinearLayout titleLayout = new LinearLayout(requireContext());
         titleLayout.setOrientation(LinearLayout.VERTICAL);
 
-        LinearLayout.LayoutParams titleParams =
-                new LinearLayout.LayoutParams(
-                        0,
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        1f
-                );
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+        );
 
         titleParams.setMargins(dp(12), 0, dp(8), 0);
         titleLayout.setLayoutParams(titleParams);
@@ -332,11 +326,10 @@ public class itsoNotificationFragment extends Fragment {
         tvDescription.setTextSize(14f);
         tvDescription.setLineSpacing(2f, 1f);
 
-        LinearLayout.LayoutParams descParams =
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                );
+        LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
         descParams.setMargins(0, dp(12), 0, 0);
         tvDescription.setLayoutParams(descParams);
 
@@ -351,11 +344,10 @@ public class itsoNotificationFragment extends Fragment {
         btnViewDetails.setCornerRadius(dp(16));
         btnViewDetails.setElevation(0);
 
-        LinearLayout.LayoutParams btnParams =
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        dp(46)
-                );
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(46)
+        );
         btnParams.setMargins(0, dp(14), 0, 0);
         btnViewDetails.setLayoutParams(btnParams);
 
@@ -380,7 +372,6 @@ public class itsoNotificationFragment extends Fragment {
                     "No request found.",
                     Toast.LENGTH_SHORT
             ).show();
-
             return;
         }
 
@@ -464,15 +455,12 @@ public class itsoNotificationFragment extends Fragment {
         String itsoStatus = getStringValue(doc, "itsoStatus");
         String itsoAvailability = getStringValue(doc, "itsoAvailability");
 
-        if ("Rejected".equalsIgnoreCase(status)
-                || "Rejected".equalsIgnoreCase(itsoStatus)
-                || "Returned".equalsIgnoreCase(status)
-                || "Returned".equalsIgnoreCase(itsoStatus)) {
-            return "Rejected";
-        }
-
         if ("Not Available".equalsIgnoreCase(itsoStatus)
-                || "Not Available".equalsIgnoreCase(itsoAvailability)) {
+                || "Not Available".equalsIgnoreCase(itsoAvailability)
+                || "Rejected".equalsIgnoreCase(itsoStatus)
+                || "Returned".equalsIgnoreCase(itsoStatus)
+                || "Rejected".equalsIgnoreCase(status)
+                || "Returned".equalsIgnoreCase(status)) {
             return "Not Available";
         }
 
@@ -514,10 +502,6 @@ public class itsoNotificationFragment extends Fragment {
 
         if ("Not Available".equalsIgnoreCase(status)) {
             return "This technical support request has been marked as not available.";
-        }
-
-        if ("Rejected".equalsIgnoreCase(status)) {
-            return "This technical support request has been rejected or returned.";
         }
 
         if (!nameToShow.isEmpty()) {
@@ -627,10 +611,6 @@ public class itsoNotificationFragment extends Fragment {
             return android.R.drawable.ic_dialog_alert;
         }
 
-        if ("Rejected".equalsIgnoreCase(status)) {
-            return android.R.drawable.ic_delete;
-        }
-
         return android.R.drawable.ic_dialog_info;
     }
 
@@ -643,10 +623,6 @@ public class itsoNotificationFragment extends Fragment {
             return Color.parseColor("#F57C00");
         }
 
-        if ("Rejected".equalsIgnoreCase(status)) {
-            return Color.parseColor("#970705");
-        }
-
         return Color.parseColor("#313131");
     }
 
@@ -657,10 +633,6 @@ public class itsoNotificationFragment extends Fragment {
 
         if ("Not Available".equalsIgnoreCase(status)) {
             return Color.parseColor("#FFF3E0");
-        }
-
-        if ("Rejected".equalsIgnoreCase(status)) {
-            return Color.parseColor("#F3D9D9");
         }
 
         return Color.parseColor("#EEEEEE");
