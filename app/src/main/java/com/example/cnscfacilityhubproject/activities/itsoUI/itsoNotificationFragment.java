@@ -34,7 +34,11 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+import android.widget.Filter;
+
 public class itsoNotificationFragment extends Fragment {
+
+    private static final String KEY_SELECTED_FILTER = "selectedFilter";
 
     private AutoCompleteTextView actvNotificationFilter;
     private View layoutEmptyState;
@@ -46,6 +50,7 @@ public class itsoNotificationFragment extends Fragment {
     private final List<DocumentSnapshot> notificationList = new ArrayList<>();
 
     private String selectedFilter = "All";
+    private boolean filterAlreadyInitialized = false;
 
     public itsoNotificationFragment() {
         super(R.layout.fragment_itso_notification);
@@ -60,8 +65,19 @@ public class itsoNotificationFragment extends Fragment {
 
         db = FirebaseFirestore.getInstance();
 
-        if (getArguments() != null) {
-            selectedFilter = getArguments().getString("filter", "All");
+        if (savedInstanceState != null) {
+            selectedFilter = normalizeFilter(savedInstanceState.getString(KEY_SELECTED_FILTER, selectedFilter));
+            filterAlreadyInitialized = true;
+        } else if (!filterAlreadyInitialized) {
+            if (getArguments() != null) {
+                selectedFilter = normalizeFilter(getArguments().getString("filter", "All"));
+            } else {
+                selectedFilter = normalizeFilter(selectedFilter);
+            }
+
+            filterAlreadyInitialized = true;
+        } else {
+            selectedFilter = normalizeFilter(selectedFilter);
         }
 
         actvNotificationFilter = view.findViewById(R.id.actvNotificationFilter);
@@ -73,13 +89,19 @@ public class itsoNotificationFragment extends Fragment {
     }
 
     @Override
-    public void onDestroyView() {
-        super.onDestroyView();
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(KEY_SELECTED_FILTER, normalizeFilter(selectedFilter));
+    }
 
+    @Override
+    public void onDestroyView() {
         if (notificationListener != null) {
             notificationListener.remove();
             notificationListener = null;
         }
+
+        super.onDestroyView();
     }
 
     private void setupFilter() {
@@ -90,19 +112,23 @@ public class itsoNotificationFragment extends Fragment {
                 "Not Available"
         };
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+        ArrayAdapter<String> adapter = new NoFilterArrayAdapter(
                 requireContext(),
                 android.R.layout.simple_list_item_1,
                 filterOptions
         );
 
-        actvNotificationFilter.setAdapter(adapter);
-        actvNotificationFilter.setText(selectedFilter, false);
+        selectedFilter = normalizeFilter(selectedFilter);
 
-        actvNotificationFilter.setOnItemClickListener((parent, view, position, id) -> {
-            selectedFilter = filterOptions[position];
-            renderNotifications();
-        });
+        if (actvNotificationFilter != null) {
+            actvNotificationFilter.setAdapter(adapter);
+            actvNotificationFilter.setText(selectedFilter, false);
+
+            actvNotificationFilter.setOnItemClickListener((parent, view, position, id) -> {
+                selectedFilter = normalizeFilter(filterOptions[position]);
+                renderNotifications();
+            });
+        }
     }
 
     private void listenForITSONotifications() {
@@ -165,12 +191,24 @@ public class itsoNotificationFragment extends Fragment {
             return;
         }
 
+        selectedFilter = normalizeFilter(selectedFilter);
+
+        if (actvNotificationFilter != null) {
+            String currentText = actvNotificationFilter.getText() == null
+                    ? ""
+                    : actvNotificationFilter.getText().toString();
+
+            if (!selectedFilter.equalsIgnoreCase(currentText)) {
+                actvNotificationFilter.setText(selectedFilter, false);
+            }
+        }
+
         layoutNotificationList.removeAllViews();
 
         List<DocumentSnapshot> filtered = new ArrayList<>();
 
         for (DocumentSnapshot doc : notificationList) {
-            String status = getDisplayStatus(doc);
+            String status = normalizeFilter(getDisplayStatus(doc));
 
             if ("All".equalsIgnoreCase(selectedFilter)
                     || selectedFilter.equalsIgnoreCase(status)) {
@@ -194,7 +232,7 @@ public class itsoNotificationFragment extends Fragment {
     private View createNotificationCard(DocumentSnapshot doc) {
         String requestId = doc.getId();
 
-        String status = getDisplayStatus(doc);
+        String status = normalizeFilter(getDisplayStatus(doc));
         String purpose = getStringValue(doc, "purpose");
         String facility = getFinalFacility(doc);
 
@@ -455,21 +493,68 @@ public class itsoNotificationFragment extends Fragment {
         String itsoStatus = getStringValue(doc, "itsoStatus");
         String itsoAvailability = getStringValue(doc, "itsoAvailability");
 
-        if ("Not Available".equalsIgnoreCase(itsoStatus)
-                || "Not Available".equalsIgnoreCase(itsoAvailability)
+        if ("Not Available".equalsIgnoreCase(itsoAvailability)
+                || "Unavailable".equalsIgnoreCase(itsoAvailability)
+                || "Not Available".equalsIgnoreCase(itsoStatus)
+                || "Unavailable".equalsIgnoreCase(itsoStatus)
                 || "Rejected".equalsIgnoreCase(itsoStatus)
                 || "Returned".equalsIgnoreCase(itsoStatus)
+                || "Not Available".equalsIgnoreCase(status)
+                || "Unavailable".equalsIgnoreCase(status)
                 || "Rejected".equalsIgnoreCase(status)
                 || "Returned".equalsIgnoreCase(status)) {
             return "Not Available";
         }
 
-        if ("Available".equalsIgnoreCase(itsoStatus)
-                || "Available".equalsIgnoreCase(itsoAvailability)) {
+        if ("Available".equalsIgnoreCase(itsoAvailability)
+                || "Approved".equalsIgnoreCase(itsoAvailability)
+                || "Available".equalsIgnoreCase(itsoStatus)
+                || "Approved".equalsIgnoreCase(itsoStatus)
+                || "Approved - Available".equalsIgnoreCase(itsoStatus)
+                || "Available".equalsIgnoreCase(status)
+                || "Approved".equalsIgnoreCase(status)
+                || "Approved - Available".equalsIgnoreCase(status)) {
             return "Available";
         }
 
         return "Pending";
+    }
+
+    private String normalizeFilter(String filter) {
+        if (filter == null || filter.trim().isEmpty()) {
+            return "All";
+        }
+
+        String clean = filter.trim();
+
+        if ("Approved - Available".equalsIgnoreCase(clean)
+                || "Approved".equalsIgnoreCase(clean)) {
+            return "Available";
+        }
+
+        if ("Rejected".equalsIgnoreCase(clean)
+                || "Returned".equalsIgnoreCase(clean)
+                || "Unavailable".equalsIgnoreCase(clean)) {
+            return "Not Available";
+        }
+
+        if ("All".equalsIgnoreCase(clean)) {
+            return "All";
+        }
+
+        if ("Pending".equalsIgnoreCase(clean)) {
+            return "Pending";
+        }
+
+        if ("Available".equalsIgnoreCase(clean)) {
+            return "Available";
+        }
+
+        if ("Not Available".equalsIgnoreCase(clean)) {
+            return "Not Available";
+        }
+
+        return "All";
     }
 
     private String buildDescriptionText(DocumentSnapshot doc, String status) {
@@ -649,6 +734,10 @@ public class itsoNotificationFragment extends Fragment {
     }
 
     private String getStringValue(DocumentSnapshot doc, String field) {
+        if (doc == null || field == null) {
+            return "";
+        }
+
         Object value = doc.get(field);
 
         return value == null
