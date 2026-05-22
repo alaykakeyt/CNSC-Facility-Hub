@@ -95,34 +95,42 @@ public class FcmTokenHelper {
     /**
      * Remove (mark as inactive) the current user's FCM token.
      * Called on logout.
+     *
+     * @param onComplete Callback to run when removal is finished (successfully or not)
      */
-    public static void removeCurrentUserToken() {
+    public static void removeCurrentUserToken(Runnable onComplete) {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser == null) {
             Log.d(TAG, "Cannot remove FCM token: User not logged in");
+            if (onComplete != null) onComplete.run();
             return;
         }
+
+        String uid = currentUser.getUid();
 
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
             if (!task.isSuccessful()) {
                 Log.w(TAG, "Failed to get FCM token for removal", task.getException());
+                if (onComplete != null) onComplete.run();
                 return;
             }
 
             String token = task.getResult();
-            removeTokenForUser(currentUser.getUid(), token);
+            removeTokenForUser(uid, token, onComplete);
         });
     }
 
     /**
      * Remove (mark as inactive) FCM token for a specific user.
      *
-     * @param uid   The user's UID
-     * @param token The FCM token
+     * @param uid        The user's UID
+     * @param token      The FCM token
+     * @param onComplete Callback to run when removal is finished
      */
-    public static void removeTokenForUser(String uid, String token) {
+    public static void removeTokenForUser(String uid, String token, Runnable onComplete) {
         if (uid == null || uid.isEmpty() || token == null || token.isEmpty()) {
             Log.w(TAG, "Cannot remove FCM token: Invalid UID or token");
+            if (onComplete != null) onComplete.run();
             return;
         }
 
@@ -140,15 +148,18 @@ public class FcmTokenHelper {
                     .collection(TOKENS_COLLECTION)
                     .document(tokenHash)
                     .set(tokenData, SetOptions.merge())
-                    .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "FCM token marked inactive for user: " + uid);
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Failed to remove FCM token", e);
+                    .addOnCompleteListener(task -> {
+                        if (task.isSuccessful()) {
+                            Log.d(TAG, "FCM token marked inactive for user: " + uid);
+                        } else {
+                            Log.e(TAG, "Failed to remove FCM token", task.getException());
+                        }
+                        if (onComplete != null) onComplete.run();
                     });
 
         } catch (Exception e) {
             Log.e(TAG, "Error removing FCM token", e);
+            if (onComplete != null) onComplete.run();
         }
     }
 

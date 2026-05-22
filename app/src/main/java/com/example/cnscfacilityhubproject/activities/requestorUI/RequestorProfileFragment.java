@@ -254,23 +254,27 @@ public class RequestorProfileFragment extends Fragment {
         isLoggingOut = true;
         removeProfileListener();
 
+        // Show progress or disable logout button if needed
+        if (layoutLogout != null) layoutLogout.setEnabled(false);
+
         // Remove FCM token before logout
-        FcmTokenHelper.removeCurrentUserToken();
+        FcmTokenHelper.removeCurrentUserToken(() -> {
+            // This runs whether removal succeeded or failed
+            if (auth != null) {
+                auth.signOut();
+            }
 
-        if (auth != null) {
-            auth.signOut();
-        }
+            currentUser = null;
 
-        currentUser = null;
+            if (!isAdded()) return;
 
-        if (!isAdded()) return;
+            Toast.makeText(getContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
 
-        Toast.makeText(getContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
-
-        Intent intent = new Intent(requireActivity(), LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        requireActivity().finish();
+            Intent intent = new Intent(requireActivity(), LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            requireActivity().finish();
+        });
     }
 
     private void showProfilePhotoOptions() {
