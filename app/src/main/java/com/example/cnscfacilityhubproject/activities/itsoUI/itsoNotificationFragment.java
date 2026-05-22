@@ -31,6 +31,7 @@ import com.google.firebase.firestore.ListenerRegistration;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -104,6 +105,7 @@ public class itsoNotificationFragment extends Fragment {
                 "Not Available"
         };
 
+        // Fix: Use NoFilterArrayAdapter which now correctly initializes with a mutable list
         ArrayAdapter<String> adapter = new NoFilterArrayAdapter(
                 requireContext(),
                 android.R.layout.simple_list_item_1,
@@ -800,15 +802,17 @@ public class itsoNotificationFragment extends Fragment {
 
     private static class NoFilterArrayAdapter extends ArrayAdapter<String> {
 
-        private final String[] items;
+        private final List<String> items;
 
         public NoFilterArrayAdapter(
                 @NonNull Context context,
                 int resource,
                 @NonNull String[] objects
         ) {
-            super(context, resource, objects);
-            this.items = objects;
+            // Fix: Pass a mutable ArrayList to the super constructor.
+            // ArrayAdapter's internal list becomes unmodifiable if passed an array directly.
+            super(context, resource, new ArrayList<>(Arrays.asList(objects)));
+            this.items = new ArrayList<>(Arrays.asList(objects));
         }
 
         @NonNull
@@ -819,20 +823,19 @@ public class itsoNotificationFragment extends Fragment {
                 protected FilterResults performFiltering(CharSequence constraint) {
                     FilterResults results = new FilterResults();
                     results.values = items;
-                    results.count = items.length;
+                    results.count = items.size();
                     return results;
                 }
 
                 @Override
                 protected void publishResults(CharSequence constraint, FilterResults results) {
+                    // Fix: clear() now works because the adapter was initialized with a mutable ArrayList.
                     clear();
 
-                    if (results != null && results.values instanceof String[]) {
-                        String[] values = (String[]) results.values;
-
-                        for (String item : values) {
-                            add(item);
-                        }
+                    if (results != null && results.values instanceof List) {
+                        @SuppressWarnings("unchecked")
+                        List<String> values = (List<String>) results.values;
+                        addAll(values);
                     }
 
                     notifyDataSetChanged();
