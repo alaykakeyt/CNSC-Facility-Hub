@@ -139,41 +139,12 @@ public class RequestorNavBarActivity extends AppCompatActivity {
         navNotification.setOnClickListener(v -> {
             loadFragment(new RequestorNotificationFragment());
             setSelectedTab(Tab.NOTIFICATION);
-            markAllNotificationsAsSeen();
         });
 
         navProfile.setOnClickListener(v -> {
             loadFragment(new RequestorProfileFragment());
             setSelectedTab(Tab.PROFILE);
         });
-    }
-
-    private void markAllNotificationsAsSeen() {
-        if (auth.getCurrentUser() == null) return;
-
-        String userId = auth.getCurrentUser().getUid();
-
-        db.collection("requests")
-                .whereEqualTo("userId", userId)
-                .get()
-                .addOnSuccessListener(snapshot -> {
-                    if (snapshot == null || snapshot.isEmpty()) return;
-
-                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        if (RequestDataHelper.isRequestorNotificationUnseen(doc)) {
-                            doc.getReference().update(
-                                    "requestorSeen", true,
-                                    "requestorNotificationSeen", true,
-                                    "requestorApprovedSeen", true,
-                                    "notificationForRequestor", false,
-                                    "requestorNotificationOpenedAt", FieldValue.serverTimestamp(),
-                                    "updatedAt", FieldValue.serverTimestamp()
-                            );
-                        }
-                    }
-
-                    updateIncomingBadge(0);
-                });
     }
 
     private void loadFragment(Fragment fragment) {

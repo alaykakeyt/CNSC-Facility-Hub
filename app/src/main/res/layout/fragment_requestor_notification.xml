@@ -106,13 +106,16 @@
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/layoutNotificationList"
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvNotifications"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:animateLayoutChanges="true"
-            android:orientation="vertical" />
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            android:visibility="gone"
+            tools:listitem="@layout/item_requestor_notification"
+            tools:visibility="visible" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
