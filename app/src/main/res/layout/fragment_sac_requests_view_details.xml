@@ -22,19 +22,14 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnBack"
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/backbtn"
                 android:layout_width="46dp"
                 android:layout_height="46dp"
+                android:background="@drawable/backbtn"
                 android:contentDescription="Back"
-                android:text="‹"
-                android:textColor="#313131"
-                android:textSize="28sp"
-                app:backgroundTint="#FFFFFF"
-                app:cornerRadius="18dp"
-                app:elevation="0dp"
-                app:strokeColor="#313131"
-                app:strokeWidth="1dp" />
+                android:padding="11dp"
+                app:tint="#313131" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -51,14 +46,6 @@
                     android:textSize="26sp"
                     android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:alpha="0.72"
-                    android:text="Review Student Center booking request"
-                    android:textColor="#313131"
-                    android:textSize="13sp" />
             </LinearLayout>
         </LinearLayout>
 

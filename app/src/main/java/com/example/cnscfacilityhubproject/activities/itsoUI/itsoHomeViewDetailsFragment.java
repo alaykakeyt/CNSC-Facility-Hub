@@ -4,9 +4,13 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.StyleSpan;
 import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,6 +20,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.AppCompatImageView;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
@@ -46,6 +51,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     private String requestId = "";
     private ListenerRegistration requestListener;
 
+    private AppCompatImageView backbtn;
     private MaterialButton btnAvailable;
     private MaterialButton btnNotAvailable;
 
@@ -116,6 +122,8 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     }
 
     private void bindViews(View view) {
+        backbtn = view.findViewById(R.id.backbtn);
+
         btnAvailable = view.findViewById(R.id.btnAvailable);
         btnNotAvailable = view.findViewById(R.id.btnNotAvailable);
 
@@ -139,6 +147,10 @@ public class itsoHomeViewDetailsFragment extends Fragment {
     }
 
     private void setupButtons() {
+        if (backbtn != null) {
+            backbtn.setOnClickListener(v -> goBack());
+        }
+
         if (btnAvailable != null) {
             btnAvailable.setOnClickListener(v ->
                     markTechnicalStatusAndRoute("Approved", "Available")
@@ -160,17 +172,31 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         setLabeledText(tvSchedule, "Schedule:\n", "");
         setLabeledText(tvFacility, "Facilities: ", "");
 
-        tvRequestorInfo.setText(
-                labelValue("Name: ", "") +
-                        "\n" + labelValue("Contact: ", "") +
-                        "\n" + labelValue("College / Department: ", "") +
-                        "\n" + labelValue("Office / Course: ", "")
-        );
+        tvRequestorInfo.setText(buildLabelLines(
+                new String[]{
+                        "Name: ",
+                        "Contact: ",
+                        "College / Department: ",
+                        "Office / Course: "
+                },
+                new String[]{
+                        "",
+                        "",
+                        "",
+                        ""
+                }
+        ));
 
-        tvParticipants.setText(
-                labelValue("Participants: ", "") +
-                        "\n" + labelValue("Number of Participants: ", "")
-        );
+        tvParticipants.setText(buildLabelLines(
+                new String[]{
+                        "Participants: ",
+                        "Number of Participants: "
+                },
+                new String[]{
+                        "",
+                        ""
+                }
+        ));
 
         setLabeledText(tvPurposeFull, "Purpose: ", "");
         tvAmenities.setText(buildEmptyAmenitiesText());
@@ -248,17 +274,31 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         setLabeledText(tvSchedule, "Schedule:\n", scheduleDisplay);
         setLabeledText(tvFacility, "Facilities: ", facilitiesDisplay);
 
-        tvRequestorInfo.setText(
-                labelValue("Name: ", requestorName) +
-                        "\n" + labelValue("Contact: ", contactNumber) +
-                        "\n" + labelValue("College / Department: ", department) +
-                        "\n" + labelValue("Office / Course: ", course)
-        );
+        tvRequestorInfo.setText(buildLabelLines(
+                new String[]{
+                        "Name: ",
+                        "Contact: ",
+                        "College / Department: ",
+                        "Office / Course: "
+                },
+                new String[]{
+                        requestorName,
+                        contactNumber,
+                        department,
+                        course
+                }
+        ));
 
-        tvParticipants.setText(
-                labelValue("Participants: ", participants) +
-                        "\n" + labelValue("Number of Participants: ", numberOfParticipants)
-        );
+        tvParticipants.setText(buildLabelLines(
+                new String[]{
+                        "Participants: ",
+                        "Number of Participants: "
+                },
+                new String[]{
+                        participants,
+                        numberOfParticipants
+                }
+        ));
 
         setLabeledText(tvPurposeFull, "Purpose: ", purpose);
         tvAmenities.setText(buildAmenities(doc));
@@ -310,19 +350,6 @@ public class itsoHomeViewDetailsFragment extends Fragment {
                 || "ITSO".equalsIgnoreCase(notificationTarget)
                 || "ITSO_REVIEW".equalsIgnoreCase(workflowStage)
                 || "Pending".equalsIgnoreCase(itsoStatus);
-    }
-
-    private boolean isMarkedAvailable(DocumentSnapshot doc, String displayStatus) {
-        String itsoAvailability = getStringValue(doc, "itsoAvailability");
-        String itsoStatus = getStringValue(doc, "itsoStatus");
-        String status = getStringValue(doc, "status");
-
-        return "Available".equalsIgnoreCase(itsoAvailability)
-                || "Approved".equalsIgnoreCase(itsoStatus)
-                || "Available".equalsIgnoreCase(itsoStatus)
-                || "Approved - Available".equalsIgnoreCase(status)
-                || "Approved - Available".equalsIgnoreCase(displayStatus)
-                || "Available".equalsIgnoreCase(displayStatus);
     }
 
     private void setItsoRemarksEditable(boolean editable) {
@@ -415,7 +442,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
         if (proposalFiles.isEmpty()) {
             if (tvProposalFile != null) {
-                tvProposalFile.setText("Proposal / Supporting Files: ");
+                tvProposalFile.setText(labelValue("Proposal / Supporting Files: ", ""));
                 tvProposalFile.setTextColor(Color.parseColor("#313131"));
             }
             return;
@@ -432,10 +459,10 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
         if (tvProposalFile != null) {
             if (hasLocalContentUri) {
-                tvProposalFile.setText("Proposal / Supporting Files: Local device URI detected");
+                tvProposalFile.setText(labelValue("Proposal / Supporting Files: ", "Local device URI detected"));
                 tvProposalFile.setTextColor(Color.RED);
             } else {
-                tvProposalFile.setText("Proposal / Supporting Files: " + proposalFiles.size() + " file(s)");
+                tvProposalFile.setText(labelValue("Proposal / Supporting Files: ", proposalFiles.size() + " file(s)"));
                 tvProposalFile.setTextColor(Color.parseColor("#313131"));
             }
         }
@@ -731,10 +758,7 @@ public class itsoHomeViewDetailsFragment extends Fragment {
                                 }
 
                                 setActionButtonsEnabled(false);
-
-                                if (markedAvailable) {
-                                    setItsoRemarksEditable(false);
-                                }
+                                setItsoRemarksEditable(false);
 
                                 Toast.makeText(
                                         requireContext(),
@@ -805,13 +829,22 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         return "";
     }
 
-    private String buildEmptyAmenitiesText() {
-        return labelValue("Tables: ", "") +
-                "\n" + labelValue("Chairs: ", "") +
-                "\n" + labelValue("Other Amenities: ", "");
+    private CharSequence buildEmptyAmenitiesText() {
+        return buildLabelLines(
+                new String[]{
+                        "Tables: ",
+                        "Chairs: ",
+                        "Other Amenities: "
+                },
+                new String[]{
+                        "",
+                        "",
+                        ""
+                }
+        );
     }
 
-    private String buildAmenities(DocumentSnapshot doc) {
+    private CharSequence buildAmenities(DocumentSnapshot doc) {
         Boolean tablesRequested = getNullableBooleanValue(doc, "tablesRequested");
         Boolean chairsRequested = getNullableBooleanValue(doc, "chairsRequested");
 
@@ -835,9 +868,18 @@ public class itsoHomeViewDetailsFragment extends Fragment {
                     : "Not requested";
         }
 
-        return labelValue("Tables: ", tablesValue) +
-                "\n" + labelValue("Chairs: ", chairsValue) +
-                "\n" + labelValue("Other Amenities: ", otherAmenities);
+        return buildLabelLines(
+                new String[]{
+                        "Tables: ",
+                        "Chairs: ",
+                        "Other Amenities: "
+                },
+                new String[]{
+                        tablesValue,
+                        chairsValue,
+                        otherAmenities
+                }
+        );
     }
 
     private String buildTechnicalList(DocumentSnapshot doc) {
@@ -918,8 +960,44 @@ public class itsoHomeViewDetailsFragment extends Fragment {
         textView.setText(labelValue(label, value));
     }
 
-    private String labelValue(String label, String value) {
-        return label + cleanDisplayValue(value);
+    private CharSequence labelValue(String label, String value) {
+        SpannableStringBuilder builder = new SpannableStringBuilder();
+
+        int start = builder.length();
+        builder.append(label);
+        builder.setSpan(
+                new StyleSpan(Typeface.BOLD),
+                start,
+                builder.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        );
+
+        builder.append(cleanDisplayValue(value));
+        return builder;
+    }
+
+    private SpannableStringBuilder buildLabelLines(String[] labels, String[] values) {
+        SpannableStringBuilder builder = new SpannableStringBuilder();
+
+        for (int i = 0; i < labels.length; i++) {
+            if (i > 0) {
+                builder.append("\n");
+            }
+
+            int start = builder.length();
+            builder.append(labels[i]);
+            builder.setSpan(
+                    new StyleSpan(Typeface.BOLD),
+                    start,
+                    builder.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            );
+
+            String value = i < values.length ? values[i] : "";
+            builder.append(cleanDisplayValue(value));
+        }
+
+        return builder;
     }
 
     private void setChipText(Chip chip, String value) {
@@ -1157,7 +1235,10 @@ public class itsoHomeViewDetailsFragment extends Fragment {
 
         if (requireActivity() instanceof itsoNavBarActivity) {
             ((itsoNavBarActivity) requireActivity()).openHomeTab();
+            return;
         }
+
+        requireActivity().finish();
     }
 
     private static class DisplayProposalFile {

@@ -22,21 +22,23 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <LinearLayout
-                android:layout_width="0dp"
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/backbtn"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:background="@drawable/backbtn"
+                android:contentDescription="Back"
+                android:padding="11dp"
+                app:tint="#313131" />
+
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="View Request"
-                    android:textColor="#313131"
-                    android:textSize="26sp"
-                    android:textStyle="bold" />
-
-            </LinearLayout>
+                android:layout_marginStart="10dp"
+                android:text="Request Details"
+                android:textColor="#313131"
+                android:textSize="26sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <com.google.android.material.card.MaterialCardView
@@ -109,10 +111,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="5dp"
-                    android:text="Facility: —"
+                    android:text="Facilities: —"
                     android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textSize="14sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -139,6 +140,12 @@
                     android:textColor="#313131"
                     android:textSize="18sp"
                     android:textStyle="bold" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:background="#E6E1D2" />
 
                 <TextView
                     android:id="@+id/tvRequestorInfo"
@@ -175,6 +182,12 @@
                     android:textColor="#313131"
                     android:textSize="18sp"
                     android:textStyle="bold" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:background="#E6E1D2" />
 
                 <TextView
                     android:id="@+id/tvParticipants"
@@ -222,13 +235,19 @@
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:background="#E6E1D2" />
+
                 <TextView
                     android:id="@+id/tvAmenities"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:lineSpacingExtra="4dp"
-                    android:text="Amenities: —"
+                    android:text="Tables: —"
                     android:textColor="#313131"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -257,6 +276,12 @@
                     android:textColor="#313131"
                     android:textSize="18sp"
                     android:textStyle="bold" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:background="#E6E1D2" />
 
                 <TextView
                     android:id="@+id/tvTechnicalList"
@@ -298,10 +323,16 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="File and Route"
+                    android:text="Proposal"
                     android:textColor="#313131"
                     android:textSize="18sp"
                     android:textStyle="bold" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:background="#E6E1D2" />
 
                 <TextView
                     android:id="@+id/tvProposalFile"
@@ -312,21 +343,53 @@
                     android:textColor="#313131"
                     android:textSize="14sp" />
 
-                <TextView
-                    android:id="@+id/tvRoute"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Route: —"
-                    android:textColor="#313131"
-                    android:textSize="14sp" />
-
                 <LinearLayout
                     android:id="@+id/layoutProposalFiles"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:orientation="vertical" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="#FFFFFF"
+            app:cardCornerRadius="26dp"
+            app:cardElevation="7dp"
+            app:strokeColor="#313131"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Route Information"
+                    android:textColor="#313131"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:background="#E6E1D2" />
+
+                <TextView
+                    android:id="@+id/tvRoute"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Route: —"
+                    android:textColor="#313131"
+                    android:textSize="14sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -358,13 +421,14 @@
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etItsoRemarks"
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
+                    android:layout_height="80dp"
                     android:layout_marginTop="10dp"
                     android:backgroundTint="#970705"
                     android:gravity="top|start"
                     android:hint="Enter remarks here..."
                     android:inputType="textMultiLine|textCapSentences"
                     android:lineSpacingExtra="4dp"
+                    android:minLines="3"
                     android:padding="10dp"
                     android:textColor="#313131"
                     android:textColorHint="#7A7A7A"

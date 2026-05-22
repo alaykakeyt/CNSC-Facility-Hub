@@ -4,9 +4,13 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.StyleSpan;
 import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
@@ -36,15 +40,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import java.util.ArrayList;
-import java.util.List;
-import android.text.TextUtils;
-
-import android.graphics.Typeface;
-import android.text.SpannableString;
-import android.text.Spanned;
-import android.text.style.StyleSpan;
-
 public class RequestorRequestDetailsFragment extends Fragment {
 
     private static final String ARG_REQUEST_ID = "requestId";
@@ -60,6 +55,8 @@ public class RequestorRequestDetailsFragment extends Fragment {
 
     private final List<FirestoreProposalFile> proposalFilesToOpen = new ArrayList<>();
 
+    private View backbtn;
+
     private TextView tvDetailPurpose;
     private TextView tvDetailActivityType;
     private Chip chipDetailStatus;
@@ -74,7 +71,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
     private TextView tvDetailDateRange;
     private TextView tvDetailTimeRange;
     private TextView tvDetailFacility;
-
 
     private TextView tvDetailPurposeFull;
 
@@ -131,6 +127,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         }
 
         bindViews(view);
+        setupClickListeners();
         clearDynamicFields();
         applyDetailsVisibilityMode();
 
@@ -144,6 +141,8 @@ public class RequestorRequestDetailsFragment extends Fragment {
     }
 
     private void bindViews(View view) {
+        backbtn = view.findViewById(R.id.backbtn);
+
         cardRequestorInformation = view.findViewById(R.id.cardRequestorInformation);
         cardProposalFiles = view.findViewById(R.id.cardProposalFiles);
 
@@ -162,7 +161,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
         tvDetailTimeRange = view.findViewById(R.id.tvDetailTimeRange);
         tvDetailFacility = view.findViewById(R.id.tvDetailFacility);
 
-
         tvDetailPurposeFull = view.findViewById(R.id.tvDetailPurposeFull);
 
         tvDetailTables = view.findViewById(R.id.tvDetailTables);
@@ -180,11 +178,17 @@ public class RequestorRequestDetailsFragment extends Fragment {
         tvDetailItsoRemarks = view.findViewById(R.id.tvDetailItsoRemarks);
         tvDetailSacRemarks = view.findViewById(R.id.tvDetailSacRemarks);
         tvDetailGsoRemarks = view.findViewById(R.id.tvDetailGsoRemarks);
+    }
 
+    private void setupClickListeners() {
+        if (backbtn != null) {
+            backbtn.setClickable(true);
+            backbtn.setFocusable(true);
+            backbtn.setOnClickListener(v -> goBack());
+        }
     }
 
     private void clearDynamicFields() {
-
         hideText(tvDetailPurpose);
         hideText(tvDetailActivityType);
 
@@ -202,12 +206,12 @@ public class RequestorRequestDetailsFragment extends Fragment {
         setLabelOnly(tvDetailOfficeCourse, "Office / Course: ");
 
         setLabelOnly(tvDetailDateRange, "Schedule:\n");
+
         if (tvDetailTimeRange != null) {
             tvDetailTimeRange.setVisibility(View.GONE);
         }
+
         setLabelOnly(tvDetailFacility, "Facilities: ");
-
-
         setLabelOnly(tvDetailPurposeFull, "Purpose: ");
 
         setLabelOnly(tvDetailTables, "Tables: ");
@@ -217,6 +221,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         if (cardTechnicalDetails != null) {
             cardTechnicalDetails.setVisibility(View.VISIBLE);
         }
+
         setLabelOnly(tvDetailNeedsTechnical, "Technical Needed: ");
         setLabelOnly(tvDetailTechnicalList, "Selected Technicals: ");
         setLabelOnly(tvDetailConnectors, "Connectors / Cables: ");
@@ -229,6 +234,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         if (cardAdminRemarks != null) {
             cardAdminRemarks.setVisibility(View.GONE);
         }
+
         hideText(tvDetailItsoRemarks);
         hideText(tvDetailSacRemarks);
         hideText(tvDetailGsoRemarks);
@@ -328,7 +334,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
                 getStringValue(doc, "course")
         );
 
-
         Boolean tablesRequested = getNullableBooleanValue(doc, "tablesRequested");
         Boolean chairsRequested = getNullableBooleanValue(doc, "chairsRequested");
         String tablesCount = getLongString(doc, "tablesCount");
@@ -374,10 +379,12 @@ public class RequestorRequestDetailsFragment extends Fragment {
         setLabeledTextOrHide(tvDetailOfficeCourse, "Office / Course: ", officeCourse);
 
         setLabeledTextOrHide(tvDetailDateRange, "Schedule:\n", scheduleDisplay);
-        tvDetailTimeRange.setVisibility(View.GONE);
+
+        if (tvDetailTimeRange != null) {
+            tvDetailTimeRange.setVisibility(View.GONE);
+        }
+
         setLabeledTextOrHide(tvDetailFacility, "Facilities: ", facilitiesDisplay);
-
-
         setLabeledTextOrHide(tvDetailPurposeFull, "Purpose: ", purpose);
 
         if (tablesRequested == null) {
@@ -441,7 +448,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
             cardAdminRemarks.setVisibility(View.VISIBLE);
         }
 
-
         setOfficeRemarksRow(
                 tvDetailSacRemarks,
                 "SAC Remarks: ",
@@ -449,6 +455,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
                 sacRemarks,
                 ""
         );
+
         setOfficeRemarksRow(
                 tvDetailItsoRemarks,
                 "ITSO Remarks: ",
@@ -481,7 +488,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
         }
 
         String cleaned = cleanDisplayValue(remarks);
-        textView.setText(label + (cleaned.isEmpty() ? emptyText : cleaned));
+        textView.setText(makeBoldLabel(label, cleaned.isEmpty() ? emptyText : cleaned));
         textView.setVisibility(View.VISIBLE);
     }
 
@@ -525,7 +532,8 @@ public class RequestorRequestDetailsFragment extends Fragment {
         if (cleaned.isEmpty()) return false;
 
         String normalized = cleaned.replaceAll("[^a-z0-9]+", " ").trim();
-        return normalized.contains("student center") || cleaned.replace(" ", "").contains("studentcenter");
+        return normalized.contains("student center")
+                || cleaned.replace(" ", "").contains("studentcenter");
     }
 
     private String getItsoRemarks(DocumentSnapshot doc) {
@@ -563,11 +571,24 @@ public class RequestorRequestDetailsFragment extends Fragment {
     private String yesNo(boolean value) {
         return value ? "Yes" : "No";
     }
+
     private void setLabeledTextOrHide(TextView textView, String label, String value) {
         if (textView == null) return;
 
         String cleaned = cleanDisplayValue(value);
-        String fullText = label + cleaned;
+        textView.setText(makeBoldLabel(label, cleaned));
+        textView.setVisibility(View.VISIBLE);
+    }
+
+    private void setLabelOnly(TextView textView, String label) {
+        if (textView == null) return;
+
+        textView.setText(makeBoldLabel(label, ""));
+        textView.setVisibility(View.VISIBLE);
+    }
+
+    private SpannableString makeBoldLabel(String label, String value) {
+        String fullText = label + cleanDisplayValue(value);
 
         SpannableString spannableString = new SpannableString(fullText);
         spannableString.setSpan(
@@ -577,35 +598,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
         );
 
-        textView.setText(spannableString);
-        textView.setVisibility(View.VISIBLE);
-    }
-
-    private void setLabelOnly(TextView textView, String label) {
-        if (textView == null) return;
-
-        SpannableString spannableString = new SpannableString(label);
-        spannableString.setSpan(
-                new StyleSpan(Typeface.BOLD),
-                0,
-                label.length(),
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-        );
-
-        textView.setText(spannableString);
-        textView.setVisibility(View.VISIBLE);
-    }
-
-    private String buildBooleanCountValue(Boolean requested, String count) {
-        if (requested == null) {
-            return "";
-        }
-
-        if (hasDisplayValue(count)) {
-            return count;
-        }
-
-        return String.valueOf(requested);
+        return spannableString;
     }
 
     private String getTechnicalRequirementsFromFirestore(DocumentSnapshot doc) {
@@ -1013,7 +1006,7 @@ public class RequestorRequestDetailsFragment extends Fragment {
                 ? requestId
                 : originalName.trim();
 
-        if (name == null || name.trim().isEmpty()) {
+        if (name.trim().isEmpty()) {
             name = String.valueOf(System.currentTimeMillis());
         }
 
@@ -1164,23 +1157,6 @@ public class RequestorRequestDetailsFragment extends Fragment {
                     ColorStateList.valueOf(Color.parseColor("#EEEEEE"))
             );
         }
-    }
-
-    private String getRemarks(DocumentSnapshot doc) {
-        String remarks = getStringValue(doc, "remarks");
-        if (!remarks.isEmpty()) return remarks;
-
-        remarks = getStringValue(doc, "returnReason");
-        if (!remarks.isEmpty()) return remarks;
-
-        remarks = getStringValue(doc, "adminRemarks");
-        if (!remarks.isEmpty()) return remarks;
-
-        remarks = getStringValue(doc, "gsoRemarks");
-        if (!remarks.isEmpty()) return remarks;
-
-        remarks = getStringValue(doc, "itsoRemarks");
-        return remarks;
     }
 
     private String getStringValue(DocumentSnapshot doc, String field) {
@@ -1370,9 +1346,12 @@ public class RequestorRequestDetailsFragment extends Fragment {
     private void goBack() {
         if (!isAdded()) return;
 
-        requireActivity()
-                .getSupportFragmentManager()
-                .popBackStack();
+        if (requireActivity().getSupportFragmentManager().getBackStackEntryCount() > 0) {
+            requireActivity().getSupportFragmentManager().popBackStack();
+            return;
+        }
+
+        requireActivity().finish();
     }
 
     private static class FirestoreProposalFile {
