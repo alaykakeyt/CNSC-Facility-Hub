@@ -267,42 +267,9 @@
                 android:padding="18dp">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Participants and Purpose"
-                    android:textColor="#313131"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="12dp"
-                    android:background="#E6E1D2" />
-
-                <TextView
-                    android:id="@+id/tvDetailParticipants"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:textColor="#313131"
-                    android:textSize="14sp"
-                    tools:text="Participants: —" />
-
-                <TextView
-                    android:id="@+id/tvDetailNumberOfParticipants"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:textColor="#313131"
-                    android:textSize="14sp"
-                    tools:text="Number of Participants: —" />
-
-                <TextView
                     android:id="@+id/tvDetailPurposeFull"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
                     android:lineSpacingExtra="3dp"
                     android:textColor="#313131"
                     android:textSize="14sp"
