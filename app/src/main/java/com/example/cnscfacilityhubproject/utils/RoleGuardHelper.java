@@ -56,7 +56,7 @@ public class RoleGuardHelper {
         // Step 1: Check if user is logged in
         FirebaseUser currentUser = auth.getCurrentUser();
         if (currentUser == null) {
-            handleVerificationFailure("Please log in first.", callback);
+            handleVerificationFailure("Please log in first.", false, callback);
             return;
         }
 
@@ -72,9 +72,9 @@ public class RoleGuardHelper {
 
                     // Check if profile exists
                     if (!documentSnapshot.exists()) {
-                        auth.signOut();
                         handleVerificationFailure(
                                 "User profile not found. Please contact the administrator.",
+                                true, // Should sign out if profile missing
                                 callback
                         );
                         return;
@@ -83,9 +83,9 @@ public class RoleGuardHelper {
                     // Check if role matches expected role
                     String userType = documentSnapshot.getString("userType");
                     if (userType == null || !expectedRole.equalsIgnoreCase(userType.trim())) {
-                        auth.signOut();
                         handleVerificationFailure(
                                 "Access denied. Please log in with a " + expectedRole + " account.",
+                                true, // Should sign out on role mismatch
                                 callback
                         );
                         return;
@@ -102,15 +102,17 @@ public class RoleGuardHelper {
 
                     // Handle error (network, permission denied, etc.)
                     String message = "Unable to verify user role: " + e.getMessage();
-                    handleVerificationFailure(message, callback);
+                    handleVerificationFailure(message, false, callback); // Don't sign out on network failure
                 });
     }
 
     /**
      * Handle verification failure by signing out and redirecting to login
      */
-    private void handleVerificationFailure(String message, OnRoleVerified callback) {
-        auth.signOut();
+    private void handleVerificationFailure(String message, boolean shouldSignOut, OnRoleVerified callback) {
+        if (shouldSignOut) {
+            auth.signOut();
+        }
         Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
         callback.onFailure(message);
 

@@ -2,9 +2,11 @@ package com.example.cnscfacilityhubproject.activities;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -39,7 +41,7 @@ import java.util.Locale;
 
 public class LoginActivity extends AppCompatActivity {
 
-
+    private static final String TAG = "CNSC_AuthSession";
 
     private void loadBookingData(){
         FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -82,6 +84,7 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "LoginActivity opened");
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_login);
 
@@ -91,9 +94,10 @@ public class LoginActivity extends AppCompatActivity {
         FirebaseAuth auth = FirebaseAuth.getInstance();
         FirebaseFirestore db = FirebaseFirestore.getInstance();
 
-
-
-
+        if (auth.getCurrentUser() != null) {
+            Log.d(TAG, "Existing session detected for UID: " + auth.getCurrentUser().getUid());
+            checkExistingSessionAndRoute(auth, db);
+        }
 
         EditText email = findViewById(R.id.etCampusId);
         EditText password = findViewById(R.id.etPassword);
@@ -194,6 +198,62 @@ public class LoginActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+    }
+
+    private void checkExistingSessionAndRoute(FirebaseAuth auth, FirebaseFirestore db) {
+        FirebaseUser currentUser = auth.getCurrentUser();
+        if (currentUser == null) return;
+
+        // Disable login form while checking
+        setLoginFormEnabled(false);
+        ProgressBar pb = findViewById(R.id.pbSessionCheck);
+        if (pb != null) pb.setVisibility(View.VISIBLE);
+
+        db.collection("users")
+                .document(currentUser.getUid())
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (!documentSnapshot.exists()) {
+                        Log.w(TAG, "User profile not found in Firestore for UID: " + currentUser.getUid());
+                        setLoginFormEnabled(true);
+                        if (pb != null) pb.setVisibility(View.GONE);
+                        return;
+                    }
+
+                    String userType = documentSnapshot.getString("userType");
+                    if (userType == null || userType.trim().isEmpty()) {
+                        Log.w(TAG, "User role is missing for UID: " + currentUser.getUid());
+                        setLoginFormEnabled(true);
+                        if (pb != null) pb.setVisibility(View.GONE);
+                        return;
+                    }
+
+                    Log.d(TAG, "Auto-routing user with role: " + userType);
+                    routeUserByRole(userType.trim().toLowerCase(Locale.ROOT), auth);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load user profile during session check", e);
+                    setLoginFormEnabled(true);
+                    if (pb != null) pb.setVisibility(View.GONE);
+                    Toast.makeText(this, "Unable to verify session. Please check your connection.", Toast.LENGTH_LONG).show();
+                });
+    }
+
+    private void setLoginFormEnabled(boolean enabled) {
+        Button loginBtn = findViewById(R.id.btnLogin);
+        EditText email = findViewById(R.id.etCampusId);
+        EditText password = findViewById(R.id.etPassword);
+        TextView signUpTxt = findViewById(R.id.tvSignUp);
+
+        if (loginBtn != null) loginBtn.setEnabled(enabled);
+        if (email != null) email.setEnabled(enabled);
+        if (password != null) password.setEnabled(enabled);
+        if (signUpTxt != null) signUpTxt.setEnabled(enabled);
+        
+        // Optionally update text to show loading state
+        if (loginBtn != null) {
+            loginBtn.setText(enabled ? "Log In" : "Checking session...");
+        }
     }
 
     private void routeUserByRole(String userType, FirebaseAuth auth) {
